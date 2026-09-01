@@ -7,8 +7,17 @@
       * { box-sizing: border-box; }
       html.tab-mode { background: #141414; height: 100%; }
       body.tab-mode {
-        width: min(720px, 94vw);
-        margin: 8vh auto 0;
+        width: auto;
+        background: #141414;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        padding: 8vh 16px 24px;
+        min-height: 100%;
+      }
+      .panel { background: #1a1a1c; }
+      .tab-mode .panel {
+        width: min(720px, 100%);
         border: 1px solid #ffffff14;
         border-radius: 16px;
         overflow: hidden;
@@ -106,11 +115,13 @@
     </style>
   </head>
   <body>
+    <div class="panel">
     <div class="input-row">
       <input id="input" class="input" autofocus placeholder="Search bookmarks and commands…" spellcheck="false" autocomplete="off" />
       <div class="hint"><span class="kbd">&gt; Commands</span><span class="kbd">@ Tabs</span><span class="kbd"># History</span><span class="kbd">: Emoji</span><span class="kbd">~ Files</span><button id="gear" title="SuperChrome Settings"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="currentColor"/><path d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2" stroke="currentColor" stroke-linecap="round"/></svg></button></div>
     </div>
     <div id="list" class="list"></div>
+    </div>
     <script type="module" src="/src/popup.ts"></script>
   </body>
 </html>
