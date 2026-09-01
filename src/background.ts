@@ -191,7 +191,7 @@ async function queryPalette(
   // Browsing inside one folder: its direct children, subfolders included.
   if (mode === 'bookmarks' && folderId) {
     const children = await chrome.bookmarks.getChildren(folderId)
-    return rank(
+    return rank<PaletteItem>(
       children.map((c) =>
         c.url
           ? {
@@ -315,7 +315,7 @@ async function queryPalette(
       usageKey: `folder:${f.id}`,
     }
   })
-  return rank([...bookmarkEntries, ...folderEntries], query, usage).slice(0, 50)
+  return rank<PaletteItem>([...bookmarkEntries, ...folderEntries], query, usage).slice(0, 50)
 }
 
 function collectBookmarks(
