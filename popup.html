@@ -46,11 +46,11 @@
       }
       .item .icon img { width: 18px; height: 18px; border-radius: 4px; }
       .item .icon.plain { background: transparent; }
-      .item .icon.kind-command { background: #4c9df3; color: #ffffff; }
-      .item .icon.kind-folder { background: #e0a63c; color: #ffffff; }
-      .item .icon.kind-history { background: #9a6ee8; color: #ffffff; }
+      .item .icon.kind-command { background: var(--sc-command, #4c9df3); color: #ffffff; }
+      .item .icon.kind-folder { background: var(--sc-folder, #e0a63c); color: #ffffff; }
+      .item .icon.kind-history { background: var(--sc-history, #9a6ee8); color: #ffffff; }
       .item .icon.kind-bookmark, .item .icon.kind-tab, .item .icon.kind-closed {
-        background: #e05d5d; color: #ffffff;
+        background: var(--sc-fallback, #e05d5d); color: #ffffff;
       }
       .item .title {
         overflow: hidden; text-overflow: ellipsis;

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SuperChrome Settings</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; }
+      body {
+        background: #141414;
+        color: #ccccccdd;
+        font: 14px -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        display: flex;
+        justify-content: center;
+        padding: 48px 24px;
+      }
+      .page { width: min(560px, 100%); }
+      .header { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+      .header img { width: 40px; height: 40px; }
+      .header h1 { font-size: 20px; font-weight: 700; color: #e8e8e8; margin: 0; }
+      .card {
+        background: #1c1c1e;
+        border: 1px solid #2a2a2a;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 16px;
+      }
+      .card h2 {
+        font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;
+        color: #969696; margin: 0 0 14px;
+      }
+      .row {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 16px; min-height: 34px;
+      }
+      .row + .row { margin-top: 10px; }
+      .row label { color: #e0e0e0; }
+      .row .hint { display: block; font-size: 12px; color: #cccccc66; margin-top: 2px; }
+      input[type='range'] { width: 200px; accent-color: #4c9df3; }
+      input[type='color'] {
+        width: 44px; height: 28px; padding: 2px;
+        background: #2a2a2a; border: 1px solid #3c3c3c; border-radius: 6px; cursor: pointer;
+      }
+      input[type='number'], select {
+        background: #2a2a2a55; border: 1px solid #3c3c3c; border-radius: 6px;
+        color: #e0e0e0; font: inherit; padding: 5px 8px; outline: none;
+      }
+      input[type='number'] { width: 80px; }
+      input:focus, select:focus, textarea:focus { border-color: #30373a; }
+      textarea {
+        width: 100%; min-height: 90px; resize: vertical;
+        background: #2a2a2a55; border: 1px solid #3c3c3c; border-radius: 6px;
+        color: #e0e0e0; font: 13px ui-monospace, Menlo, monospace; padding: 8px; outline: none;
+      }
+      .value { color: #cccccc99; font-size: 13px; min-width: 36px; text-align: right; }
+      .footer-row { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+      button {
+        background: none; border: 1px solid #3c3c3c; border-radius: 6px;
+        color: #e0e0e0; font: inherit; padding: 6px 14px; cursor: pointer;
+      }
+      button:hover { background: #ffffff10; }
+      #status { color: #7bc97b; font-size: 13px; opacity: 0; transition: opacity 0.2s; }
+      #status.show { opacity: 1; }
+      .swatch-row { display: flex; gap: 18px; flex-wrap: wrap; }
+      .swatch { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+      .swatch span { font-size: 12px; color: #cccccc99; }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="header">
+        <img src="/icons/icon128.png" alt="" />
+        <h1>SuperChrome Settings</h1>
+      </div>
+
+      <div class="card">
+        <h2>Appearance</h2>
+        <div class="row">
+          <label>Glass opacity<span class="hint">Lower = more page shows through the palette</span></label>
+          <span style="display:flex;align-items:center;gap:10px">
+            <input id="opacity" type="range" min="0.4" max="1" step="0.05" />
+            <span class="value" id="opacity-value"></span>
+          </span>
+        </div>
+        <div class="row" style="align-items:flex-start">
+          <label>Icon colors<span class="hint">Tiles for non-favicon results</span></label>
+          <div class="swatch-row">
+            <span class="swatch"><input id="color-command" type="color" /><span>Command</span></span>
+            <span class="swatch"><input id="color-folder" type="color" /><span>Folder</span></span>
+            <span class="swatch"><input id="color-history" type="color" /><span>History</span></span>
+            <span class="swatch"><input id="color-fallback" type="color" /><span>Fallback</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Behavior</h2>
+        <div class="row">
+          <label>Default mode<span class="hint">What quick-open and the popup show first</span></label>
+          <select id="default-mode">
+            <option value="bookmarks">Bookmarks</option>
+            <option value="commands">Commands</option>
+            <option value="tabs">Tabs</option>
+            <option value="history">History</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Frecency decay<span class="hint">Days for usage ranking to fade by ~63%</span></label>
+          <span style="display:flex;align-items:center;gap:8px">
+            <input id="decay" type="number" min="1" max="90" /> <span class="value">days</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Disabled sites</h2>
+        <div class="row" style="align-items:flex-start; flex-direction:column">
+          <label style="margin-bottom:8px">The overlay won't open on these hosts (the popup opens instead) — one per line, subdomains included<span class="hint">e.g. figma.com</span></label>
+          <textarea id="sites" spellcheck="false" placeholder="figma.com&#10;docs.google.com"></textarea>
+        </div>
+      </div>
+
+      <div class="footer-row">
+        <button id="reset">Restore Defaults</button>
+        <span id="status">Saved</span>
+      </div>
+    </div>
+    <script type="module" src="/src/options.ts"></script>
+  </body>
+</html>

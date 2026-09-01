@@ -1,39 +1,91 @@
-async function togglePaletteIn(
-  tabId: number | undefined,
-  mode: 'bookmarks' | 'commands',
-): Promise<void> {
-  if (!tabId) return
+type PaletteMode = 'bookmarks' | 'commands' | 'tabs' | 'history'
+
+interface UserSettings {
+  glassOpacity: number
+  iconColors: { command: string; folder: string; history: string; fallback: string }
+  frecencyDecayDays: number
+  defaultMode: PaletteMode
+  disabledSites: string[]
+}
+
+const DEFAULT_SETTINGS: UserSettings = {
+  glassOpacity: 0.8,
+  iconColors: { command: '#4c9df3', folder: '#e0a63c', history: '#9a6ee8', fallback: '#e05d5d' },
+  frecencyDecayDays: 14,
+  defaultMode: 'bookmarks',
+  disabledSites: [],
+}
+
+async function getSettings(): Promise<UserSettings> {
   try {
-    await chrome.tabs.sendMessage(tabId, { type: 'toggle-palette', mode })
-  } catch {
-    // Content script isn't there (tab predates the extension, or injection was
-    // missed) — inject on demand and retry.
-    try {
-      await chrome.scripting.executeScript({ target: { tabId }, files: ['palette.js'] })
-      await chrome.tabs.sendMessage(tabId, { type: 'toggle-palette', mode })
-    } catch {
-      // Restricted page (chrome://, Web Store, PDF viewer) — open the popup
-      // palette instead. The hash tells the popup which mode to start in.
-      try {
-        await chrome.action.setPopup({
-          popup: mode === 'commands' ? 'popup.html#commands' : 'popup.html',
-        })
-        await chrome.action.openPopup()
-      } catch {
-        // openPopup needs a focused window; nothing more we can do.
-      } finally {
-        await chrome.action.setPopup({ popup: 'popup.html' })
-      }
+    const { settings } = await chrome.storage.sync.get('settings')
+    return {
+      ...DEFAULT_SETTINGS,
+      ...settings,
+      iconColors: { ...DEFAULT_SETTINGS.iconColors, ...settings?.iconColors },
     }
+  } catch {
+    return DEFAULT_SETTINGS
+  }
+}
+
+const MODE_HASH: Record<PaletteMode, string> = {
+  bookmarks: '',
+  commands: '#commands',
+  tabs: '#tabs',
+  history: '#history',
+}
+
+function hostOf(url: string | undefined): string | null {
+  try {
+    return url ? new URL(url).hostname.toLowerCase() : null
+  } catch {
+    return null
+  }
+}
+
+async function togglePaletteIn(
+  tab: chrome.tabs.Tab | undefined,
+  mode: PaletteMode,
+): Promise<void> {
+  if (!tab?.id) return
+  const settings = await getSettings()
+  const host = hostOf(tab.url)
+  const disabled =
+    host !== null && settings.disabledSites.some((d) => host === d || host.endsWith(`.${d}`))
+
+  if (!disabled) {
+    try {
+      await chrome.tabs.sendMessage(tab.id, { type: 'toggle-palette', mode })
+      return
+    } catch {
+      // Content script isn't there — inject on demand and retry.
+    }
+    try {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['palette.js'] })
+      await chrome.tabs.sendMessage(tab.id, { type: 'toggle-palette', mode })
+      return
+    } catch {
+      // Restricted page (chrome://, Web Store, PDF viewer) — fall through.
+    }
+  }
+
+  // Popup palette: extension UI works everywhere, including disabled sites.
+  try {
+    await chrome.action.setPopup({ popup: `popup.html${MODE_HASH[mode]}` })
+    await chrome.action.openPopup()
+  } catch {
+    // openPopup needs a focused window; nothing more we can do.
+  } finally {
+    await chrome.action.setPopup({ popup: 'popup.html' })
   }
 }
 
 chrome.commands.onCommand.addListener(async (command) => {
-  const mode =
-    command === 'open-palette' ? 'commands' : command === 'quick-open' ? 'bookmarks' : null
-  if (!mode) return
+  if (command !== 'open-palette' && command !== 'quick-open') return
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-  void togglePaletteIn(tab?.id, mode)
+  const mode = command === 'open-palette' ? 'commands' : (await getSettings()).defaultMode
+  void togglePaletteIn(tab, mode)
 })
 
 /** Popup senders have no tab; fall back to the active tab of the current window. */
@@ -71,6 +123,7 @@ const PAGE_COMMANDS: Record<string, string> = {
 
 const PALETTE_COMMANDS = [
   { id: 'switch-to-tab', label: 'Switch to Tab…' },
+  { id: 'open-options', label: 'SuperChrome: Settings' },
   { id: 'bookmark-tab', label: 'Bookmark Current Tab' },
   { id: 'new-tab', label: 'New Tab' },
   { id: 'duplicate-tab', label: 'Duplicate Tab' },
@@ -132,12 +185,12 @@ async function getUsage(): Promise<UsageMap> {
   }
 }
 
-/** Usage count decayed by a two-week half-life-ish curve. */
-function frecency(usage: UsageMap, key: string): number {
+/** Usage count decayed over the configured number of days. */
+function frecency(usage: UsageMap, key: string, decayDays: number): number {
   const entry = usage[key]
   if (!entry) return 0
   const days = (Date.now() - entry.t) / 86_400_000
-  return entry.n * Math.exp(-days / 14)
+  return entry.n * Math.exp(-days / decayDays)
 }
 
 function fuzzyMatch(
@@ -167,12 +220,13 @@ function rank<T extends object>(
   entries: Array<{ item: T; text: string; usageKey: string }>,
   query: string,
   usage: UsageMap,
+  decayDays = DEFAULT_SETTINGS.frecencyDecayDays,
 ): Array<T & { positions?: number[] }> {
   const scored: Array<{ item: T; score: number; index: number; positions: number[] }> = []
   entries.forEach((entry, index) => {
     const match = fuzzyMatch(query, entry.text)
     if (!match) return
-    const boost = Math.min(30, frecency(usage, entry.usageKey) * 5)
+    const boost = Math.min(30, frecency(usage, entry.usageKey, decayDays) * 5)
     scored.push({ item: entry.item, score: match.score + boost, index, positions: match.positions })
   })
   scored.sort((a, b) => b.score - a.score || a.index - b.index)
@@ -187,6 +241,7 @@ async function queryPalette(
 ): Promise<PaletteItem[]> {
   const query = rawQuery.trim().toLowerCase()
   const usage = await getUsage()
+  const decay = (await getSettings()).frecencyDecayDays
 
   // Browsing inside one folder: its direct children, subfolders included.
   if (mode === 'bookmarks' && folderId) {
@@ -213,6 +268,7 @@ async function queryPalette(
       ),
       query,
       usage,
+      decay,
     )
   }
 
@@ -236,6 +292,7 @@ async function queryPalette(
       })),
       query,
       usage,
+      decay,
     )
   }
 
@@ -260,6 +317,7 @@ async function queryPalette(
         })),
       query,
       usage,
+      decay,
     )
     const sessions = await chrome.sessions.getRecentlyClosed({ maxResults: 10 })
     const closed = rank(
@@ -279,6 +337,7 @@ async function queryPalette(
         })),
       query,
       usage,
+      decay,
     )
     return [...open, ...closed]
   }
@@ -315,7 +374,7 @@ async function queryPalette(
       usageKey: `folder:${f.id}`,
     }
   })
-  return rank<PaletteItem>([...bookmarkEntries, ...folderEntries], query, usage).slice(0, 50)
+  return rank<PaletteItem>([...bookmarkEntries, ...folderEntries], query, usage, decay).slice(0, 50)
 }
 
 function collectBookmarks(
@@ -523,6 +582,9 @@ async function runCommand(id: string, sender: chrome.runtime.MessageSender): Pro
     }
     case 'move-tab-new-window':
       if (tab?.id) await chrome.windows.create({ tabId: tab.id, focused: true })
+      break
+    case 'open-options':
+      await chrome.runtime.openOptionsPage()
       break
     case 'open-devtools':
       // Extensions can't open DevTools; the native host (native-host/) presses

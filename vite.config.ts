@@ -8,6 +8,7 @@ export default defineConfig({
         background: 'src/background.ts',
         palette: 'src/palette.ts',
         popup: 'popup.html',
+        options: 'options.html',
       },
       output: {
         entryFileNames: '[name].js',

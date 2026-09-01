@@ -480,5 +480,34 @@ function shortUrl(url: string): string {
   }
 }
 
-if (location.hash === '#commands') inputEl.value = '>'
-void updateList()
+const HASH_PREFIX: Record<string, string> = {
+  '#commands': '>',
+  '#tabs': '@',
+  '#history': '#',
+}
+const MODE_PREFIX: Record<string, string> = {
+  bookmarks: '',
+  commands: '>',
+  tabs: '@',
+  history: '#',
+}
+
+async function applyStartupSettings(): Promise<void> {
+  try {
+    const { settings } = await chrome.storage.sync.get('settings')
+    const colors = settings?.iconColors ?? {}
+    for (const key of ['command', 'folder', 'history', 'fallback'] as const) {
+      if (typeof colors[key] === 'string') {
+        document.documentElement.style.setProperty(`--sc-${key}`, colors[key])
+      }
+    }
+    if (!(location.hash in HASH_PREFIX) && settings?.defaultMode) {
+      inputEl.value = MODE_PREFIX[settings.defaultMode] ?? ''
+    }
+  } catch {
+    // Defaults baked into the CSS cover this.
+  }
+}
+
+if (location.hash in HASH_PREFIX) inputEl.value = HASH_PREFIX[location.hash]
+void applyStartupSettings().then(updateList)

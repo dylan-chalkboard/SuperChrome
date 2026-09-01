@@ -45,7 +45,7 @@ const PALETTE_CSS = `
 .panel {
   position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
   width: min(720px, 94vw);
-  background: rgba(24, 24, 26, 0.8);
+  background: rgba(24, 24, 26, var(--sc-op, 0.8));
   backdrop-filter: blur(60px) saturate(1.6);
   -webkit-backdrop-filter: blur(60px) saturate(1.6);
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -95,11 +95,11 @@ const PALETTE_CSS = `
   flex-shrink: 0;
 }
 .item .icon.plain { background: transparent; }
-.item .icon.kind-command { background: #4c9df3; color: #ffffff; }
-.item .icon.kind-folder { background: #e0a63c; color: #ffffff; }
-.item .icon.kind-history { background: #9a6ee8; color: #ffffff; }
+.item .icon.kind-command { background: var(--sc-command, #4c9df3); color: #ffffff; }
+.item .icon.kind-folder { background: var(--sc-folder, #e0a63c); color: #ffffff; }
+.item .icon.kind-history { background: var(--sc-history, #9a6ee8); color: #ffffff; }
 .item .icon.kind-bookmark, .item .icon.kind-tab, .item .icon.kind-closed {
-  background: #e05d5d; color: #ffffff;
+  background: var(--sc-fallback, #e05d5d); color: #ffffff;
 }
 .item .icon img { width: 18px; height: 18px; border-radius: 4px; }
 .item .title {
@@ -195,9 +195,16 @@ let savedQuery = ''
 let foldersCache: FolderInfo[] | null = null
 let browseStack: Array<{ id: string; label: string }> = []
 
+const MODE_PREFIX: Record<string, string> = {
+  bookmarks: '',
+  commands: '>',
+  tabs: '@',
+  history: '#',
+}
+
 chrome.runtime.onMessage.addListener((message: { type?: string; mode?: string }) => {
   if (message?.type === 'toggle-palette') {
-    void togglePalette(message.mode === 'commands' ? '>' : '')
+    void togglePalette(MODE_PREFIX[message.mode ?? 'bookmarks'] ?? '')
   }
 })
 
@@ -213,6 +220,23 @@ async function togglePalette(prefix: string): Promise<void> {
     return
   }
   openPalette(prefix)
+}
+
+/** Options-page settings (opacity, icon colors) applied as CSS variables. */
+async function applyUserSettings(): Promise<void> {
+  try {
+    const { settings } = await chrome.storage.sync.get('settings')
+    if (!panelEl || !settings) return
+    if (typeof settings.glassOpacity === 'number') {
+      panelEl.style.setProperty('--sc-op', String(settings.glassOpacity))
+    }
+    const colors = settings.iconColors ?? {}
+    for (const key of ['command', 'folder', 'history', 'fallback'] as const) {
+      if (typeof colors[key] === 'string') panelEl.style.setProperty(`--sc-${key}`, colors[key])
+    }
+  } catch {
+    // Defaults baked into the CSS cover this.
+  }
 }
 
 function setInput(value: string): void {
@@ -298,6 +322,7 @@ function openPalette(prefix: string): void {
   }
   paletteInput.focus()
   paletteInput.setSelectionRange(prefix.length, prefix.length)
+  void applyUserSettings()
   void updateList()
 }
 
