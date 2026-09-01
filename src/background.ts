@@ -420,6 +420,25 @@ function basename(path: string): string {
   return path.split('/').pop() || path
 }
 
+function commandEntries(): Array<{
+  item: PaletteItem
+  text: string
+  usageKey: string
+}> {
+  return PALETTE_COMMANDS.map((c) => ({
+    item: {
+      kind: 'command' as const,
+      label: c.label,
+      detail: '',
+      commandId: c.id,
+      icon: COMMAND_META[c.id]?.icon,
+      color: COMMAND_META[c.id]?.color || undefined,
+    },
+    text: c.label.toLowerCase(),
+    usageKey: `command:${c.id}`,
+  }))
+}
+
 async function queryPalette(
   mode: string,
   rawQuery: string,
@@ -520,23 +539,7 @@ async function queryPalette(
   }
 
   if (mode === 'commands') {
-    return rank(
-      PALETTE_COMMANDS.map((c) => ({
-        item: {
-          kind: 'command' as const,
-          label: c.label,
-          detail: '',
-          commandId: c.id,
-          icon: COMMAND_META[c.id]?.icon,
-          color: COMMAND_META[c.id]?.color || undefined,
-        },
-        text: c.label.toLowerCase(),
-        usageKey: `command:${c.id}`,
-      })),
-      query,
-      usage,
-      decay,
-    )
+    return rank(commandEntries(), query, usage, decay)
   }
 
   if (mode === 'tabs') {
@@ -630,28 +633,38 @@ async function queryPalette(
       usageKey: `folder:${f.id}`,
     }
   })
+  const commands = commandEntries()
+
   if (!query) {
-    // Raycast-style home view: frecency picks up top, then the full library
-    // with folders first.
-    const all = [...bookmarkEntries, ...folderEntries]
+    // Raycast-style home view: frecency picks up top, then the library with
+    // folders first, then the most-used commands ('>' still shows them all).
+    const all = [...bookmarkEntries, ...folderEntries, ...commands]
     const suggested = all
       .map((entry) => ({ entry, score: frecency(usage, entry.usageKey, decay) }))
       .filter((x) => x.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, 6)
     const suggestedKeys = new Set(suggested.map((x) => x.entry.usageKey))
+    const topCommands = commands
+      .filter((entry) => !suggestedKeys.has(entry.usageKey))
+      .map((entry) => ({ entry, score: frecency(usage, entry.usageKey, decay) }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8)
     return [
       ...suggested.map((x): PaletteItem => ({ ...x.entry.item, group: 'Suggested' })),
       ...[...folderEntries, ...bookmarkEntries]
         .filter((entry) => !suggestedKeys.has(entry.usageKey))
         .map((entry): PaletteItem => ({ ...entry.item, group: 'Bookmarks' })),
-    ].slice(0, 60)
+      ...topCommands.map((x): PaletteItem => ({ ...x.entry.item, group: 'Commands' })),
+    ].slice(0, 70)
   }
 
-  const results = rank<PaletteItem>([...bookmarkEntries, ...folderEntries], query, usage, decay).slice(
-    0,
-    50,
-  )
+  const results = rank<PaletteItem>(
+    [...bookmarkEntries, ...folderEntries, ...commands],
+    query,
+    usage,
+    decay,
+  ).slice(0, 50)
   const calc = tryCalculate(rawQuery)
   if (calc !== null) {
     results.unshift({
