@@ -132,6 +132,13 @@ const PALETTE_CSS = `
 .footer .spacer { flex: 1; }
 .footer .action { display: flex; align-items: center; gap: 6px; }
 .footer .brand-logo { width: 26px; height: 26px; opacity: 0.5; }
+.footer .gear {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0;
+  background: none; border: none; border-radius: 6px;
+  color: #cccccc80; cursor: pointer;
+}
+.footer .gear:hover { background: #ffffff14; color: #e8e8e8; }
 .actions {
   position: absolute; right: 10px; bottom: 46px;
   min-width: 230px;
@@ -437,6 +444,18 @@ function renderFooter(): void {
     actions.append(document.createTextNode('Actions'), kbd('⌘K'))
     paletteFooter.appendChild(actions)
   }
+
+  const gear = document.createElement('button')
+  gear.className = 'gear'
+  gear.title = 'SuperChrome Settings'
+  gear.innerHTML =
+    '<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="currentColor"/><path d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2" stroke="currentColor" stroke-linecap="round"/></svg>'
+  gear.addEventListener('mousedown', (e) => {
+    e.preventDefault()
+    void chrome.runtime.sendMessage({ type: 'run-command', id: 'open-options' })
+    closePalette()
+  })
+  paletteFooter.appendChild(gear)
 }
 
 /* ---------- Key handling ---------- */

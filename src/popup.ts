@@ -561,5 +561,10 @@ async function applyStartupSettings(): Promise<void> {
   }
 }
 
+document.getElementById('gear')?.addEventListener('click', () => {
+  void chrome.runtime.openOptionsPage()
+  window.close()
+})
+
 if (location.hash in HASH_PREFIX) inputEl.value = HASH_PREFIX[location.hash]
 void applyStartupSettings().then(updateList)

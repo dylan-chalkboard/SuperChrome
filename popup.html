@@ -24,6 +24,13 @@
       }
       .input::placeholder { color: #ffffff40; }
       .hint { display: flex; gap: 6px; margin-right: 12px; flex-shrink: 0; }
+      #gear {
+        display: flex; align-items: center; justify-content: center;
+        width: 24px; height: 24px; padding: 0;
+        background: none; border: none; border-radius: 6px;
+        color: #cccccc80; cursor: pointer;
+      }
+      #gear:hover { background: #ffffff14; color: #e8e8e8; }
       .kbd {
         background: #ffffff14; color: #cccccc99;
         border-radius: 4px; padding: 2px 7px; font-size: 11px;
@@ -90,7 +97,7 @@
   <body>
     <div class="input-row">
       <input id="input" class="input" placeholder="Search bookmarks and commands…" spellcheck="false" autocomplete="off" />
-      <div class="hint"><span class="kbd">&gt; Commands</span><span class="kbd">@ Tabs</span><span class="kbd"># History</span><span class="kbd">: Emoji</span><span class="kbd">! Clips</span></div>
+      <div class="hint"><span class="kbd">&gt; Commands</span><span class="kbd">@ Tabs</span><span class="kbd"># History</span><span class="kbd">: Emoji</span><span class="kbd">! Clips</span><button id="gear" title="SuperChrome Settings"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="currentColor"/><path d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2" stroke="currentColor" stroke-linecap="round"/></svg></button></div>
     </div>
     <div id="list" class="list"></div>
     <script type="module" src="/src/popup.ts"></script>
