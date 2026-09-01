@@ -376,10 +376,14 @@ function openPalette(prefix: string): void {
     void updateList()
   })
   paletteInput.addEventListener('blur', () => {
-    // Give row mousedown handlers a beat to run before tearing down.
+    // Pages like google.com aggressively re-focus their own search box.
+    // Clicks outside are handled by the backdrop, so on blur we reclaim
+    // focus instead of closing.
     setTimeout(() => {
-      if (paletteHost && shadow.activeElement !== paletteInput) closePalette()
-    }, 150)
+      if (paletteHost && paletteInput && shadow.activeElement !== paletteInput) {
+        paletteInput.focus()
+      }
+    }, 0)
   })
 
   const hint = document.createElement('div')
