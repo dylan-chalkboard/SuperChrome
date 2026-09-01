@@ -255,6 +255,7 @@ let savedQuery = ''
 let foldersCache: FolderInfo[] | null = null
 let browseStack: Array<{ id: string; label: string }> = []
 let lastFocused: HTMLElement | null = null
+let prefersNewTab = false
 
 /** Insert into the element that had focus before the palette opened, else copy. */
 function insertOrCopy(text: string): void {
@@ -311,6 +312,8 @@ async function applyUserSettings(): Promise<void> {
     for (const key of ['command', 'folder', 'history', 'fallback'] as const) {
       if (typeof colors[key] === 'string') panelEl.style.setProperty(`--sc-${key}`, colors[key])
     }
+    prefersNewTab = settings.openInNewTab === true
+    renderFooter()
   } catch {
     // Defaults baked into the CSS cover this.
   }
@@ -449,6 +452,16 @@ function renderFooter(): void {
             : 'Open'
   primary.append(document.createTextNode(primaryLabel), kbd('↵'))
   paletteFooter.appendChild(primary)
+
+  if (uiState === 'list' && (mode === 'bookmarks' || mode === 'history')) {
+    const secondary = document.createElement('span')
+    secondary.className = 'action'
+    secondary.append(
+      document.createTextNode(prefersNewTab ? 'Current Tab' : 'New Tab'),
+      kbd('⌘↵'),
+    )
+    paletteFooter.appendChild(secondary)
+  }
 
   if (uiState === 'list') {
     if (browseStack.length && mode === 'bookmarks') {

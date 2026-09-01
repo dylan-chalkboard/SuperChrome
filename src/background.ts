@@ -7,6 +7,7 @@ interface UserSettings {
   iconColors: { command: string; folder: string; history: string; fallback: string }
   frecencyDecayDays: number
   defaultMode: PaletteMode
+  openInNewTab: boolean
   disabledSites: string[]
 }
 
@@ -15,6 +16,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   iconColors: { command: '#4c9df3', folder: '#e0a63c', history: '#9a6ee8', fallback: '#e05d5d' },
   frecencyDecayDays: 14,
   defaultMode: 'bookmarks',
+  openInNewTab: false,
   disabledSites: [],
 }
 
@@ -811,7 +813,9 @@ async function handleMessage(
       return {}
     case 'open-url': {
       const tab = await senderTab(sender)
-      if (message.newTab || !tab?.id) await chrome.tabs.create({ url: message.url })
+      // The setting inverts Enter vs Cmd+Enter: XOR keeps both reachable.
+      const newTab = (message.newTab ?? false) !== (await getSettings()).openInNewTab
+      if (newTab || !tab?.id) await chrome.tabs.create({ url: message.url })
       else await chrome.tabs.update(tab.id, { url: message.url })
       return {}
     }
