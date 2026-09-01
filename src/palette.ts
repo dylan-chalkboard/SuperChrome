@@ -125,7 +125,7 @@ const PALETTE_CSS = `
 }
 .footer .spacer { flex: 1; }
 .footer .action { display: flex; align-items: center; gap: 6px; }
-.footer .brand-logo { width: 18px; height: 18px; opacity: 0.85; }
+.footer .brand-logo { width: 26px; height: 26px; opacity: 0.9; }
 .actions {
   position: absolute; right: 10px; bottom: 46px;
   min-width: 230px;
