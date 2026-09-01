@@ -13,7 +13,18 @@ async function togglePaletteIn(
       await chrome.scripting.executeScript({ target: { tabId }, files: ['palette.js'] })
       await chrome.tabs.sendMessage(tabId, { type: 'toggle-palette', mode })
     } catch {
-      // Restricted page — nothing to show.
+      // Restricted page (chrome://, Web Store, PDF viewer) — open the popup
+      // palette instead. The hash tells the popup which mode to start in.
+      try {
+        await chrome.action.setPopup({
+          popup: mode === 'commands' ? 'popup.html#commands' : 'popup.html',
+        })
+        await chrome.action.openPopup()
+      } catch {
+        // openPopup needs a focused window; nothing more we can do.
+      } finally {
+        await chrome.action.setPopup({ popup: 'popup.html' })
+      }
     }
   }
 }

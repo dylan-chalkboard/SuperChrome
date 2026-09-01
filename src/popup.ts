@@ -51,6 +51,7 @@ let flatItems: PaletteItem[] = []
 let selectedIndex = 0
 
 async function boot(): Promise<void> {
+  if (location.hash === '#commands') inputEl.value = '>'
   data = (await chrome.runtime.sendMessage({ type: 'palette-data' })) as PaletteData
   updateList()
 }

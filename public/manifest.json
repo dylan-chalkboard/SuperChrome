@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Code Panel",
   "description": "VSCode-style command palette for your bookmarks",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "minimum_chrome_version": "114",
   "permissions": [
     "bookmarks",
