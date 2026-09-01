@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Cursor Dark (SuperChrome)",
-  "description": "Cursor Dark browser theme to match SuperChrome",
-  "version": "1.0.1",
+  "name": "SuperChrome Dark",
+  "description": "A calm, deep-dark browser theme that pairs with the SuperChrome palette. Palette inspired by the Cursor Dark editor theme.",
+  "version": "1.1.0",
   "theme": {
     "colors": {
       "frame": [
