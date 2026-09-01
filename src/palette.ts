@@ -1282,14 +1282,7 @@ function iconFor(item: RemoteItem): HTMLElement {
     icon.innerHTML = (item.icon && CMD_ICONS[item.icon]) || DOC_SVG
     return icon
   }
-  icon.innerHTML =
-    kind === 'folder'
-      ? FOLDER_SVG
-      : kind === 'history'
-        ? CLOCK_SVG
-        : kind === 'download'
-          ? DOC_SVG
-          : COMMAND_SVG
+  icon.innerHTML = kind === 'folder' ? FOLDER_SVG : kind === 'history' ? CLOCK_SVG : COMMAND_SVG
   return icon
 }
 
