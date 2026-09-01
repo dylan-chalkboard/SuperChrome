@@ -7,7 +7,7 @@
  */
 
 interface RemoteItem {
-  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder'
+  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji' | 'clip'
   label: string
   detail: string
   url?: string
@@ -15,6 +15,9 @@ interface RemoteItem {
   tabId?: number
   commandId?: string
   sessionId?: string
+  emoji?: string
+  text?: string
+  clipT?: number
   group?: string
   positions?: number[]
 }
@@ -101,6 +104,9 @@ const PALETTE_CSS = `
 .item .icon.kind-bookmark, .item .icon.kind-tab, .item .icon.kind-closed {
   background: var(--sc-fallback, #e05d5d); color: #ffffff;
 }
+.item .icon.kind-clip { background: #3aa99f; color: #ffffff; }
+.item .icon.kind-calc { background: #4caf7d; color: #ffffff; font-weight: 700; font-size: 14px; }
+.item .icon.emoji-glyph { font-size: 17px; }
 .item .icon img { width: 18px; height: 18px; border-radius: 4px; }
 .item .title {
   overflow: hidden; text-overflow: ellipsis;
@@ -156,6 +162,8 @@ const CLOCK_SVG =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor"/><path d="M8 5v3.2l2.2 1.6" stroke="currentColor" stroke-linecap="round"/></svg>'
 const FOLDER_SVG =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1.5 3.5h4.5l1.5 2h7v7h-13v-9z" stroke="currentColor" stroke-linejoin="round"/></svg>'
+const CLIP_SVG =
+  '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="3.5" y="3.5" width="9" height="11" rx="1.5" stroke="currentColor"/><path d="M5.5 3.5v-1h5v1" stroke="currentColor"/><path d="M6 7.5h4M6 10h4" stroke="currentColor" stroke-linecap="round"/></svg>'
 
 const TYPE_LABELS: Record<string, string> = {
   bookmark: 'Bookmark',
@@ -164,6 +172,9 @@ const TYPE_LABELS: Record<string, string> = {
   command: 'Command',
   folder: 'Folder',
   closed: 'Closed',
+  calc: 'Calculator',
+  emoji: 'Emoji',
+  clip: 'Clip',
 }
 
 const GROUP_LABELS: Record<string, string> = {
@@ -171,6 +182,8 @@ const GROUP_LABELS: Record<string, string> = {
   commands: 'Commands',
   tabs: 'Open Tabs',
   history: 'History',
+  emoji: 'Emoji',
+  clipboard: 'Clipboard',
 }
 
 type UiState = 'list' | 'actions' | 'rename' | 'move'
@@ -194,6 +207,51 @@ let subStateTarget: RemoteItem | null = null
 let savedQuery = ''
 let foldersCache: FolderInfo[] | null = null
 let browseStack: Array<{ id: string; label: string }> = []
+let lastFocused: HTMLElement | null = null
+
+/* Clipboard history: capture what gets copied on regular pages. */
+for (const eventType of ['copy', 'cut'] as const) {
+  document.addEventListener(
+    eventType,
+    () => {
+      const text = selectionText()
+      if (text && text.length <= 10_000) {
+        void chrome.runtime.sendMessage({ type: 'clip-add', text }).catch(() => {})
+      }
+    },
+    true,
+  )
+}
+
+function selectionText(): string {
+  const selected = window.getSelection()?.toString() ?? ''
+  if (selected) return selected
+  const active = document.activeElement
+  if (
+    (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) &&
+    active.selectionStart !== null &&
+    active.selectionEnd !== null
+  ) {
+    return active.value.substring(active.selectionStart, active.selectionEnd)
+  }
+  return ''
+}
+
+/** Insert into the element that had focus before the palette opened, else copy. */
+function insertOrCopy(text: string): void {
+  const target = lastFocused
+  closePalette()
+  if (
+    target &&
+    (target.isContentEditable ||
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement)
+  ) {
+    target.focus()
+    if (document.execCommand('insertText', false, text)) return
+  }
+  copyText(text)
+}
 
 const MODE_PREFIX: Record<string, string> = {
   bookmarks: '',
@@ -265,6 +323,7 @@ function closePalette(): void {
 }
 
 function openPalette(prefix: string): void {
+  lastFocused = document.activeElement as HTMLElement | null
   paletteHost = document.createElement('div')
   paletteHost.style.cssText = 'position:fixed;inset:0;z-index:2147483647;'
   const shadow = paletteHost.attachShadow({ mode: 'closed' })
@@ -303,7 +362,7 @@ function openPalette(prefix: string): void {
 
   const hint = document.createElement('div')
   hint.className = 'hint'
-  hint.append(kbd('> Commands'), kbd('@ Tabs'), kbd('# History'))
+  hint.append(kbd('> Cmds'), kbd('@ Tabs'), kbd('# History'), kbd(': Emoji'), kbd('! Clips'))
 
   inputRow.append(paletteInput, hint)
 
@@ -338,6 +397,8 @@ function currentMode(): string {
   if (raw.startsWith('>')) return 'commands'
   if (raw.startsWith('@')) return 'tabs'
   if (raw.startsWith('#')) return 'history'
+  if (raw.startsWith(':')) return 'emoji'
+  if (raw.startsWith('!')) return 'clipboard'
   return 'bookmarks'
 }
 
@@ -358,7 +419,15 @@ function renderFooter(): void {
   const primary = document.createElement('span')
   primary.className = 'action'
   const primaryLabel =
-    uiState === 'move' ? 'Move Here' : mode === 'commands' ? 'Run' : mode === 'tabs' ? 'Switch' : 'Open'
+    uiState === 'move'
+      ? 'Move Here'
+      : mode === 'commands'
+        ? 'Run'
+        : mode === 'tabs'
+          ? 'Switch'
+          : mode === 'emoji' || mode === 'clipboard'
+            ? 'Insert'
+            : 'Open'
   primary.append(document.createTextNode(primaryLabel), kbd('↵'))
   paletteFooter.appendChild(primary)
 
@@ -487,7 +556,9 @@ function recordUsage(item: RemoteItem): void {
         ? `command:${item.commandId}`
         : item.kind === 'folder'
           ? `folder:${item.id}`
-          : null
+          : item.kind === 'emoji'
+            ? `emoji:${item.emoji}`
+            : null
   if (key) void chrome.runtime.sendMessage({ type: 'record-usage', key })
 }
 
@@ -513,6 +584,20 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
   }
   if (item.kind === 'folder') {
     enterFolder(item)
+    return
+  }
+  if (item.kind === 'calc') {
+    copyText(item.text ?? item.label)
+    closePalette()
+    return
+  }
+  if (item.kind === 'emoji') {
+    recordUsage(item)
+    insertOrCopy(item.emoji ?? '')
+    return
+  }
+  if (item.kind === 'clip') {
+    insertOrCopy(item.text ?? '')
     return
   }
   recordUsage(item)
@@ -576,6 +661,19 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'open-all', label: 'Open All in New Tabs' },
         { id: 'rename', label: 'Rename…' },
         { id: 'folder-delete', label: 'Delete Folder', danger: true },
+      ]
+    case 'calc':
+      return [{ id: 'copy-text', label: 'Copy Result' }]
+    case 'emoji':
+      return [
+        { id: 'insert', label: 'Insert' },
+        { id: 'copy-text', label: 'Copy Emoji' },
+      ]
+    case 'clip':
+      return [
+        { id: 'insert', label: 'Insert' },
+        { id: 'copy-text', label: 'Copy' },
+        { id: 'clip-delete', label: 'Remove from History', danger: true },
       ]
     default:
       return [{ id: 'run', label: 'Run Command' }]
@@ -671,6 +769,18 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
       return
     case 'folder-delete':
       await chrome.runtime.sendMessage({ type: 'folder-delete', id: item.id })
+      break
+    case 'insert':
+      closeActions()
+      if (item.kind === 'emoji') recordUsage(item)
+      insertOrCopy(item.kind === 'emoji' ? (item.emoji ?? '') : (item.text ?? ''))
+      return
+    case 'copy-text':
+      copyText(item.kind === 'emoji' ? (item.emoji ?? '') : (item.text ?? item.label))
+      closePalette()
+      return
+    case 'clip-delete':
+      await chrome.runtime.sendMessage({ type: 'clip-delete', clipT: item.clipT })
       break
     case 'run':
       closeActions()
@@ -814,7 +924,7 @@ async function updateList(): Promise<void> {
   }
 
   const mode = currentMode()
-  const query = paletteInput.value.replace(/^[>@#]/, '')
+  const query = paletteInput.value.replace(/^[>@#:!]/, '')
   const browsing = mode === 'bookmarks' && browseStack.length > 0
   const folderId = browsing ? browseStack[browseStack.length - 1].id : undefined
   const response = (await chrome.runtime.sendMessage({
@@ -922,8 +1032,24 @@ function iconFor(item: RemoteItem): HTMLElement {
     icon.appendChild(img)
     return icon
   }
+  if (kind === 'emoji') {
+    icon.className = 'icon plain emoji-glyph'
+    icon.textContent = item.emoji ?? ''
+    return icon
+  }
   icon.className = `icon kind-${kind}`
-  icon.innerHTML = kind === 'folder' ? FOLDER_SVG : kind === 'history' ? CLOCK_SVG : COMMAND_SVG
+  if (kind === 'calc') {
+    icon.textContent = '='
+    return icon
+  }
+  icon.innerHTML =
+    kind === 'folder'
+      ? FOLDER_SVG
+      : kind === 'history'
+        ? CLOCK_SVG
+        : kind === 'clip'
+          ? CLIP_SVG
+          : COMMAND_SVG
   return icon
 }
 

@@ -1,3 +1,5 @@
+import { EMOJI } from './emoji-data'
+
 type PaletteMode = 'bookmarks' | 'commands' | 'tabs' | 'history'
 
 interface UserSettings {
@@ -160,7 +162,7 @@ const PALETTE_COMMANDS = [
 /* ---------- Ranking: fuzzy match blended with usage frecency ---------- */
 
 interface PaletteItem {
-  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder'
+  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji' | 'clip'
   label: string
   detail: string
   url?: string
@@ -168,6 +170,9 @@ interface PaletteItem {
   tabId?: number
   commandId?: string
   sessionId?: string
+  emoji?: string
+  text?: string
+  clipT?: number
   /** Overrides the mode's default group header in the results list. */
   group?: string
   /** Indices into the ranked text that matched the query, for highlighting. */
@@ -233,6 +238,123 @@ function rank<T extends object>(
   return scored.map((s) => (query ? { ...s.item, positions: s.positions } : s.item))
 }
 
+/* ---------- Inline calculator: safe recursive-descent parser, no eval ---------- */
+
+function tryCalculate(raw: string): string | null {
+  let expr = raw.trim().toLowerCase()
+  if (expr.length < 2 || expr.length > 64) return null
+  expr = expr
+    .replace(/,/g, '')
+    .replace(/\bof\b/g, '*')
+    .replace(/(^|[\s\d)])x([\s\d(])/g, '$1*$2')
+    .replace(/\bpi\b/g, String(Math.PI))
+  if (!/^[\d\s+\-*/^().%e]+$/.test(expr)) return null
+  if (!/[+\-*/^%]/.test(expr) || !/\d/.test(expr)) return null
+
+  let pos = 0
+  const peek = (): string => expr[pos] ?? ''
+  const skip = (): void => {
+    while (peek() === ' ') pos++
+  }
+  const primary = (): number => {
+    skip()
+    if (peek() === '(') {
+      pos++
+      const value = additive()
+      skip()
+      if (peek() !== ')') throw new Error('paren')
+      pos++
+      return value
+    }
+    const match = /^\d*\.?\d+(e[+-]?\d+)?/.exec(expr.slice(pos))
+    if (!match) throw new Error('number')
+    pos += match[0].length
+    return Number(match[0])
+  }
+  const postfix = (): number => {
+    let value = primary()
+    skip()
+    while (peek() === '%') {
+      pos++
+      value /= 100
+      skip()
+    }
+    return value
+  }
+  const unary = (): number => {
+    skip()
+    if (peek() === '-') {
+      pos++
+      return -unary()
+    }
+    return postfix()
+  }
+  const power = (): number => {
+    const base = unary()
+    skip()
+    if (peek() === '^') {
+      pos++
+      return base ** power()
+    }
+    return base
+  }
+  const multiplicative = (): number => {
+    let value = power()
+    skip()
+    while (peek() === '*' || peek() === '/') {
+      const op = expr[pos++]
+      const rhs = power()
+      value = op === '*' ? value * rhs : value / rhs
+      skip()
+    }
+    return value
+  }
+  const additive = (): number => {
+    let value = multiplicative()
+    skip()
+    while (peek() === '+' || peek() === '-') {
+      const op = expr[pos++]
+      const rhs = multiplicative()
+      value = op === '+' ? value + rhs : value - rhs
+      skip()
+    }
+    return value
+  }
+
+  try {
+    const result = additive()
+    skip()
+    if (pos !== expr.length || !Number.isFinite(result)) return null
+    return String(Number(result.toPrecision(12)))
+  } catch {
+    return null
+  }
+}
+
+/* ---------- Clipboard history (captured by content-script copy events) ---------- */
+
+interface Clip {
+  text: string
+  t: number
+}
+
+async function getClips(): Promise<Clip[]> {
+  try {
+    const { clips } = await chrome.storage.local.get('clips')
+    return clips ?? []
+  } catch {
+    return []
+  }
+}
+
+function ago(t: number): string {
+  const s = Math.max(0, (Date.now() - t) / 1000)
+  if (s < 60) return 'just now'
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`
+  return `${Math.floor(s / 86400)}d ago`
+}
+
 async function queryPalette(
   mode: string,
   rawQuery: string,
@@ -242,6 +364,39 @@ async function queryPalette(
   const query = rawQuery.trim().toLowerCase()
   const usage = await getUsage()
   const decay = (await getSettings()).frecencyDecayDays
+
+  if (mode === 'emoji') {
+    return rank<PaletteItem>(
+      EMOJI.map(([char, name]) => ({
+        item: { kind: 'emoji' as const, label: name, detail: '', emoji: char },
+        text: name,
+        usageKey: `emoji:${char}`,
+      })),
+      query,
+      usage,
+      decay,
+    ).slice(0, 50)
+  }
+
+  if (mode === 'clipboard') {
+    const clips = await getClips()
+    return rank<PaletteItem>(
+      clips.map((clip) => ({
+        item: {
+          kind: 'clip' as const,
+          label: clip.text.replace(/\s+/g, ' ').slice(0, 80),
+          detail: ago(clip.t),
+          text: clip.text,
+          clipT: clip.t,
+        },
+        text: clip.text.toLowerCase().slice(0, 200),
+        usageKey: `clip:${clip.t}`,
+      })),
+      query,
+      usage,
+      decay,
+    )
+  }
 
   // Browsing inside one folder: its direct children, subfolders included.
   if (mode === 'bookmarks' && folderId) {
@@ -374,7 +529,21 @@ async function queryPalette(
       usageKey: `folder:${f.id}`,
     }
   })
-  return rank<PaletteItem>([...bookmarkEntries, ...folderEntries], query, usage, decay).slice(0, 50)
+  const results = rank<PaletteItem>([...bookmarkEntries, ...folderEntries], query, usage, decay).slice(
+    0,
+    50,
+  )
+  const calc = tryCalculate(rawQuery)
+  if (calc !== null) {
+    results.unshift({
+      kind: 'calc',
+      label: calc,
+      detail: `${rawQuery.trim()} =`,
+      text: calc,
+      group: 'Calculator',
+    })
+  }
+  return results
 }
 
 function collectBookmarks(
@@ -424,6 +593,8 @@ interface Message {
   parentId?: string
   sessionId?: string
   folderId?: string
+  text?: string
+  clipT?: number
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -447,6 +618,22 @@ async function handleMessage(
           message.folderId,
         ),
       }
+    case 'clip-add': {
+      const text = message.text?.trim()
+      if (!text || text.length > 10_000) return {}
+      const clips = await getClips()
+      if (clips[0]?.text === text) return {}
+      const next = [{ text, t: Date.now() }, ...clips.filter((c) => c.text !== text)].slice(0, 50)
+      await chrome.storage.local.set({ clips: next }).catch(() => {})
+      return {}
+    }
+    case 'clip-delete': {
+      const clips = await getClips()
+      await chrome.storage.local
+        .set({ clips: clips.filter((c) => c.t !== message.clipT) })
+        .catch(() => {})
+      return {}
+    }
     case 'record-usage': {
       if (!message.key) return {}
       const usage = await getUsage()
