@@ -133,6 +133,18 @@ const PALETTE_COMMANDS = [
   { id: 'split-tab', label: 'Split Tab Right' },
   { id: 'move-tab-new-window', label: 'Move Tab to New Window' },
   { id: 'close-tab', label: 'Close Tab' },
+  { id: 'new-group-from-tab', label: 'New Tab Group from Tab' },
+  { id: 'new-incognito-window', label: 'New Incognito Window' },
+  { id: 'zoom-in', label: 'Zoom In' },
+  { id: 'zoom-out', label: 'Zoom Out' },
+  { id: 'zoom-reset', label: 'Zoom: Actual Size' },
+  { id: 'toggle-fullscreen', label: 'Toggle Full Screen' },
+  { id: 'merge-windows', label: 'Merge All Windows' },
+  { id: 'toggle-bookmarks-bar', label: 'Toggle Bookmarks Bar' },
+  { id: 'save-page', label: 'Save Page As…' },
+  { id: 'find-in-page', label: 'Find in Page' },
+  { id: 'task-manager', label: 'Open Task Manager' },
+  { id: 'js-console', label: 'Developer: JavaScript Console' },
   { id: 'print-page', label: 'Print Page' },
   { id: 'open-devtools', label: 'Developer: Open DevTools' },
   { id: 'view-source', label: 'Developer: View Page Source' },
@@ -162,7 +174,7 @@ const PALETTE_COMMANDS = [
 /* ---------- Ranking: fuzzy match blended with usage frecency ---------- */
 
 interface PaletteItem {
-  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji'
+  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji' | 'download'
   label: string
   detail: string
   url?: string
@@ -172,6 +184,9 @@ interface PaletteItem {
   sessionId?: string
   emoji?: string
   text?: string
+  groupColor?: string
+  grouped?: boolean
+  downloadId?: number
   /** Overrides the mode's default group header in the results list. */
   group?: string
   /** Indices into the ranked text that matched the query, for highlighting. */
@@ -330,6 +345,30 @@ function tryCalculate(raw: string): string | null {
   }
 }
 
+const GROUP_COLORS: Record<string, string> = {
+  grey: '#8e8e93',
+  blue: '#4c9df3',
+  red: '#e05d5d',
+  yellow: '#e8c341',
+  green: '#4caf7d',
+  pink: '#e57fb3',
+  purple: '#9a6ee8',
+  cyan: '#3ab5c6',
+  orange: '#e8964a',
+}
+
+function ago(t: number): string {
+  const s = Math.max(0, (Date.now() - t) / 1000)
+  if (s < 60) return 'just now'
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`
+  return `${Math.floor(s / 86400)}d ago`
+}
+
+function basename(path: string): string {
+  return path.split('/').pop() || path
+}
+
 async function queryPalette(
   mode: string,
   rawQuery: string,
@@ -393,6 +432,33 @@ async function queryPalette(
       .map((r) => ({ kind: 'history' as const, label: r.title || r.url!, detail: '', url: r.url }))
   }
 
+  if (mode === 'downloads') {
+    const downloads = await chrome.downloads.search({
+      orderBy: ['-startTime'],
+      limit: 50,
+      exists: true,
+      state: 'complete',
+    })
+    return rank<PaletteItem>(
+      downloads
+        .filter((d) => d.filename)
+        .map((d) => ({
+          item: {
+            kind: 'download' as const,
+            label: basename(d.filename),
+            detail: ago(Date.parse(d.startTime)),
+            downloadId: d.id,
+            text: d.filename,
+          },
+          text: basename(d.filename).toLowerCase(),
+          usageKey: `download:${d.id}`,
+        })),
+      query,
+      usage,
+      decay,
+    )
+  }
+
   if (mode === 'commands') {
     return rank(
       PALETTE_COMMANDS.map((c) => ({
@@ -409,22 +475,34 @@ async function queryPalette(
   if (mode === 'tabs') {
     const currentWindowId =
       sender.tab?.windowId ?? (await chrome.windows.getLastFocused()).id
-    const tabs = await chrome.tabs.query({})
+    const [tabs, tabGroups] = await Promise.all([
+      chrome.tabs.query({}),
+      chrome.tabGroups.query({}),
+    ])
+    const groupsById = new Map(tabGroups.map((g) => [g.id, g]))
     const open = rank(
       tabs
         .filter((t) => t.id !== undefined)
-        .map((t) => ({
-          item: {
-            kind: 'tab' as const,
-            label: t.title || t.url || '',
-            detail: t.windowId === currentWindowId ? '' : 'Other window',
-            tabId: t.id,
-            url: t.url ?? '',
-            group: 'Open Tabs',
-          },
-          text: `${t.title} ${t.url}`.toLowerCase(),
-          usageKey: `tab:${t.url}`,
-        })),
+        .map((t) => {
+          const tabGroup = t.groupId !== undefined ? groupsById.get(t.groupId) : undefined
+          const windowNote = t.windowId === currentWindowId ? '' : 'Other window'
+          return {
+            item: {
+              kind: 'tab' as const,
+              label: t.title || t.url || '',
+              detail: tabGroup?.title
+                ? `${tabGroup.title}${windowNote ? ` · ${windowNote}` : ''}`
+                : windowNote,
+              tabId: t.id,
+              url: t.url ?? '',
+              group: 'Open Tabs',
+              groupColor: tabGroup ? GROUP_COLORS[tabGroup.color] : undefined,
+              grouped: !!tabGroup,
+            },
+            text: `${t.title} ${t.url} ${tabGroup?.title ?? ''}`.toLowerCase(),
+            usageKey: `tab:${t.url}`,
+          }
+        }),
       query,
       usage,
       decay,
@@ -549,6 +627,8 @@ interface Message {
   sessionId?: string
   folderId?: string
   text?: string
+  groupId?: number
+  downloadId?: number
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -622,6 +702,36 @@ async function handleMessage(
         const tab = await chrome.tabs.update(message.tabId, { active: true })
         if (tab?.windowId !== undefined) await chrome.windows.update(tab.windowId, { focused: true })
       }
+      return {}
+    case 'tab-groups': {
+      const groups = await chrome.tabGroups.query({})
+      return {
+        groups: groups.map((g) => ({
+          id: g.id,
+          title: g.title || 'Untitled group',
+          color: GROUP_COLORS[g.color],
+        })),
+      }
+    }
+    case 'tab-group-add':
+      if (message.tabId !== undefined && message.groupId !== undefined) {
+        await chrome.tabs.group({ tabIds: [message.tabId], groupId: message.groupId })
+      }
+      return {}
+    case 'tab-ungroup':
+      if (message.tabId !== undefined) await chrome.tabs.ungroup([message.tabId])
+      return {}
+    case 'download-open': {
+      if (message.downloadId === undefined) return {}
+      try {
+        await chrome.downloads.open(message.downloadId)
+      } catch {
+        await chrome.downloads.show(message.downloadId)
+      }
+      return {}
+    }
+    case 'download-show':
+      if (message.downloadId !== undefined) await chrome.downloads.show(message.downloadId)
       return {}
     case 'restore-session':
       if (message.sessionId) await chrome.sessions.restore(message.sessionId)
@@ -710,6 +820,72 @@ async function runCommand(id: string, sender: chrome.runtime.MessageSender): Pro
       break
     case 'open-options':
       await chrome.runtime.openOptionsPage()
+      break
+    case 'new-group-from-tab':
+      if (tab?.id) await chrome.tabs.group({ tabIds: [tab.id] })
+      break
+    case 'new-incognito-window':
+      try {
+        await chrome.windows.create({ incognito: true, focused: true })
+      } catch {
+        // Incognito access not granted — let the native host press Cmd+Shift+N.
+        await chrome.runtime
+          .sendNativeMessage('com.superchrome.host', { action: 'new-incognito' })
+          .catch(() => {})
+      }
+      break
+    case 'zoom-in':
+    case 'zoom-out':
+    case 'zoom-reset': {
+      if (!tab?.id) break
+      if (id === 'zoom-reset') {
+        await chrome.tabs.setZoom(tab.id, 0)
+      } else {
+        const zoom = await chrome.tabs.getZoom(tab.id)
+        await chrome.tabs.setZoom(tab.id, id === 'zoom-in' ? zoom * 1.25 : zoom / 1.25)
+      }
+      break
+    }
+    case 'toggle-fullscreen': {
+      if (tab?.windowId === undefined) break
+      const win = await chrome.windows.get(tab.windowId)
+      await chrome.windows.update(tab.windowId, {
+        state: win.state === 'fullscreen' ? 'normal' : 'fullscreen',
+      })
+      break
+    }
+    case 'merge-windows': {
+      if (tab?.windowId === undefined) break
+      const all = await chrome.tabs.query({})
+      const movers = all.filter((t) => t.windowId !== tab.windowId && t.id !== undefined)
+      for (const t of movers) {
+        await chrome.tabs.move(t.id!, { windowId: tab.windowId, index: -1 })
+        if (t.pinned) await chrome.tabs.update(t.id!, { pinned: true })
+      }
+      break
+    }
+    case 'toggle-bookmarks-bar':
+    case 'save-page':
+    case 'find-in-page':
+      await chrome.runtime
+        .sendNativeMessage('com.superchrome.host', { action: 'keystroke', name: id })
+        .catch(() => {})
+      break
+    case 'task-manager':
+      await chrome.runtime
+        .sendNativeMessage('com.superchrome.host', {
+          action: 'click-menu',
+          path: ['Window', 'Task Manager'],
+        })
+        .catch(() => {})
+      break
+    case 'js-console':
+      await chrome.runtime
+        .sendNativeMessage('com.superchrome.host', {
+          action: 'click-menu',
+          path: ['View', 'Developer', 'JavaScript Console'],
+        })
+        .catch(() => {})
       break
     case 'open-devtools':
       // Extensions can't open DevTools; the native host (native-host/) presses

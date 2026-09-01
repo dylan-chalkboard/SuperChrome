@@ -7,7 +7,7 @@
  */
 
 interface RemoteItem {
-  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji'
+  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji' | 'download'
   label: string
   detail: string
   url?: string
@@ -17,6 +17,9 @@ interface RemoteItem {
   sessionId?: string
   emoji?: string
   text?: string
+  groupColor?: string
+  grouped?: boolean
+  downloadId?: number
   group?: string
   positions?: number[]
 }
@@ -103,6 +106,8 @@ const PALETTE_CSS = `
 .item .icon.kind-bookmark, .item .icon.kind-tab, .item .icon.kind-closed {
   background: var(--sc-fallback, #e05d5d); color: #ffffff;
 }
+.item .icon.kind-download { background: #3aa99f; color: #ffffff; }
+.group-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .item .icon.kind-calc { background: #4caf7d; color: #ffffff; font-weight: 700; font-size: 14px; }
 .item .icon.emoji-glyph { font-size: 17px; }
 .item .icon img { width: 18px; height: 18px; border-radius: 4px; }
@@ -165,6 +170,8 @@ const COMMAND_SVG =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M5 4l4 4-4 4" stroke="currentColor" stroke-linecap="round"/></svg>'
 const CLOCK_SVG =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor"/><path d="M8 5v3.2l2.2 1.6" stroke="currentColor" stroke-linecap="round"/></svg>'
+const DOC_SVG =
+  '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 1.5h5.5L12.5 5v9.5h-8.5v-13z" stroke="currentColor" stroke-linejoin="round"/><path d="M9.5 1.5V5H12.5" stroke="currentColor" stroke-linejoin="round"/></svg>'
 const FOLDER_SVG =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1.5 3.5h4.5l1.5 2h7v7h-13v-9z" stroke="currentColor" stroke-linejoin="round"/></svg>'
 
@@ -177,6 +184,7 @@ const TYPE_LABELS: Record<string, string> = {
   closed: 'Closed',
   calc: 'Calculator',
   emoji: 'Emoji',
+  download: 'Download',
 }
 
 const GROUP_LABELS: Record<string, string> = {
@@ -185,9 +193,10 @@ const GROUP_LABELS: Record<string, string> = {
   tabs: 'Open Tabs',
   history: 'History',
   emoji: 'Emoji',
+  downloads: 'Downloads',
 }
 
-type UiState = 'list' | 'actions' | 'rename' | 'move'
+type UiState = 'list' | 'actions' | 'rename' | 'move' | 'group'
 
 let paletteHost: HTMLDivElement | null = null
 let paletteInput: HTMLInputElement | null = null
@@ -335,7 +344,7 @@ function openPalette(prefix: string): void {
 
   const hint = document.createElement('div')
   hint.className = 'hint'
-  hint.append(kbd('> Cmds'), kbd('@ Tabs'), kbd('# History'), kbd(': Emoji'))
+  hint.append(kbd('> Cmds'), kbd('@ Tabs'), kbd('# History'), kbd(': Emoji'), kbd('~ Files'))
 
   inputRow.append(paletteInput, hint)
 
@@ -371,6 +380,7 @@ function currentMode(): string {
   if (raw.startsWith('@')) return 'tabs'
   if (raw.startsWith('#')) return 'history'
   if (raw.startsWith(':')) return 'emoji'
+  if (raw.startsWith('~')) return 'downloads'
   return 'bookmarks'
 }
 
@@ -487,7 +497,7 @@ function onGlobalKey(e: KeyboardEvent): void {
 
   if (e.key === 'Escape') {
     e.preventDefault()
-    if (uiState === 'move') exitSubState(false)
+    if (uiState === 'move' || uiState === 'group') exitSubState(false)
     else if (browseStack.length && currentMode() === 'bookmarks') popFolder()
     else closePalette()
   } else if (
@@ -566,6 +576,15 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     await commitMove(item)
     return
   }
+  if (uiState === 'group') {
+    await commitGroup(item)
+    return
+  }
+  if (item.kind === 'download') {
+    void chrome.runtime.sendMessage({ type: 'download-open', downloadId: item.downloadId })
+    closePalette()
+    return
+  }
   if (item.kind === 'folder') {
     enterFolder(item)
     return
@@ -622,13 +641,20 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'copy-md', label: 'Copy Markdown Link' },
         { id: 'delete-history', label: 'Remove from History', danger: true },
       ]
-    case 'tab':
-      return [
+    case 'tab': {
+      const actions: PaletteAction[] = [
         { id: 'switch', label: 'Switch to Tab' },
+        { id: 'add-to-group', label: 'Add to Group…' },
+        { id: 'new-group', label: 'New Group from Tab' },
+      ]
+      if (item.grouped) actions.push({ id: 'ungroup', label: 'Remove from Group' })
+      actions.push(
         { id: 'copy-url', label: 'Copy URL' },
         { id: 'copy-md', label: 'Copy Markdown Link' },
         { id: 'close-tab', label: 'Close Tab', danger: true },
-      ]
+      )
+      return actions
+    }
     case 'closed':
       return [
         { id: 'reopen', label: 'Reopen Tab' },
@@ -641,6 +667,12 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'open-all', label: 'Open All in New Tabs' },
         { id: 'rename', label: 'Rename…' },
         { id: 'folder-delete', label: 'Delete Folder', danger: true },
+      ]
+    case 'download':
+      return [
+        { id: 'download-open', label: 'Open File' },
+        { id: 'download-show', label: 'Show in Finder' },
+        { id: 'copy-text', label: 'Copy Path' },
       ]
     case 'calc':
       return [{ id: 'copy-text', label: 'Copy Result' }]
@@ -743,6 +775,24 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
       return
     case 'folder-delete':
       await chrome.runtime.sendMessage({ type: 'folder-delete', id: item.id })
+      break
+    case 'download-open':
+      await chrome.runtime.sendMessage({ type: 'download-open', downloadId: item.downloadId })
+      closePalette()
+      return
+    case 'download-show':
+      await chrome.runtime.sendMessage({ type: 'download-show', downloadId: item.downloadId })
+      closePalette()
+      return
+    case 'add-to-group':
+      closeActions()
+      await enterGroup(item)
+      return
+    case 'new-group':
+      await chrome.runtime.sendMessage({ type: 'tab-group-add', tabId: item.tabId })
+      break
+    case 'ungroup':
+      await chrome.runtime.sendMessage({ type: 'tab-ungroup', tabId: item.tabId })
       break
     case 'insert':
       closeActions()
@@ -887,6 +937,34 @@ async function commitMove(folderItem: RemoteItem): Promise<void> {
   exitSubState(true)
 }
 
+let groupsCache: Array<{ id: number; title: string; color?: string }> | null = null
+
+async function enterGroup(item: RemoteItem): Promise<void> {
+  if (!paletteInput) return
+  uiState = 'group'
+  subStateTarget = item
+  savedQuery = paletteInput.value
+  paletteInput.value = ''
+  paletteInput.placeholder = `Add "${item.label}" to group…`
+  paletteInput.focus()
+  const response = (await chrome.runtime.sendMessage({ type: 'tab-groups' })) as {
+    groups?: Array<{ id: number; title: string; color?: string }>
+  }
+  groupsCache = response?.groups ?? []
+  void updateList()
+}
+
+async function commitGroup(groupItem: RemoteItem): Promise<void> {
+  if (subStateTarget?.tabId !== undefined) {
+    await chrome.runtime.sendMessage({
+      type: 'tab-group-add',
+      tabId: subStateTarget.tabId,
+      groupId: groupItem.downloadId,
+    })
+  }
+  exitSubState(true)
+}
+
 function exitSubState(_commit: boolean): void {
   if (uiState === 'actions') closeActions()
   if (!paletteInput) return
@@ -924,6 +1002,23 @@ async function updateList(): Promise<void> {
 
   if (uiState === 'rename') return
 
+  if (uiState === 'group') {
+    const query = paletteInput.value.trim().toLowerCase()
+    const groups = (groupsCache ?? [])
+      .filter((g) => !query || g.title.toLowerCase().includes(query))
+      .map(
+        (g): RemoteItem => ({
+          kind: 'command',
+          label: g.title,
+          detail: '',
+          groupColor: g.color,
+          downloadId: g.id,
+        }),
+      )
+    renderItems('Tab Groups', groups)
+    return
+  }
+
   if (uiState === 'move') {
     const query = paletteInput.value.trim().toLowerCase()
     const folders = (foldersCache ?? [])
@@ -936,7 +1031,7 @@ async function updateList(): Promise<void> {
   }
 
   const mode = currentMode()
-  const query = paletteInput.value.replace(/^[>@#:]/, '')
+  const query = paletteInput.value.replace(/^[>@#:~]/, '')
   const browsing = mode === 'bookmarks' && browseStack.length > 0
   const folderId = browsing ? browseStack[browseStack.length - 1].id : undefined
   const response = (await chrome.runtime.sendMessage({
@@ -985,7 +1080,14 @@ function renderItems(groupLabel: string, items: RemoteItem[]): void {
     const type = document.createElement('span')
     type.className = 'type'
     type.textContent = TYPE_LABELS[item.kind] ?? ''
-    row.append(iconFor(item), title, detail, type)
+    row.append(iconFor(item), title, detail)
+    if (item.groupColor) {
+      const dot = document.createElement('span')
+      dot.className = 'group-dot'
+      dot.style.background = item.groupColor
+      row.appendChild(dot)
+    }
+    row.appendChild(type)
     row.addEventListener('mousedown', (e) => {
       e.preventDefault()
       void executeItem(item, e.metaKey || e.ctrlKey)
@@ -1054,7 +1156,14 @@ function iconFor(item: RemoteItem): HTMLElement {
     icon.textContent = '='
     return icon
   }
-  icon.innerHTML = kind === 'folder' ? FOLDER_SVG : kind === 'history' ? CLOCK_SVG : COMMAND_SVG
+  icon.innerHTML =
+    kind === 'folder'
+      ? FOLDER_SVG
+      : kind === 'history'
+        ? CLOCK_SVG
+        : kind === 'download'
+          ? DOC_SVG
+          : COMMAND_SVG
   return icon
 }
 

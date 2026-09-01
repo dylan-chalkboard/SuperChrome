@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "SuperChrome",
   "description": "Raycast-style command palette for Chrome — bookmarks, tabs, history, and commands",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "minimum_chrome_version": "114",
   "permissions": [
     "bookmarks",
@@ -12,7 +12,10 @@
     "nativeMessaging",
     "storage",
     "history",
-    "sessions"
+    "sessions",
+    "tabGroups",
+    "downloads",
+    "downloads.open"
   ],
   "host_permissions": [
     "<all_urls>"

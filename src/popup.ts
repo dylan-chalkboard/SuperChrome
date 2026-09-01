@@ -8,7 +8,7 @@
  */
 
 interface RemoteItem {
-  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji'
+  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji' | 'download'
   label: string
   detail: string
   url?: string
@@ -18,6 +18,9 @@ interface RemoteItem {
   sessionId?: string
   emoji?: string
   text?: string
+  groupColor?: string
+  grouped?: boolean
+  downloadId?: number
   group?: string
   positions?: number[]
 }
@@ -34,6 +37,8 @@ const COMMAND_SVG =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M5 4l4 4-4 4" stroke="currentColor" stroke-linecap="round"/></svg>'
 const CLOCK_SVG =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor"/><path d="M8 5v3.2l2.2 1.6" stroke="currentColor" stroke-linecap="round"/></svg>'
+const DOC_SVG =
+  '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 1.5h5.5L12.5 5v9.5h-8.5v-13z" stroke="currentColor" stroke-linejoin="round"/><path d="M9.5 1.5V5H12.5" stroke="currentColor" stroke-linejoin="round"/></svg>'
 const FOLDER_SVG =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1.5 3.5h4.5l1.5 2h7v7h-13v-9z" stroke="currentColor" stroke-linejoin="round"/></svg>'
 
@@ -46,6 +51,7 @@ const TYPE_LABELS: Record<string, string> = {
   folder: 'Folder',
   calc: 'Calculator',
   emoji: 'Emoji',
+  download: 'Download',
 }
 
 const GROUP_LABELS: Record<string, string> = {
@@ -54,6 +60,7 @@ const GROUP_LABELS: Record<string, string> = {
   tabs: 'Open Tabs',
   history: 'History',
   emoji: 'Emoji',
+  downloads: 'Downloads',
 }
 
 // Page-local commands need the page's document; they can't run from a popup.
@@ -72,6 +79,7 @@ function currentMode(): string {
   if (raw.startsWith('@')) return 'tabs'
   if (raw.startsWith('#')) return 'history'
   if (raw.startsWith(':')) return 'emoji'
+  if (raw.startsWith('~')) return 'downloads'
   return 'bookmarks'
 }
 
@@ -175,13 +183,19 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'copy-md', label: 'Copy Markdown Link' },
         { id: 'delete-history', label: 'Remove from History', danger: true },
       ]
-    case 'tab':
-      return [
+    case 'tab': {
+      const actions: PaletteAction[] = [
         { id: 'switch', label: 'Switch to Tab' },
+        { id: 'new-group', label: 'New Group from Tab' },
+      ]
+      if (item.grouped) actions.push({ id: 'ungroup', label: 'Remove from Group' })
+      actions.push(
         { id: 'copy-url', label: 'Copy URL' },
         { id: 'copy-md', label: 'Copy Markdown Link' },
         { id: 'close-tab', label: 'Close Tab', danger: true },
-      ]
+      )
+      return actions
+    }
     case 'closed':
       return [
         { id: 'reopen', label: 'Reopen Tab' },
@@ -193,6 +207,12 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'browse', label: 'Browse Folder' },
         { id: 'open-all', label: 'Open All in New Tabs' },
         { id: 'folder-delete', label: 'Delete Folder', danger: true },
+      ]
+    case 'download':
+      return [
+        { id: 'download-open', label: 'Open File' },
+        { id: 'download-show', label: 'Show in Finder' },
+        { id: 'copy-text', label: 'Copy Path' },
       ]
     case 'calc':
       return [{ id: 'copy-text', label: 'Copy Result' }]
@@ -292,6 +312,20 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
     case 'folder-delete':
       await chrome.runtime.sendMessage({ type: 'folder-delete', id: item.id })
       break
+    case 'download-open':
+      await chrome.runtime.sendMessage({ type: 'download-open', downloadId: item.downloadId })
+      window.close()
+      return
+    case 'download-show':
+      await chrome.runtime.sendMessage({ type: 'download-show', downloadId: item.downloadId })
+      window.close()
+      return
+    case 'new-group':
+      await chrome.runtime.sendMessage({ type: 'tab-group-add', tabId: item.tabId })
+      break
+    case 'ungroup':
+      await chrome.runtime.sendMessage({ type: 'tab-ungroup', tabId: item.tabId })
+      break
     case 'copy-text':
       await copyText(item.kind === 'emoji' ? (item.emoji ?? '') : (item.text ?? item.label))
       window.close()
@@ -358,6 +392,11 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     enterFolder(item)
     return
   }
+  if (item.kind === 'download') {
+    await chrome.runtime.sendMessage({ type: 'download-open', downloadId: item.downloadId })
+    window.close()
+    return
+  }
   if (item.kind === 'calc' || item.kind === 'emoji') {
     recordUsage(item)
     await copyText(item.kind === 'emoji' ? (item.emoji ?? '') : (item.text ?? item.label))
@@ -385,7 +424,7 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
 async function updateList(): Promise<void> {
   const token = ++queryToken
   const mode = currentMode()
-  const query = inputEl.value.replace(/^[>@#:]/, '')
+  const query = inputEl.value.replace(/^[>@#:~]/, '')
   const browsing = mode === 'bookmarks' && browseStack.length > 0
   const response = (await chrome.runtime.sendMessage({
     type: 'palette-query',
@@ -432,7 +471,14 @@ async function updateList(): Promise<void> {
     const type = document.createElement('span')
     type.className = 'type'
     type.textContent = TYPE_LABELS[item.kind] ?? ''
-    row.append(iconFor(item), title, detail, type)
+    row.append(iconFor(item), title, detail)
+    if (item.groupColor) {
+      const dot = document.createElement('span')
+      dot.className = 'group-dot'
+      dot.style.background = item.groupColor
+      row.appendChild(dot)
+    }
+    row.appendChild(type)
     row.addEventListener('click', (e) => void executeItem(item, e.metaKey || e.ctrlKey))
     row.addEventListener('mousemove', () => {
       if (selectedIndex !== index) {
@@ -498,7 +544,14 @@ function iconFor(item: RemoteItem): HTMLElement {
     icon.textContent = '='
     return icon
   }
-  icon.innerHTML = kind === 'folder' ? FOLDER_SVG : kind === 'history' ? CLOCK_SVG : COMMAND_SVG
+  icon.innerHTML =
+    kind === 'folder'
+      ? FOLDER_SVG
+      : kind === 'history'
+        ? CLOCK_SVG
+        : kind === 'download'
+          ? DOC_SVG
+          : COMMAND_SVG
   return icon
 }
 
