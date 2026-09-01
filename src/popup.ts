@@ -397,11 +397,9 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
     }
     case 'copy-url':
       await copyText(item.url ?? '')
-      closeSelf()
       return
     case 'copy-md':
       await copyText(`[${item.label}](${item.url ?? ''})`)
-      closeSelf()
       return
     case 'switch':
       await chrome.runtime.sendMessage({ type: 'activate-tab', tabId: item.tabId })
@@ -443,7 +441,6 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
       return
     case 'copy-text':
       await copyText(item.kind === 'emoji' ? (item.emoji ?? '') : (item.text ?? item.label))
-      closeSelf()
       return
     case 'run':
       closeActions()
@@ -463,7 +460,7 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
   void updateList()
 }
 
-async function copyText(text: string): Promise<void> {
+async function copyText(text: string, swatch?: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(text)
   } catch {
@@ -474,6 +471,23 @@ async function copyText(text: string): Promise<void> {
     document.execCommand('copy')
     area.remove()
   }
+  showToast(swatch ? `${text} copied` : 'Copied to clipboard', swatch)
+  setTimeout(closeSelf, 900)
+}
+
+function showToast(message: string, swatch?: string): void {
+  const pill = document.createElement('div')
+  pill.className = 'ptoast'
+  if (swatch) {
+    const chip = document.createElement('span')
+    chip.style.cssText = `width:14px;height:14px;border-radius:4px;border:1px solid #ffffff33;background:${swatch};`
+    pill.appendChild(chip)
+  } else {
+    pill.innerHTML =
+      '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.2 3.2L13 5" stroke="#7bc97b" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  }
+  pill.appendChild(document.createTextNode(message))
+  document.body.appendChild(pill)
 }
 
 function moveSelection(delta: number): void {
@@ -534,7 +548,6 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
   if (item.kind === 'calc' || item.kind === 'emoji') {
     recordUsage(item)
     await copyText(item.kind === 'emoji' ? (item.emoji ?? '') : (item.text ?? item.label))
-    closeSelf()
     return
   }
   recordUsage(item)

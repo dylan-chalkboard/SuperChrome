@@ -1110,7 +1110,7 @@ function showToast(message: string, swatch?: string): void {
   setTimeout(() => {
     pill.classList.remove('show')
     setTimeout(() => host.remove(), 200)
-  }, 1400)
+  }, 1800)
 }
 
 /* ---------- Rename / move sub-states ---------- */
