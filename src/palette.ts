@@ -184,6 +184,10 @@ const PALETTE_CSS = `
 .action-row.danger { color: #ff8f8f; }
 .list::-webkit-scrollbar { width: 10px; }
 .list::-webkit-scrollbar-thumb { background: #ffffff1a; border-radius: 5px; }
+@media (prefers-reduced-motion: reduce) {
+  .panel, .selector, .toast { transition: none !important; }
+}
+.panel.no-motion, .no-motion .selector { transition: none !important; }
 `
 
 const BOOKMARK_SVG =
@@ -285,6 +289,11 @@ let lastFocused: HTMLElement | null = null
 let prefersNewTab = false
 let selectorEl: HTMLElement | null = null
 const GRID_COLS = 10
+let reduceMotionPref = false
+
+function reducedMotion(): boolean {
+  return reduceMotionPref || window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
 
 /** Insert into the element that had focus before the palette opened, else copy. */
 function insertOrCopy(text: string): void {
@@ -342,6 +351,8 @@ async function applyUserSettings(): Promise<void> {
       if (typeof colors[key] === 'string') panelEl.style.setProperty(`--sc-${key}`, colors[key])
     }
     prefersNewTab = settings.openInNewTab === true
+    reduceMotionPref = settings.reduceMotion === true
+    if (reduceMotionPref) panelEl.classList.add('no-motion')
     renderFooter()
   } catch {
     // Defaults baked into the CSS cover this.
@@ -362,7 +373,7 @@ function closePalette(): void {
   }
   const host = paletteHost
   const panel = panelEl
-  if (host && panel) {
+  if (host && panel && !reducedMotion()) {
     host.style.pointerEvents = 'none'
     panel.classList.add('closing')
     setTimeout(() => host.remove(), 140)
@@ -438,9 +449,11 @@ function openPalette(prefix: string): void {
   panelEl.append(inputRow, paletteList, paletteFooter)
   backdrop.appendChild(panelEl)
   shadow.append(style, backdrop)
-  panelEl.classList.add('enter')
+  if (!reducedMotion()) {
+    panelEl.classList.add('enter')
+    requestAnimationFrame(() => panelEl?.classList.remove('enter'))
+  }
   document.documentElement.appendChild(paletteHost)
-  requestAnimationFrame(() => panelEl?.classList.remove('enter'))
   for (const type of ['keydown', 'keypress', 'keyup'] as const) {
     window.addEventListener(type, onGlobalKey, true)
   }
@@ -1045,6 +1058,7 @@ function showToast(message: string): void {
       transition: opacity 0.15s ease;
     }
     .toast.show { opacity: 1; }
+    @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
   `
   const pill = document.createElement('div')
   pill.className = 'toast'

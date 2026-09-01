@@ -8,6 +8,7 @@ interface UserSettings {
   frecencyDecayDays: number
   defaultMode: PaletteMode
   openInNewTab: boolean
+  reduceMotion: boolean
   disabledSites: string[]
 }
 
@@ -17,6 +18,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   frecencyDecayDays: 14,
   defaultMode: 'bookmarks',
   openInNewTab: false,
+  reduceMotion: false,
   disabledSites: [],
 }
 

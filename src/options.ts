@@ -4,6 +4,7 @@ interface UserSettings {
   frecencyDecayDays: number
   defaultMode: 'bookmarks' | 'commands' | 'tabs' | 'history'
   openInNewTab: boolean
+  reduceMotion: boolean
   disabledSites: string[]
 }
 
@@ -13,6 +14,7 @@ const DEFAULTS: UserSettings = {
   frecencyDecayDays: 14,
   defaultMode: 'bookmarks',
   openInNewTab: false,
+  reduceMotion: false,
   disabledSites: [],
 }
 
@@ -26,6 +28,7 @@ const colorHistory = el<HTMLInputElement>('color-history')
 const colorFallback = el<HTMLInputElement>('color-fallback')
 const defaultMode = el<HTMLSelectElement>('default-mode')
 const newTab = el<HTMLInputElement>('new-tab')
+const reduceMotion = el<HTMLInputElement>('reduce-motion')
 const decay = el<HTMLInputElement>('decay')
 const sites = el<HTMLTextAreaElement>('sites')
 const status = el<HTMLSpanElement>('status')
@@ -39,6 +42,7 @@ function populate(s: UserSettings): void {
   colorFallback.value = s.iconColors.fallback
   defaultMode.value = s.defaultMode
   newTab.checked = s.openInNewTab
+  reduceMotion.checked = s.reduceMotion
   decay.value = String(s.frecencyDecayDays)
   sites.value = s.disabledSites.join('\n')
 }
@@ -63,6 +67,7 @@ function collect(): UserSettings {
     frecencyDecayDays: Math.min(90, Math.max(1, Number(decay.value) || DEFAULTS.frecencyDecayDays)),
     defaultMode: (defaultMode.value as UserSettings['defaultMode']) || 'bookmarks',
     openInNewTab: newTab.checked,
+    reduceMotion: reduceMotion.checked,
     disabledSites: sites.value.split('\n').map(cleanHost).filter(Boolean),
   }
 }
@@ -83,7 +88,7 @@ function save(): void {
   }, 200)
 }
 
-for (const input of [opacity, colorCommand, colorFolder, colorHistory, colorFallback, defaultMode, newTab, decay, sites]) {
+for (const input of [opacity, colorCommand, colorFolder, colorHistory, colorFallback, defaultMode, newTab, reduceMotion, decay, sites]) {
   input.addEventListener('input', save)
   input.addEventListener('change', save)
 }

@@ -125,6 +125,8 @@
       .action-row .spacer { flex: 1; min-width: 16px; }
       .action-row.selected { background: #ffffff24; }
       .action-row.danger { color: #ff8f8f; }
+      @media (prefers-reduced-motion: reduce) { .selector { transition: none !important; } }
+      .no-motion .selector { transition: none !important; }
       ::-webkit-scrollbar { width: 10px; }
       ::-webkit-scrollbar-thumb { background: #ffffff1a; border-radius: 5px; }
     </style>

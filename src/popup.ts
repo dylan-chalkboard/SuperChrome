@@ -780,6 +780,7 @@ async function applyStartupSettings(): Promise<void> {
         document.documentElement.style.setProperty(`--sc-${key}`, colors[key])
       }
     }
+    if (settings?.reduceMotion === true) document.documentElement.classList.add('no-motion')
     if (!(location.hash in HASH_PREFIX) && settings?.defaultMode) {
       inputEl.value = MODE_PREFIX[settings.defaultMode] ?? ''
     }
