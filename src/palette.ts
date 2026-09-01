@@ -51,6 +51,7 @@ const PALETTE_CSS = `
 }
 .panel {
   position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+  transition: opacity 0.13s ease, transform 0.13s ease;
   width: min(720px, 94vw);
   background: rgba(24, 24, 26, var(--sc-op, 0.8));
   backdrop-filter: blur(60px) saturate(1.6);
@@ -64,6 +65,10 @@ const PALETTE_CSS = `
   font: 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   color: #ccccccdd;
   overflow: hidden;
+}
+.panel.enter, .panel.closing {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-6px) scale(0.985);
 }
 .input-row {
   display: flex; align-items: center;
@@ -337,7 +342,15 @@ function closePalette(): void {
   for (const type of ['keydown', 'keypress', 'keyup'] as const) {
     window.removeEventListener(type, onGlobalKey, true)
   }
-  paletteHost?.remove()
+  const host = paletteHost
+  const panel = panelEl
+  if (host && panel) {
+    host.style.pointerEvents = 'none'
+    panel.classList.add('closing')
+    setTimeout(() => host.remove(), 140)
+  } else {
+    host?.remove()
+  }
   paletteHost = null
   paletteInput = null
   paletteList = null
@@ -407,7 +420,9 @@ function openPalette(prefix: string): void {
   panelEl.append(inputRow, paletteList, paletteFooter)
   backdrop.appendChild(panelEl)
   shadow.append(style, backdrop)
+  panelEl.classList.add('enter')
   document.documentElement.appendChild(paletteHost)
+  requestAnimationFrame(() => panelEl?.classList.remove('enter'))
   for (const type of ['keydown', 'keypress', 'keyup'] as const) {
     window.addEventListener(type, onGlobalKey, true)
   }
