@@ -542,7 +542,7 @@ async function queryPalette(
     item: {
       kind: 'bookmark' as const,
       label: b.title,
-      detail: b.path,
+      detail: b.path ? `in ${b.path}` : '',
       url: b.url,
       id: b.id,
     },
@@ -551,11 +551,12 @@ async function queryPalette(
   }))
   const folderEntries = folders.map((f) => {
     const segments = f.path.split(' / ')
+    const parent = segments.slice(0, -1).join(' / ')
     return {
       item: {
         kind: 'folder' as const,
         label: segments[segments.length - 1],
-        detail: segments.slice(0, -1).join(' / '),
+        detail: parent ? `in ${parent}` : '',
         id: f.id,
       },
       text: segments[segments.length - 1].toLowerCase(),
