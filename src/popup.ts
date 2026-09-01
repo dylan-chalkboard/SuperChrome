@@ -110,6 +110,13 @@ if (IS_TAB) {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeSelf()
   })
+  // New tabs can land with focus in the omnibox; grab it back for typing.
+  for (const delay of [0, 80, 200]) {
+    setTimeout(() => {
+      window.focus()
+      document.getElementById('input')?.focus()
+    }, delay)
+  }
 }
 
 /** window.close works for script-opened tabs; tabs.remove covers the rest. */
