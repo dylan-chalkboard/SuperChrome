@@ -645,18 +645,22 @@ async function queryPalette(
       .sort((a, b) => b.score - a.score)
       .slice(0, 6)
     const suggestedKeys = new Set(suggested.map((x) => x.entry.usageKey))
-    const topCommands = commands
+    const allCommands = commands
       .filter((entry) => !suggestedKeys.has(entry.usageKey))
-      .map((entry) => ({ entry, score: frecency(usage, entry.usageKey, decay) }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 8)
+      .map((entry, index) => ({
+        entry,
+        index,
+        score: frecency(usage, entry.usageKey, decay),
+      }))
+      .sort((a, b) => b.score - a.score || a.index - b.index)
     return [
       ...suggested.map((x): PaletteItem => ({ ...x.entry.item, group: 'Suggested' })),
       ...[...folderEntries, ...bookmarkEntries]
         .filter((entry) => !suggestedKeys.has(entry.usageKey))
+        .slice(0, 50)
         .map((entry): PaletteItem => ({ ...entry.item, group: 'Bookmarks' })),
-      ...topCommands.map((x): PaletteItem => ({ ...x.entry.item, group: 'Commands' })),
-    ].slice(0, 70)
+      ...allCommands.map((x): PaletteItem => ({ ...x.entry.item, group: 'Commands' })),
+    ]
   }
 
   const results = rank<PaletteItem>(
