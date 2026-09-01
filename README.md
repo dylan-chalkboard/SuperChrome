@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-white.png">
+    <img src="assets/logo-black.png" alt="SuperChrome" width="140">
+  </picture>
+</p>
+
 # SuperChrome
 
 A Raycast/VSCode-style command palette for Chrome bookmarks — liquid-glass floating quick-open at the top of the screen. Works alongside Chrome's native bookmarks bar.

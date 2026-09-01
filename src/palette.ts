@@ -125,6 +125,7 @@ const PALETTE_CSS = `
 }
 .footer .spacer { flex: 1; }
 .footer .action { display: flex; align-items: center; gap: 6px; }
+.footer .brand-logo { width: 18px; height: 18px; opacity: 0.85; }
 .actions {
   position: absolute; right: 10px; bottom: 46px;
   min-width: 230px;
@@ -318,8 +319,12 @@ function currentMode(): string {
 function renderFooter(): void {
   if (!paletteFooter) return
   paletteFooter.textContent = ''
-  const brand = document.createElement('span')
-  brand.textContent = 'SuperChrome'
+  const brand = document.createElement('img')
+  brand.className = 'brand-logo'
+  brand.src = chrome.runtime.getURL('/icons/footer.png')
+  brand.alt = 'SuperChrome'
+  brand.title = 'SuperChrome'
+  brand.draggable = false
   const spacer = document.createElement('span')
   spacer.className = 'spacer'
   paletteFooter.append(brand, spacer)

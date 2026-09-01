@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "SuperChrome",
-  "description": "Raycast-style command palette for Chrome \u2014 bookmarks, tabs, history, and commands",
-  "version": "0.7.0",
+  "description": "Raycast-style command palette for Chrome — bookmarks, tabs, history, and commands",
+  "version": "0.7.1",
   "minimum_chrome_version": "114",
   "permissions": [
     "bookmarks",
@@ -20,7 +20,8 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "_favicon/*"
+        "_favicon/*",
+        "icons/*"
       ],
       "matches": [
         "<all_urls>"
@@ -32,8 +33,14 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Open bookmark palette",
-    "default_popup": "popup.html"
+    "default_title": "Open SuperChrome palette",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "content_scripts": [
     {
@@ -67,5 +74,11 @@
         "mac": "Command+P"
       }
     }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   }
 }
