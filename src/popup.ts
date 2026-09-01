@@ -103,6 +103,25 @@ const GROUP_LABELS: Record<string, string> = {
 // Page-local commands need the page's document; they can't run from a popup.
 const PAGE_ONLY_COMMANDS = new Set(['print-page'])
 
+const IS_TAB = new URLSearchParams(location.search).has('tab')
+if (IS_TAB) {
+  document.documentElement.classList.add('tab-mode')
+  document.body.classList.add('tab-mode')
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeSelf()
+  })
+}
+
+/** window.close works for script-opened tabs; tabs.remove covers the rest. */
+function closeSelf(): void {
+  window.close()
+  setTimeout(() => {
+    void chrome.tabs.getCurrent().then((tab) => {
+      if (tab?.id) void chrome.tabs.remove(tab.id)
+    })
+  }, 50)
+}
+
 const inputEl = document.getElementById('input') as HTMLInputElement
 const listEl = document.getElementById('list')!
 
@@ -348,23 +367,23 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
         url: item.url,
         newTab: action.id === 'open-new-tab',
       })
-      window.close()
+      closeSelf()
       return
     case 'copy-url':
       await copyText(item.url ?? '')
-      window.close()
+      closeSelf()
       return
     case 'copy-md':
       await copyText(`[${item.label}](${item.url ?? ''})`)
-      window.close()
+      closeSelf()
       return
     case 'switch':
       await chrome.runtime.sendMessage({ type: 'activate-tab', tabId: item.tabId })
-      window.close()
+      closeSelf()
       return
     case 'reopen':
       await chrome.runtime.sendMessage({ type: 'restore-session', sessionId: item.sessionId })
-      window.close()
+      closeSelf()
       return
     case 'browse':
       closeActions()
@@ -372,18 +391,18 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
       return
     case 'open-all':
       await chrome.runtime.sendMessage({ type: 'open-folder-tabs', id: item.id })
-      window.close()
+      closeSelf()
       return
     case 'folder-delete':
       await chrome.runtime.sendMessage({ type: 'folder-delete', id: item.id })
       break
     case 'download-open':
       await chrome.runtime.sendMessage({ type: 'download-open', downloadId: item.downloadId })
-      window.close()
+      closeSelf()
       return
     case 'download-show':
       await chrome.runtime.sendMessage({ type: 'download-show', downloadId: item.downloadId })
-      window.close()
+      closeSelf()
       return
     case 'new-group':
       await chrome.runtime.sendMessage({ type: 'tab-group-add', tabId: item.tabId })
@@ -398,7 +417,7 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
       return
     case 'copy-text':
       await copyText(item.kind === 'emoji' ? (item.emoji ?? '') : (item.text ?? item.label))
-      window.close()
+      closeSelf()
       return
     case 'run':
       closeActions()
@@ -464,13 +483,13 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
   }
   if (item.kind === 'download') {
     await chrome.runtime.sendMessage({ type: 'download-open', downloadId: item.downloadId })
-    window.close()
+    closeSelf()
     return
   }
   if (item.kind === 'calc' || item.kind === 'emoji') {
     recordUsage(item)
     await copyText(item.kind === 'emoji' ? (item.emoji ?? '') : (item.text ?? item.label))
-    window.close()
+    closeSelf()
     return
   }
   recordUsage(item)
@@ -488,7 +507,7 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
   } else {
     await chrome.runtime.sendMessage({ type: 'run-command', id: item.commandId })
   }
-  window.close()
+  closeSelf()
 }
 
 async function updateList(): Promise<void> {
@@ -679,7 +698,7 @@ async function applyStartupSettings(): Promise<void> {
 
 document.getElementById('gear')?.addEventListener('click', () => {
   void chrome.runtime.openOptionsPage()
-  window.close()
+  closeSelf()
 })
 
 if (location.hash in HASH_PREFIX) inputEl.value = HASH_PREFIX[location.hash]

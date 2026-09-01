@@ -5,6 +5,16 @@
     <title>SuperChrome</title>
     <style>
       * { box-sizing: border-box; }
+      html.tab-mode { background: #141414; height: 100%; }
+      body.tab-mode {
+        width: min(720px, 94vw);
+        margin: 8vh auto 0;
+        border: 1px solid #ffffff14;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 16px 48px #00000088;
+      }
+      .tab-mode .list { max-height: 62vh; }
       html, body { margin: 0; }
       body {
         width: 560px;

@@ -74,15 +74,12 @@ async function togglePaletteIn(
     }
   }
 
-  // Popup palette: extension UI works everywhere, including disabled sites.
-  try {
-    await chrome.action.setPopup({ popup: `popup.html${MODE_HASH[mode]}` })
-    await chrome.action.openPopup()
-  } catch {
-    // openPopup needs a focused window; nothing more we can do.
-  } finally {
-    await chrome.action.setPopup({ popup: 'popup.html' })
-  }
+  // Restricted page (chrome://, Web Store) or disabled site: open the palette
+  // as a full extension page in a new tab — picking a result navigates it.
+  await chrome.tabs.create({
+    url: chrome.runtime.getURL(`popup.html?tab=1${MODE_HASH[mode]}`),
+    index: tab.index + 1,
+  })
 }
 
 chrome.commands.onCommand.addListener(async (command) => {
