@@ -75,6 +75,8 @@ const PALETTE_COMMANDS = [
   { id: 'new-tab', label: 'New Tab' },
   { id: 'duplicate-tab', label: 'Duplicate Tab' },
   { id: 'toggle-pin', label: 'Pin/Unpin Tab' },
+  { id: 'split-tab', label: 'Split Tab Right' },
+  { id: 'move-tab-new-window', label: 'Move Tab to New Window' },
   { id: 'close-tab', label: 'Close Tab' },
   { id: 'print-page', label: 'Print Page' },
   { id: 'open-devtools', label: 'Developer: Open DevTools' },
@@ -105,13 +107,16 @@ const PALETTE_COMMANDS = [
 /* ---------- Ranking: fuzzy match blended with usage frecency ---------- */
 
 interface PaletteItem {
-  kind: 'bookmark' | 'tab' | 'history' | 'command'
+  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed'
   label: string
   detail: string
   url?: string
   id?: string
   tabId?: number
   commandId?: string
+  sessionId?: string
+  /** Overrides the mode's default group header in the results list. */
+  group?: string
   /** Indices into the ranked text that matched the query, for highlighting. */
   positions?: number[]
 }
@@ -206,19 +211,20 @@ async function queryPalette(
   }
 
   if (mode === 'tabs') {
-    const tabs = sender.tab
-      ? await chrome.tabs.query({ windowId: sender.tab.windowId })
-      : await chrome.tabs.query({ currentWindow: true })
-    return rank(
+    const currentWindowId =
+      sender.tab?.windowId ?? (await chrome.windows.getLastFocused()).id
+    const tabs = await chrome.tabs.query({})
+    const open = rank(
       tabs
         .filter((t) => t.id !== undefined)
         .map((t) => ({
           item: {
             kind: 'tab' as const,
             label: t.title || t.url || '',
-            detail: '',
+            detail: t.windowId === currentWindowId ? '' : 'Other window',
             tabId: t.id,
             url: t.url ?? '',
+            group: 'Open Tabs',
           },
           text: `${t.title} ${t.url}`.toLowerCase(),
           usageKey: `tab:${t.url}`,
@@ -226,6 +232,26 @@ async function queryPalette(
       query,
       usage,
     )
+    const sessions = await chrome.sessions.getRecentlyClosed({ maxResults: 10 })
+    const closed = rank(
+      sessions
+        .filter((s) => s.tab?.sessionId && s.tab.url)
+        .map((s) => ({
+          item: {
+            kind: 'closed' as const,
+            label: s.tab!.title || s.tab!.url!,
+            detail: '',
+            url: s.tab!.url,
+            sessionId: s.tab!.sessionId,
+            group: 'Recently Closed',
+          },
+          text: `${s.tab!.title} ${s.tab!.url}`.toLowerCase(),
+          usageKey: `closed:${s.tab!.url}`,
+        })),
+      query,
+      usage,
+    )
+    return [...open, ...closed]
   }
 
   const [root] = await chrome.bookmarks.getTree()
@@ -293,6 +319,7 @@ interface Message {
   key?: string
   title?: string
   parentId?: string
+  sessionId?: string
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -344,7 +371,13 @@ async function handleMessage(
       if (message.tabId !== undefined) await chrome.tabs.remove(message.tabId)
       return {}
     case 'activate-tab':
-      if (message.tabId !== undefined) await chrome.tabs.update(message.tabId, { active: true })
+      if (message.tabId !== undefined) {
+        const tab = await chrome.tabs.update(message.tabId, { active: true })
+        if (tab?.windowId !== undefined) await chrome.windows.update(tab.windowId, { focused: true })
+      }
+      return {}
+    case 'restore-session':
+      if (message.sessionId) await chrome.sessions.restore(message.sessionId)
       return {}
     case 'open-url': {
       const tab = await senderTab(sender)
@@ -386,6 +419,47 @@ async function runCommand(id: string, sender: chrome.runtime.MessageSender): Pro
       break
     case 'view-source':
       if (tab?.url) await chrome.tabs.create({ url: `view-source:${tab.url}` })
+      break
+    case 'split-tab': {
+      // Chrome's native Split View has no creation API (extensions can only
+      // detect splits), so tile two windows across the current window's bounds.
+      if (!tab?.id || tab.windowId === undefined) break
+      const win = await chrome.windows.get(tab.windowId, { populate: true })
+      const left = win.left ?? 0
+      const top = win.top ?? 0
+      const width = win.width ?? 1200
+      const height = win.height ?? 800
+      const half = Math.floor(width / 2)
+      await chrome.windows.update(tab.windowId, {
+        state: 'normal',
+        left,
+        top,
+        width: half,
+        height,
+      })
+      if ((win.tabs?.length ?? 0) > 1) {
+        await chrome.windows.create({
+          tabId: tab.id,
+          left: left + half,
+          top,
+          width: width - half,
+          height,
+          focused: true,
+        })
+      } else {
+        // Lone tab: moving it would close the window; open a fresh one instead.
+        await chrome.windows.create({
+          left: left + half,
+          top,
+          width: width - half,
+          height,
+          focused: true,
+        })
+      }
+      break
+    }
+    case 'move-tab-new-window':
+      if (tab?.id) await chrome.windows.create({ tabId: tab.id, focused: true })
       break
     case 'open-devtools':
       // Extensions can't open DevTools; the native host (native-host/) presses

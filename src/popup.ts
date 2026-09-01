@@ -8,13 +8,15 @@
  */
 
 interface RemoteItem {
-  kind: 'bookmark' | 'tab' | 'history' | 'command'
+  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed'
   label: string
   detail: string
   url?: string
   id?: string
   tabId?: number
   commandId?: string
+  sessionId?: string
+  group?: string
   positions?: number[]
 }
 
@@ -36,6 +38,7 @@ const TYPE_LABELS: Record<string, string> = {
   tab: 'Tab',
   history: 'History',
   command: 'Command',
+  closed: 'Closed',
 }
 
 const GROUP_LABELS: Record<string, string> = {
@@ -145,6 +148,12 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'copy-md', label: 'Copy Markdown Link' },
         { id: 'close-tab', label: 'Close Tab', danger: true },
       ]
+    case 'closed':
+      return [
+        { id: 'reopen', label: 'Reopen Tab' },
+        { id: 'copy-url', label: 'Copy URL' },
+        { id: 'copy-md', label: 'Copy Markdown Link' },
+      ]
     default:
       return [{ id: 'run', label: 'Run Command' }]
   }
@@ -214,6 +223,10 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
       await chrome.runtime.sendMessage({ type: 'activate-tab', tabId: item.tabId })
       window.close()
       return
+    case 'reopen':
+      await chrome.runtime.sendMessage({ type: 'restore-session', sessionId: item.sessionId })
+      window.close()
+      return
     case 'run':
       closeActions()
       await executeItem(item, false)
@@ -273,6 +286,8 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     await chrome.runtime.sendMessage({ type: 'open-url', url: item.url, newTab: altAction })
   } else if (item.kind === 'tab') {
     await chrome.runtime.sendMessage({ type: 'activate-tab', tabId: item.tabId })
+  } else if (item.kind === 'closed') {
+    await chrome.runtime.sendMessage({ type: 'restore-session', sessionId: item.sessionId })
   } else if (item.commandId === 'switch-to-tab') {
     inputEl.value = '@'
     inputEl.focus()
@@ -310,12 +325,17 @@ async function updateList(): Promise<void> {
     return
   }
 
-  const label = document.createElement('div')
-  label.className = 'group-label'
-  label.textContent = GROUP_LABELS[mode] ?? 'Results'
-  listEl.appendChild(label)
-
+  const defaultGroup = GROUP_LABELS[mode] ?? 'Results'
+  let lastGroup: string | null = null
   items.forEach((item, index) => {
+    const group = item.group ?? defaultGroup
+    if (group !== lastGroup) {
+      const label = document.createElement('div')
+      label.className = 'group-label'
+      label.textContent = group
+      listEl.appendChild(label)
+      lastGroup = group
+    }
     const row = document.createElement('div')
     row.className = 'item'
     const title = labelEl(item)
@@ -371,7 +391,7 @@ function iconFor(item: RemoteItem): HTMLElement {
   icon.className = 'icon'
   if (item.kind === 'history') {
     icon.innerHTML = CLOCK_SVG
-  } else if ((item.kind === 'bookmark' || item.kind === 'tab') && item.url) {
+  } else if ((item.kind === 'bookmark' || item.kind === 'tab' || item.kind === 'closed') && item.url) {
     const img = document.createElement('img')
     img.src =
       chrome.runtime.getURL('/_favicon/') + `?pageUrl=${encodeURIComponent(item.url)}&size=32`

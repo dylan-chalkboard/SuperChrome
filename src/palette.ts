@@ -7,13 +7,15 @@
  */
 
 interface RemoteItem {
-  kind: 'bookmark' | 'tab' | 'history' | 'command'
+  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed'
   label: string
   detail: string
   url?: string
   id?: string
   tabId?: number
   commandId?: string
+  sessionId?: string
+  group?: string
   positions?: number[]
 }
 
@@ -152,6 +154,7 @@ const TYPE_LABELS: Record<string, string> = {
   history: 'History',
   command: 'Command',
   folder: 'Folder',
+  closed: 'Closed',
 }
 
 const GROUP_LABELS: Record<string, string> = {
@@ -442,6 +445,8 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     void chrome.runtime.sendMessage({ type: 'open-url', url: item.url, newTab: altAction })
   } else if (item.kind === 'tab') {
     void chrome.runtime.sendMessage({ type: 'activate-tab', tabId: item.tabId })
+  } else if (item.kind === 'closed') {
+    void chrome.runtime.sendMessage({ type: 'restore-session', sessionId: item.sessionId })
   } else if (item.commandId === 'switch-to-tab') {
     setInput('@')
     return
@@ -483,6 +488,12 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'copy-url', label: 'Copy URL' },
         { id: 'copy-md', label: 'Copy Markdown Link' },
         { id: 'close-tab', label: 'Close Tab', danger: true },
+      ]
+    case 'closed':
+      return [
+        { id: 'reopen', label: 'Reopen Tab' },
+        { id: 'copy-url', label: 'Copy URL' },
+        { id: 'copy-md', label: 'Copy Markdown Link' },
       ]
     default:
       return [{ id: 'run', label: 'Run Command' }]
@@ -557,6 +568,10 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
       return
     case 'switch':
       await chrome.runtime.sendMessage({ type: 'activate-tab', tabId: item.tabId })
+      closePalette()
+      return
+    case 'reopen':
+      await chrome.runtime.sendMessage({ type: 'restore-session', sessionId: item.sessionId })
       closePalette()
       return
     case 'run':
@@ -725,12 +740,16 @@ function renderItems(groupLabel: string, items: RemoteItem[], iconOverride?: str
     return
   }
 
-  const label = document.createElement('div')
-  label.className = 'group-label'
-  label.textContent = groupLabel
-  paletteList.appendChild(label)
-
+  let lastGroup: string | null = null
   items.forEach((item, index) => {
+    const group = item.group ?? groupLabel
+    if (group !== lastGroup) {
+      const label = document.createElement('div')
+      label.className = 'group-label'
+      label.textContent = group
+      paletteList!.appendChild(label)
+      lastGroup = group
+    }
     const row = document.createElement('div')
     row.className = 'item'
     const title = labelEl(item)
@@ -792,7 +811,7 @@ function iconFor(item: RemoteItem, iconOverride?: string): HTMLElement {
     icon.innerHTML = FOLDER_SVG
   } else if (kind === 'history') {
     icon.innerHTML = CLOCK_SVG
-  } else if ((kind === 'bookmark' || kind === 'tab') && item.url) {
+  } else if ((kind === 'bookmark' || kind === 'tab' || kind === 'closed') && item.url) {
     const img = document.createElement('img')
     img.src =
       chrome.runtime.getURL('/_favicon/') + `?pageUrl=${encodeURIComponent(item.url)}&size=32`
