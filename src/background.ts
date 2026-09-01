@@ -231,7 +231,7 @@ const COMMAND_META: Record<string, { icon: string; color: string }> = {
 /* ---------- Ranking: fuzzy match blended with usage frecency ---------- */
 
 interface PaletteItem {
-  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji' | 'download'
+  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji' | 'download' | 'search'
   label: string
   detail: string
   url?: string
@@ -743,6 +743,18 @@ async function queryPalette(
       group: 'Calculator',
     })
   }
+  // No query ever dead-ends: web search rides at the bottom of every result
+  // set, and is the only row when nothing matches.
+  const trimmed = rawQuery.trim()
+  results.push({
+    kind: 'search',
+    label: `Search Google for “${trimmed}”`,
+    detail: '',
+    url: `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`,
+    icon: 'search',
+    color: '#4c9df3',
+    group: 'Search',
+  })
   return results
 }
 

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "SuperChrome",
   "description": "Raycast-style command palette for Chrome — bookmarks, tabs, history, and commands",
-  "version": "0.14.2",
+  "version": "0.15.0",
   "minimum_chrome_version": "114",
   "permissions": [
     "bookmarks",

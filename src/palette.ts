@@ -7,7 +7,7 @@
  */
 
 interface RemoteItem {
-  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji' | 'download'
+  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji' | 'download' | 'search'
   label: string
   detail: string
   url?: string
@@ -259,6 +259,7 @@ const TYPE_LABELS: Record<string, string> = {
   calc: 'Calculator',
   emoji: 'Emoji',
   download: 'Download',
+  search: 'Search',
 }
 
 const GROUP_LABELS: Record<string, string> = {
@@ -773,7 +774,7 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     return
   }
   recordUsage(item)
-  if (item.kind === 'bookmark' || item.kind === 'history') {
+  if (item.kind === 'bookmark' || item.kind === 'history' || item.kind === 'search') {
     void chrome.runtime.sendMessage({ type: 'open-url', url: item.url, newTab: altAction })
   } else if (item.kind === 'tab') {
     void chrome.runtime.sendMessage({ type: 'activate-tab', tabId: item.tabId })
@@ -823,6 +824,11 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
             ]
           : []),
         { id: 'delete', label: 'Delete Bookmark', danger: true },
+      ]
+    case 'search':
+      return [
+        { id: 'open', label: 'Search' },
+        { id: 'open-new-tab', label: 'Search in New Tab' },
       ]
     case 'history':
       return [
@@ -1430,7 +1436,7 @@ function iconFor(item: RemoteItem): HTMLElement {
     icon.appendChild(img)
     return icon
   }
-  if (kind === 'command') {
+  if (kind === 'command' || kind === 'search') {
     if (item.icon === 'logo') {
       icon.className = 'icon plain'
       const img = document.createElement('img')
