@@ -780,14 +780,55 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
 }
 
 function copyText(text: string): void {
-  void navigator.clipboard?.writeText(text).catch(() => {
-    const area = document.createElement('textarea')
-    area.value = text
-    document.body.appendChild(area)
-    area.select()
-    document.execCommand('copy')
-    area.remove()
-  })
+  void navigator.clipboard
+    ?.writeText(text)
+    .catch(() => {
+      const area = document.createElement('textarea')
+      area.value = text
+      document.body.appendChild(area)
+      area.select()
+      document.execCommand('copy')
+      area.remove()
+    })
+    .then(() => showToast('Copied to clipboard'))
+}
+
+/** Transient confirmation pill, bottom-center, outliving the palette. */
+function showToast(message: string): void {
+  const host = document.createElement('div')
+  host.style.cssText =
+    'position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:2147483647;'
+  const shadow = host.attachShadow({ mode: 'closed' })
+  const style = document.createElement('style')
+  style.textContent = `
+    .toast {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(30, 30, 32, 0.92);
+      backdrop-filter: blur(20px) saturate(1.6);
+      -webkit-backdrop-filter: blur(20px) saturate(1.6);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 10px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 8px 24px #00000088;
+      color: #e8e8e8;
+      font: 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      padding: 9px 16px;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+    .toast.show { opacity: 1; }
+  `
+  const pill = document.createElement('div')
+  pill.className = 'toast'
+  pill.innerHTML =
+    '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.2 3.2L13 5" stroke="#7bc97b" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  pill.appendChild(document.createTextNode(message))
+  shadow.append(style, pill)
+  document.documentElement.appendChild(host)
+  requestAnimationFrame(() => pill.classList.add('show'))
+  setTimeout(() => {
+    pill.classList.remove('show')
+    setTimeout(() => host.remove(), 200)
+  }, 1400)
 }
 
 /* ---------- Rename / move sub-states ---------- */
