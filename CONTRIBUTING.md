@@ -13,7 +13,7 @@ Then in Chrome: `chrome://extensions` → Developer mode on → **Load unpacked*
 
 Iteration loop: save a file → hit ↻ on the extension card → **refresh the tab** you're testing in (content scripts only inject into fresh page loads — though the on-demand injection fallback usually covers you when triggering via shortcut).
 
-`npm run build` runs the TypeScript check plus a production build; it must pass before a PR.
+`npm run build` (TypeScript check + production build) and `npm test` (vitest unit suite) must both pass before a PR.
 
 ## Architecture (2 files)
 
@@ -33,5 +33,5 @@ Iteration loop: save a file → hit ↻ on the extension card → **refresh the 
 ## PRs
 
 - Keep the no-framework, no-dependency approach for the runtime (build-time devDeps are fine)
-- One feature per PR, with a sentence on how you tested it manually (there's no test harness — the surface is Chrome UI integration)
+- One feature per PR. Run `npm test` (pure logic in `src/lib.ts` is unit-tested — ranking, calculator, file types, tree walkers; add cases when you touch it) and describe how you manually tested the Chrome UI surface
 - If you add a permission to the manifest, justify it in the PR description; permission creep is the main thing to guard
