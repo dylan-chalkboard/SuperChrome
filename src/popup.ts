@@ -103,7 +103,9 @@ const GROUP_LABELS: Record<string, string> = {
 // Page-local commands need the page's document; they can't run from a popup.
 const PAGE_ONLY_COMMANDS = new Set(['print-page'])
 
-const IS_TAB = new URLSearchParams(location.search).has('tab')
+const PAGE_PARAMS = new URLSearchParams(location.search)
+const IS_TAB = PAGE_PARAMS.has('tab')
+const SRC_TAB = Number(PAGE_PARAMS.get('src')) || undefined
 if (IS_TAB) {
   document.documentElement.classList.add('tab-mode')
   document.body.classList.add('tab-mode')
@@ -512,7 +514,7 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     void updateList()
     return
   } else {
-    await chrome.runtime.sendMessage({ type: 'run-command', id: item.commandId })
+    await chrome.runtime.sendMessage({ type: 'run-command', id: item.commandId, srcTabId: SRC_TAB })
   }
   closeSelf()
 }

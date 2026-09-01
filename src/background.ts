@@ -77,7 +77,7 @@ async function togglePaletteIn(
   // Restricted page (chrome://, Web Store) or disabled site: open the palette
   // as a full extension page in a new tab — picking a result navigates it.
   await chrome.tabs.create({
-    url: chrome.runtime.getURL(`popup.html?tab=1${MODE_HASH[mode]}`),
+    url: chrome.runtime.getURL(`popup.html?tab=1&src=${tab.id}${MODE_HASH[mode]}`),
     index: tab.index + 1,
   })
 }
@@ -689,6 +689,7 @@ interface Message {
   groupId?: number
   downloadId?: number
   delta?: number
+  srcTabId?: number
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -823,13 +824,21 @@ async function handleMessage(
   return {}
 }
 
-async function runCommand(id: string, sender: chrome.runtime.MessageSender): Promise<void> {
+async function runCommand(
+  id: string,
+  sender: chrome.runtime.MessageSender,
+  srcTabId?: number,
+): Promise<void> {
   const pageUrl = PAGE_COMMANDS[id]
   if (pageUrl) {
     await chrome.tabs.create({ url: pageUrl })
     return
   }
-  const tab = await senderTab(sender)
+  // Tab-mode palette pages pass the tab they were opened from; tab-scoped
+  // commands must act on that tab, not the palette page itself.
+  const tab = srcTabId
+    ? await chrome.tabs.get(srcTabId).catch(() => senderTab(sender))
+    : await senderTab(sender)
   switch (id) {
     case 'new-tab':
       await chrome.tabs.create({})
