@@ -815,7 +815,8 @@ async function handleMessage(
       const newTab = (message.newTab ?? false) !== (await getSettings()).openInNewTab
       if (newTab || !tab?.id) await chrome.tabs.create({ url: message.url })
       else await chrome.tabs.update(tab.id, { url: message.url })
-      return {}
+      // Tab-mode palette needs to know whether its own tab is now navigating.
+      return { newTab: newTab || !tab?.id }
     }
     case 'run-command':
       if (message.id) await runCommand(message.id, sender)

@@ -369,15 +369,16 @@ function highlightActions(): void {
 async function runAction(action: PaletteAction, item: RemoteItem): Promise<void> {
   switch (action.id) {
     case 'open':
-    case 'open-new-tab':
+    case 'open-new-tab': {
       recordUsage(item)
-      await chrome.runtime.sendMessage({
+      const result = (await chrome.runtime.sendMessage({
         type: 'open-url',
         url: item.url,
         newTab: action.id === 'open-new-tab',
-      })
-      closeSelf()
+      })) as { newTab?: boolean }
+      if (!IS_TAB || result?.newTab) closeSelf()
       return
+    }
     case 'copy-url':
       await copyText(item.url ?? '')
       closeSelf()
@@ -503,8 +504,17 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
   }
   recordUsage(item)
   if (item.kind === 'bookmark' || item.kind === 'history') {
-    await chrome.runtime.sendMessage({ type: 'open-url', url: item.url, newTab: altAction })
-  } else if (item.kind === 'tab') {
+    const result = (await chrome.runtime.sendMessage({
+      type: 'open-url',
+      url: item.url,
+      newTab: altAction,
+    })) as { newTab?: boolean }
+    // When this palette runs as a tab and the URL loads in this very tab,
+    // closing would cancel the navigation.
+    if (!IS_TAB || result?.newTab) closeSelf()
+    return
+  }
+  if (item.kind === 'tab') {
     await chrome.runtime.sendMessage({ type: 'activate-tab', tabId: item.tabId })
   } else if (item.kind === 'closed') {
     await chrome.runtime.sendMessage({ type: 'restore-session', sessionId: item.sessionId })
