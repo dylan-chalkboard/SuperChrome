@@ -28,6 +28,18 @@ Open with `Cmd+P` (bookmarks), `Cmd+Shift+P` (commands), or the toolbar icon:
 
 **Omnibox**: type `b` + Tab in the address bar to search bookmarks — works everywhere, including `chrome://` pages where content scripts can't run.
 
+## Native DevTools bridge (macOS, optional)
+
+Extensions can't open DevTools — no API exists. The workaround is a tiny native messaging host that presses `Cmd+Opt+I` for you, making `>Developer: Open DevTools` open the real thing:
+
+```sh
+./native-host/install.sh <your-extension-id>   # ID is on chrome://extensions
+```
+
+Then restart Chrome and grant Accessibility to Google Chrome when macOS asks (System Settings → Privacy & Security → Accessibility). Without the host installed, the command falls back to opening `chrome://inspect`.
+
+The host is ~40 lines of Python (`native-host/host.py`) with a hardcoded action allowlist — it can only do what's in that file.
+
 ## Limitations (Chrome platform, not fixable)
 
 - Content scripts can't run on `chrome://` pages, the Web Store, or other extensions' pages — no palette there (use the `b` keyword)

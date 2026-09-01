@@ -60,6 +60,7 @@ const PALETTE_COMMANDS = [
   { id: 'toggle-pin', label: 'Pin/Unpin Tab' },
   { id: 'close-tab', label: 'Close Tab' },
   { id: 'print-page', label: 'Print Page' },
+  { id: 'open-devtools', label: 'Developer: Open DevTools' },
   { id: 'view-source', label: 'Developer: View Page Source' },
   { id: 'open-inspect-devices', label: 'Developer: Open chrome://inspect' },
   { id: 'open-settings', label: 'Settings: Open Chrome Settings' },
@@ -168,6 +169,15 @@ async function runCommand(id: string, sender: chrome.runtime.MessageSender): Pro
       break
     case 'view-source':
       if (tab?.url) await chrome.tabs.create({ url: `view-source:${tab.url}` })
+      break
+    case 'open-devtools':
+      // Extensions can't open DevTools; the native host (native-host/) presses
+      // Cmd+Opt+I via macOS. No-op if the host isn't installed.
+      try {
+        await chrome.runtime.sendNativeMessage('com.codepanel.host', { action: 'open-devtools' })
+      } catch {
+        await chrome.tabs.create({ url: 'chrome://inspect/' })
+      }
       break
   }
 }

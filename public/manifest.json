@@ -4,7 +4,7 @@
   "description": "VSCode-style command palette for your bookmarks",
   "version": "0.2.0",
   "minimum_chrome_version": "114",
-  "permissions": ["bookmarks", "favicon", "tabs", "scripting"],
+  "permissions": ["bookmarks", "favicon", "tabs", "scripting", "nativeMessaging"],
   "host_permissions": ["<all_urls>"],
   "web_accessible_resources": [
     {
