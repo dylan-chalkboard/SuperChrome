@@ -1032,14 +1032,14 @@ function labelEl(item: RemoteItem): HTMLElement {
 function iconFor(item: RemoteItem): HTMLElement {
   const icon = document.createElement('span')
   const kind = item.kind
-  if ((kind === 'bookmark' || kind === 'tab' || kind === 'closed') && item.url) {
+  if ((kind === 'bookmark' || kind === 'tab' || kind === 'closed' || kind === 'history') && item.url) {
     icon.className = 'icon plain'
     const img = document.createElement('img')
     img.src =
       chrome.runtime.getURL('/_favicon/') + `?pageUrl=${encodeURIComponent(item.url)}&size=32`
     img.onerror = () => {
       icon.className = `icon kind-${kind}`
-      icon.innerHTML = BOOKMARK_SVG
+      icon.innerHTML = kind === 'history' ? CLOCK_SVG : BOOKMARK_SVG
     }
     icon.appendChild(img)
     return icon
