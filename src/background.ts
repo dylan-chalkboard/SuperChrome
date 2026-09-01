@@ -171,6 +171,56 @@ const PALETTE_COMMANDS = [
   { id: 'open-version', label: 'Open Chrome Version' },
 ]
 
+
+/** Per-command icon + tile color shown in the '>' list. */
+const COMMAND_META: Record<string, { icon: string; color: string }> = {
+  'switch-to-tab': { icon: 'switch', color: '#4c9df3' },
+  'open-options': { icon: 'logo', color: '' },
+  'bookmark-tab': { icon: 'bookmark', color: '#e05d5d' },
+  'new-tab': { icon: 'tab', color: '#4c9df3' },
+  'duplicate-tab': { icon: 'tab', color: '#4c9df3' },
+  'toggle-pin': { icon: 'pin', color: '#4c9df3' },
+  'split-tab': { icon: 'split', color: '#3ab5c6' },
+  'move-tab-new-window': { icon: 'external', color: '#3ab5c6' },
+  'close-tab': { icon: 'tab', color: '#e05d5d' },
+  'new-group-from-tab': { icon: 'group', color: '#4c9df3' },
+  'new-incognito-window': { icon: 'incognito', color: '#5a5f6b' },
+  'zoom-in': { icon: 'zoom-in', color: '#3ab5c6' },
+  'zoom-out': { icon: 'zoom-out', color: '#3ab5c6' },
+  'zoom-reset': { icon: 'zoom', color: '#3ab5c6' },
+  'toggle-fullscreen': { icon: 'fullscreen', color: '#3ab5c6' },
+  'merge-windows': { icon: 'merge', color: '#3ab5c6' },
+  'toggle-bookmarks-bar': { icon: 'bookmark', color: '#e05d5d' },
+  'save-page': { icon: 'save', color: '#4caf7d' },
+  'find-in-page': { icon: 'search', color: '#4caf7d' },
+  'print-page': { icon: 'printer', color: '#4caf7d' },
+  'task-manager': { icon: 'gauge', color: '#e8964a' },
+  'js-console': { icon: 'code', color: '#9a6ee8' },
+  'open-devtools': { icon: 'code', color: '#9a6ee8' },
+  'view-source': { icon: 'code', color: '#9a6ee8' },
+  'open-inspect-devices': { icon: 'code', color: '#9a6ee8' },
+  'open-settings': { icon: 'gear', color: '#7d8a97' },
+  'open-settings-privacy': { icon: 'shield', color: '#7d8a97' },
+  'open-settings-appearance': { icon: 'paint', color: '#7d8a97' },
+  'open-settings-search': { icon: 'search', color: '#7d8a97' },
+  'open-settings-autofill': { icon: 'form', color: '#7d8a97' },
+  'open-passwords': { icon: 'key', color: '#e8c341' },
+  'open-settings-site': { icon: 'shield', color: '#7d8a97' },
+  'open-settings-languages': { icon: 'globe', color: '#7d8a97' },
+  'open-settings-system': { icon: 'gear', color: '#7d8a97' },
+  'open-clear-browsing-data': { icon: 'trash', color: '#e8964a' },
+  'open-settings-reset': { icon: 'reset', color: '#e8964a' },
+  'open-about-chrome': { icon: 'info', color: '#7d8a97' },
+  'open-webstore': { icon: 'bag', color: '#4caf7d' },
+  'open-bookmarks-manager': { icon: 'bookmark', color: '#e05d5d' },
+  'open-history': { icon: 'clock', color: '#9a6ee8' },
+  'open-downloads': { icon: 'download', color: '#3aa99f' },
+  'open-extensions': { icon: 'puzzle', color: '#e8964a' },
+  'open-shortcuts': { icon: 'keyboard', color: '#7d8a97' },
+  'open-flags': { icon: 'flag', color: '#e8964a' },
+  'open-version': { icon: 'info', color: '#7d8a97' },
+}
+
 /* ---------- Ranking: fuzzy match blended with usage frecency ---------- */
 
 interface PaletteItem {
@@ -184,6 +234,8 @@ interface PaletteItem {
   sessionId?: string
   emoji?: string
   text?: string
+  icon?: string
+  color?: string
   groupColor?: string
   grouped?: boolean
   downloadId?: number
@@ -462,7 +514,14 @@ async function queryPalette(
   if (mode === 'commands') {
     return rank(
       PALETTE_COMMANDS.map((c) => ({
-        item: { kind: 'command' as const, label: c.label, detail: '', commandId: c.id },
+        item: {
+          kind: 'command' as const,
+          label: c.label,
+          detail: '',
+          commandId: c.id,
+          icon: COMMAND_META[c.id]?.icon,
+          color: COMMAND_META[c.id]?.color || undefined,
+        },
         text: c.label.toLowerCase(),
         usageKey: `command:${c.id}`,
       })),
