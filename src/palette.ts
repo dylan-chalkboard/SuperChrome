@@ -1032,17 +1032,7 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
 }
 
 function copyText(text: string): void {
-  void navigator.clipboard
-    ?.writeText(text)
-    .catch(() => {
-      const area = document.createElement('textarea')
-      area.value = text
-      document.body.appendChild(area)
-      area.select()
-      document.execCommand('copy')
-      area.remove()
-    })
-    .then(() => showToast('Copied to clipboard'))
+  void writeClipboard(text).then(() => showToast('Copied to clipboard'))
 }
 
 async function pickColor(): Promise<void> {
@@ -1053,13 +1043,28 @@ async function pickColor(): Promise<void> {
     showToast('Color picker not supported here')
     return
   }
+  let hex: string
   try {
     const result = await new EyeDropperCtor().open()
-    const hex = result.sRGBHex.toUpperCase()
-    await navigator.clipboard.writeText(hex)
-    showToast(`${hex} copied`, hex)
+    hex = result.sRGBHex.toUpperCase()
   } catch {
     // User pressed Esc — nothing to do.
+    return
+  }
+  await writeClipboard(hex)
+  showToast(`${hex} copied`, hex)
+}
+
+async function writeClipboard(text: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text)
+  } catch {
+    const area = document.createElement('textarea')
+    area.value = text
+    document.body.appendChild(area)
+    area.select()
+    document.execCommand('copy')
+    area.remove()
   }
 }
 
