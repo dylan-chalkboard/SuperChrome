@@ -630,6 +630,24 @@ async function queryPalette(
       usageKey: `folder:${f.id}`,
     }
   })
+  if (!query) {
+    // Raycast-style home view: frecency picks up top, then the full library
+    // with folders first.
+    const all = [...bookmarkEntries, ...folderEntries]
+    const suggested = all
+      .map((entry) => ({ entry, score: frecency(usage, entry.usageKey, decay) }))
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6)
+    const suggestedKeys = new Set(suggested.map((x) => x.entry.usageKey))
+    return [
+      ...suggested.map((x): PaletteItem => ({ ...x.entry.item, group: 'Suggested' })),
+      ...[...folderEntries, ...bookmarkEntries]
+        .filter((entry) => !suggestedKeys.has(entry.usageKey))
+        .map((entry): PaletteItem => ({ ...entry.item, group: 'Bookmarks' })),
+    ].slice(0, 60)
+  }
+
   const results = rank<PaletteItem>([...bookmarkEntries, ...folderEntries], query, usage, decay).slice(
     0,
     50,
