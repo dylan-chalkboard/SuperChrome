@@ -26,7 +26,14 @@ chrome.commands.onCommand.addListener(async (command) => {
   void togglePaletteIn(tab?.id, mode)
 })
 
-chrome.action.onClicked.addListener((tab) => void togglePaletteIn(tab.id, 'bookmarks'))
+/** Popup senders have no tab; fall back to the active tab of the current window. */
+async function senderTab(
+  sender: chrome.runtime.MessageSender,
+): Promise<chrome.tabs.Tab | undefined> {
+  if (sender.tab) return sender.tab
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+  return tab
+}
 
 const PAGE_COMMANDS: Record<string, string> = {
   'open-settings': 'chrome://settings/',
@@ -107,7 +114,9 @@ async function handleMessage(
       const [root] = await chrome.bookmarks.getTree()
       const bookmarks: FlatBookmark[] = []
       for (const child of root.children ?? []) collectBookmarks(child, [], bookmarks)
-      const tabs = await chrome.tabs.query({ windowId: sender.tab?.windowId })
+      const tabs = sender.tab
+        ? await chrome.tabs.query({ windowId: sender.tab.windowId })
+        : await chrome.tabs.query({ currentWindow: true })
       return {
         bookmarks,
         tabs: tabs.map((t) => ({ id: t.id, title: t.title ?? '', url: t.url ?? '' })),
@@ -119,8 +128,9 @@ async function handleMessage(
       return {}
     }
     case 'open-url': {
-      if (message.newTab || !sender.tab?.id) await chrome.tabs.create({ url: message.url })
-      else await chrome.tabs.update(sender.tab.id, { url: message.url })
+      const tab = await senderTab(sender)
+      if (message.newTab || !tab?.id) await chrome.tabs.create({ url: message.url })
+      else await chrome.tabs.update(tab.id, { url: message.url })
       return {}
     }
     case 'run-command': {
@@ -148,7 +158,7 @@ async function runCommand(id: string, sender: chrome.runtime.MessageSender): Pro
     await chrome.tabs.create({ url: pageUrl })
     return
   }
-  const tab = sender.tab
+  const tab = await senderTab(sender)
   switch (id) {
     case 'new-tab':
       await chrome.tabs.create({})

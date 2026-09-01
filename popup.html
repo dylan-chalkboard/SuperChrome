@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Code Panel</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; }
+      body {
+        width: 560px;
+        background: #1a1a1c;
+        font: 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        color: #ccccccdd;
+      }
+      .input-row {
+        display: flex; align-items: center;
+        border-bottom: 1px solid #ffffff10;
+      }
+      .input {
+        flex: 1; min-width: 0;
+        background: transparent; border: none; outline: none;
+        padding: 13px 14px; color: #e8e8e8;
+        font-size: 15px; font-family: inherit;
+      }
+      .input::placeholder { color: #ffffff40; }
+      .hint { display: flex; gap: 6px; margin-right: 12px; flex-shrink: 0; }
+      .kbd {
+        background: #ffffff14; color: #cccccc99;
+        border-radius: 4px; padding: 2px 7px; font-size: 11px;
+      }
+      .list { max-height: 420px; overflow-y: auto; padding: 8px; }
+      .group-label {
+        font-size: 11px; font-weight: 600;
+        color: #ffffff59; padding: 8px 8px 4px;
+      }
+      .item {
+        display: flex; align-items: center; gap: 10px;
+        height: 38px; padding: 0 10px; border-radius: 8px; cursor: pointer;
+        white-space: nowrap;
+      }
+      .item.selected { background: #ffffff1a; }
+      .item .icon {
+        display: flex; align-items: center; justify-content: center;
+        width: 24px; height: 24px; border-radius: 6px;
+        background: #ffffff10; flex-shrink: 0;
+      }
+      .item .icon img { width: 18px; height: 18px; border-radius: 4px; }
+      .item .title {
+        overflow: hidden; text-overflow: ellipsis;
+        flex-shrink: 0; max-width: 55%;
+        color: #e8e8e8; font-weight: 500;
+      }
+      .item .detail {
+        flex: 1; overflow: hidden; text-overflow: ellipsis;
+        color: #ffffff4d; font-size: 13px;
+      }
+      .item .type { flex-shrink: 0; margin-left: auto; color: #ffffff4d; font-size: 12px; }
+      .empty { padding: 16px; color: #ffffff59; }
+      ::-webkit-scrollbar { width: 10px; }
+      ::-webkit-scrollbar-thumb { background: #ffffff1a; border-radius: 5px; }
+    </style>
+  </head>
+  <body>
+    <div class="input-row">
+      <input id="input" class="input" placeholder="Search bookmarks and commands…" spellcheck="false" autocomplete="off" />
+      <div class="hint"><span class="kbd">&gt; Commands</span><span class="kbd">@ Tabs</span></div>
+    </div>
+    <div id="list" class="list"></div>
+    <script type="module" src="/src/popup.ts"></script>
+  </body>
+</html>
