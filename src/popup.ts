@@ -121,14 +121,10 @@ if (IS_TAB) {
   }
 }
 
-/** window.close works for script-opened tabs; tabs.remove covers the rest. */
+/** Chrome blocks window.close() on tabs it opened; the background closes us. */
 function closeSelf(): void {
   window.close()
-  setTimeout(() => {
-    void chrome.tabs.getCurrent().then((tab) => {
-      if (tab?.id) void chrome.tabs.remove(tab.id)
-    })
-  }, 50)
+  void chrome.runtime.sendMessage({ type: 'close-me' }).catch(() => {})
 }
 
 const inputEl = document.getElementById('input') as HTMLInputElement

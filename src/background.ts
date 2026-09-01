@@ -779,6 +779,9 @@ async function handleMessage(
     case 'close-tab-id':
       if (message.tabId !== undefined) await chrome.tabs.remove(message.tabId)
       return {}
+    case 'close-me':
+      if (sender.tab?.id) await chrome.tabs.remove(sender.tab.id).catch(() => {})
+      return {}
     case 'activate-tab':
       if (message.tabId !== undefined) {
         const tab = await chrome.tabs.update(message.tabId, { active: true })
