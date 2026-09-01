@@ -486,7 +486,7 @@ async function queryPalette(
       query,
       usage,
       decay,
-    ).slice(0, 50)
+    )
   }
 
   // Browsing inside one folder: its direct children, subfolders included.
