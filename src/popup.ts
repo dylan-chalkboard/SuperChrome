@@ -8,7 +8,7 @@
  */
 
 interface RemoteItem {
-  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed'
+  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder'
   label: string
   detail: string
   url?: string
@@ -32,6 +32,8 @@ const COMMAND_SVG =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M5 4l4 4-4 4" stroke="currentColor" stroke-linecap="round"/></svg>'
 const CLOCK_SVG =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor"/><path d="M8 5v3.2l2.2 1.6" stroke="currentColor" stroke-linecap="round"/></svg>'
+const FOLDER_SVG =
+  '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1.5 3.5h4.5l1.5 2h7v7h-13v-9z" stroke="currentColor" stroke-linejoin="round"/></svg>'
 
 const TYPE_LABELS: Record<string, string> = {
   bookmark: 'Bookmark',
@@ -39,6 +41,7 @@ const TYPE_LABELS: Record<string, string> = {
   history: 'History',
   command: 'Command',
   closed: 'Closed',
+  folder: 'Folder',
 }
 
 const GROUP_LABELS: Record<string, string> = {
@@ -70,6 +73,22 @@ let actionsEl: HTMLElement | null = null
 let currentActions: PaletteAction[] = []
 let actionIndex = 0
 let actionTarget: RemoteItem | null = null
+let browseStack: Array<{ id: string; label: string }> = []
+
+function enterFolder(item: RemoteItem): void {
+  if (!item.id) return
+  recordUsage(item)
+  browseStack.push({ id: item.id, label: item.label })
+  inputEl.value = ''
+  inputEl.focus()
+  void updateList()
+}
+
+function popFolder(): void {
+  browseStack.pop()
+  inputEl.value = ''
+  void updateList()
+}
 
 inputEl.addEventListener('input', () => {
   closeActions()
@@ -83,7 +102,11 @@ inputEl.addEventListener('keydown', (e) => {
     return
   }
   if (actionsEl) {
-    if (e.key === 'Escape') {
+    if (/^[1-9]$/.test(e.key)) {
+      e.preventDefault()
+      const action = currentActions[Number(e.key) - 1]
+      if (action && actionTarget) void runAction(action, actionTarget)
+    } else if (e.key === 'Escape') {
       e.preventDefault()
       e.stopPropagation()
       closeActions()
@@ -106,6 +129,11 @@ inputEl.addEventListener('keydown', (e) => {
     e.preventDefault()
     const item = flatItems[Number(e.key) - 1]
     if (item) void executeItem(item, false)
+    return
+  }
+  if (e.key === 'Backspace' && inputEl.value === '' && browseStack.length && currentMode() === 'bookmarks') {
+    e.preventDefault()
+    popFolder()
     return
   }
   if (e.key === 'ArrowDown') {
@@ -154,6 +182,12 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'copy-url', label: 'Copy URL' },
         { id: 'copy-md', label: 'Copy Markdown Link' },
       ]
+    case 'folder':
+      return [
+        { id: 'browse', label: 'Browse Folder' },
+        { id: 'open-all', label: 'Open All in New Tabs' },
+        { id: 'folder-delete', label: 'Delete Folder', danger: true },
+      ]
     default:
       return [{ id: 'run', label: 'Run Command' }]
   }
@@ -170,7 +204,17 @@ function openActions(): void {
   currentActions.forEach((action, index) => {
     const row = document.createElement('div')
     row.className = 'action-row' + (action.danger ? ' danger' : '')
-    row.textContent = action.label
+    const label = document.createElement('span')
+    label.textContent = action.label
+    const spacer = document.createElement('span')
+    spacer.className = 'spacer'
+    row.append(label, spacer)
+    if (index < 9) {
+      const chip = document.createElement('span')
+      chip.className = 'kbd'
+      chip.textContent = String(index + 1)
+      row.appendChild(chip)
+    }
     row.addEventListener('mousedown', (e) => {
       e.preventDefault()
       void runAction(action, item)
@@ -227,6 +271,17 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
       await chrome.runtime.sendMessage({ type: 'restore-session', sessionId: item.sessionId })
       window.close()
       return
+    case 'browse':
+      closeActions()
+      enterFolder(item)
+      return
+    case 'open-all':
+      await chrome.runtime.sendMessage({ type: 'open-folder-tabs', id: item.id })
+      window.close()
+      return
+    case 'folder-delete':
+      await chrome.runtime.sendMessage({ type: 'folder-delete', id: item.id })
+      break
     case 'run':
       closeActions()
       await executeItem(item, false)
@@ -276,11 +331,17 @@ function recordUsage(item: RemoteItem): void {
       ? `bookmark:${item.url}`
       : item.kind === 'command'
         ? `command:${item.commandId}`
-        : null
+        : item.kind === 'folder'
+          ? `folder:${item.id}`
+          : null
   if (key) void chrome.runtime.sendMessage({ type: 'record-usage', key })
 }
 
 async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> {
+  if (item.kind === 'folder') {
+    enterFolder(item)
+    return
+  }
   recordUsage(item)
   if (item.kind === 'bookmark' || item.kind === 'history') {
     await chrome.runtime.sendMessage({ type: 'open-url', url: item.url, newTab: altAction })
@@ -303,10 +364,12 @@ async function updateList(): Promise<void> {
   const token = ++queryToken
   const mode = currentMode()
   const query = inputEl.value.replace(/^[>@#]/, '')
+  const browsing = mode === 'bookmarks' && browseStack.length > 0
   const response = (await chrome.runtime.sendMessage({
     type: 'palette-query',
     mode,
     query,
+    folderId: browsing ? browseStack[browseStack.length - 1].id : undefined,
   })) as { items?: RemoteItem[] }
   if (token !== queryToken) return
 
@@ -325,7 +388,9 @@ async function updateList(): Promise<void> {
     return
   }
 
-  const defaultGroup = GROUP_LABELS[mode] ?? 'Results'
+  const defaultGroup = browsing
+    ? browseStack[browseStack.length - 1].label
+    : (GROUP_LABELS[mode] ?? 'Results')
   let lastGroup: string | null = null
   items.forEach((item, index) => {
     const group = item.group ?? defaultGroup
@@ -388,20 +453,21 @@ function labelEl(item: RemoteItem): HTMLElement {
 
 function iconFor(item: RemoteItem): HTMLElement {
   const icon = document.createElement('span')
-  icon.className = 'icon'
-  if (item.kind === 'history') {
-    icon.innerHTML = CLOCK_SVG
-  } else if ((item.kind === 'bookmark' || item.kind === 'tab' || item.kind === 'closed') && item.url) {
+  const kind = item.kind
+  if ((kind === 'bookmark' || kind === 'tab' || kind === 'closed') && item.url) {
+    icon.className = 'icon plain'
     const img = document.createElement('img')
     img.src =
       chrome.runtime.getURL('/_favicon/') + `?pageUrl=${encodeURIComponent(item.url)}&size=32`
     img.onerror = () => {
+      icon.className = `icon kind-${kind}`
       icon.innerHTML = BOOKMARK_SVG
     }
     icon.appendChild(img)
-  } else {
-    icon.innerHTML = COMMAND_SVG
+    return icon
   }
+  icon.className = `icon kind-${kind}`
+  icon.innerHTML = kind === 'folder' ? FOLDER_SVG : kind === 'history' ? CLOCK_SVG : COMMAND_SVG
   return icon
 }
 

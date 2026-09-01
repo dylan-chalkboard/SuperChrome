@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Code Panel",
-  "description": "VSCode-style command palette for your bookmarks",
-  "version": "0.6.0",
+  "name": "SuperChrome",
+  "description": "Raycast-style command palette for Chrome \u2014 bookmarks, tabs, history, and commands",
+  "version": "0.7.0",
   "minimum_chrome_version": "114",
   "permissions": [
     "bookmarks",

@@ -1,4 +1,4 @@
-# Code Panel
+# SuperChrome
 
 A Raycast/VSCode-style command palette for Chrome bookmarks — liquid-glass floating quick-open at the top of the screen. Works alongside Chrome's native bookmarks bar.
 

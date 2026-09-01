@@ -1,24 +1,72 @@
 {
   "manifest_version": 3,
-  "name": "Cursor Dark (Code Panel)",
-  "description": "Cursor Dark browser theme to match the Code Panel sidebar",
+  "name": "Cursor Dark (SuperChrome)",
+  "description": "Cursor Dark browser theme to match SuperChrome",
   "version": "1.0.1",
   "theme": {
     "colors": {
-      "frame": [20, 20, 20],
-      "frame_inactive": [20, 20, 20],
-      "toolbar": [40, 40, 40],
-      "tab_text": [255, 255, 255],
-      "tab_background_text": [128, 128, 128],
-      "bookmark_text": [204, 204, 204],
-      "toolbar_button_icon": [204, 204, 204],
-      "omnibox_background": [42, 42, 42],
-      "omnibox_text": [204, 204, 204],
-      "ntp_background": [26, 26, 26],
-      "ntp_text": [204, 204, 204]
+      "frame": [
+        20,
+        20,
+        20
+      ],
+      "frame_inactive": [
+        20,
+        20,
+        20
+      ],
+      "toolbar": [
+        40,
+        40,
+        40
+      ],
+      "tab_text": [
+        255,
+        255,
+        255
+      ],
+      "tab_background_text": [
+        128,
+        128,
+        128
+      ],
+      "bookmark_text": [
+        204,
+        204,
+        204
+      ],
+      "toolbar_button_icon": [
+        204,
+        204,
+        204
+      ],
+      "omnibox_background": [
+        42,
+        42,
+        42
+      ],
+      "omnibox_text": [
+        204,
+        204,
+        204
+      ],
+      "ntp_background": [
+        26,
+        26,
+        26
+      ],
+      "ntp_text": [
+        204,
+        204,
+        204
+      ]
     },
     "tints": {
-      "buttons": [-1, -1, -1]
+      "buttons": [
+        -1,
+        -1,
+        -1
+      ]
     }
   }
 }

@@ -7,7 +7,7 @@
  */
 
 interface RemoteItem {
-  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed'
+  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder'
   label: string
   detail: string
   url?: string
@@ -94,6 +94,13 @@ const PALETTE_CSS = `
   background: #ffffff10;
   flex-shrink: 0;
 }
+.item .icon.plain { background: transparent; }
+.item .icon.kind-command { background: #4c9df3; color: #ffffff; }
+.item .icon.kind-folder { background: #e0a63c; color: #ffffff; }
+.item .icon.kind-history { background: #9a6ee8; color: #ffffff; }
+.item .icon.kind-bookmark, .item .icon.kind-tab, .item .icon.kind-closed {
+  background: #e05d5d; color: #ffffff;
+}
 .item .icon img { width: 18px; height: 18px; border-radius: 4px; }
 .item .title {
   overflow: hidden; text-overflow: ellipsis;
@@ -129,10 +136,11 @@ const PALETTE_CSS = `
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 8px 24px #00000088;
 }
 .action-row {
-  display: flex; align-items: center;
+  display: flex; align-items: center; gap: 10px;
   height: 30px; padding: 0 10px; border-radius: 6px; cursor: pointer;
   color: #e0e0e0; white-space: nowrap;
 }
+.action-row .spacer { flex: 1; min-width: 16px; }
 .action-row.selected { background: rgba(255, 255, 255, 0.14); }
 .action-row.danger { color: #ff8f8f; }
 .list::-webkit-scrollbar { width: 10px; }
@@ -184,6 +192,7 @@ let actionTarget: RemoteItem | null = null
 let subStateTarget: RemoteItem | null = null
 let savedQuery = ''
 let foldersCache: FolderInfo[] | null = null
+let browseStack: Array<{ id: string; label: string }> = []
 
 chrome.runtime.onMessage.addListener((message: { type?: string; mode?: string }) => {
   if (message?.type === 'toggle-palette') {
@@ -227,6 +236,7 @@ function closePalette(): void {
   uiState = 'list'
   actionTarget = null
   subStateTarget = null
+  browseStack = []
 }
 
 function openPalette(prefix: string): void {
@@ -309,7 +319,7 @@ function renderFooter(): void {
   if (!paletteFooter) return
   paletteFooter.textContent = ''
   const brand = document.createElement('span')
-  brand.textContent = 'Code Panel'
+  brand.textContent = 'SuperChrome'
   const spacer = document.createElement('span')
   spacer.className = 'spacer'
   paletteFooter.append(brand, spacer)
@@ -358,7 +368,11 @@ function onGlobalKey(e: KeyboardEvent): void {
   }
 
   if (uiState === 'actions') {
-    if (e.key === 'Escape') {
+    if (/^[1-9]$/.test(e.key)) {
+      e.preventDefault()
+      const action = currentActions[Number(e.key) - 1]
+      if (action && actionTarget) void runAction(action, actionTarget)
+    } else if (e.key === 'Escape') {
       e.preventDefault()
       closeActions()
     } else if (e.key === 'ArrowDown') {
@@ -391,7 +405,17 @@ function onGlobalKey(e: KeyboardEvent): void {
   if (e.key === 'Escape') {
     e.preventDefault()
     if (uiState === 'move') exitSubState(false)
+    else if (browseStack.length && currentMode() === 'bookmarks') popFolder()
     else closePalette()
+  } else if (
+    e.key === 'Backspace' &&
+    paletteInput?.value === '' &&
+    browseStack.length &&
+    currentMode() === 'bookmarks' &&
+    uiState === 'list'
+  ) {
+    e.preventDefault()
+    popFolder()
   } else if (e.key === 'ArrowDown') {
     e.preventDefault()
     moveSelection(1)
@@ -431,13 +455,34 @@ function recordUsage(item: RemoteItem): void {
       ? `bookmark:${item.url}`
       : item.kind === 'command'
         ? `command:${item.commandId}`
-        : null
+        : item.kind === 'folder'
+          ? `folder:${item.id}`
+          : null
   if (key) void chrome.runtime.sendMessage({ type: 'record-usage', key })
+}
+
+function enterFolder(item: RemoteItem): void {
+  if (!item.id || !paletteInput) return
+  recordUsage(item)
+  browseStack.push({ id: item.id, label: item.label })
+  paletteInput.value = ''
+  paletteInput.focus()
+  void updateList()
+}
+
+function popFolder(): void {
+  browseStack.pop()
+  if (paletteInput) paletteInput.value = ''
+  void updateList()
 }
 
 async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> {
   if (uiState === 'move') {
     await commitMove(item)
+    return
+  }
+  if (item.kind === 'folder') {
+    enterFolder(item)
     return
   }
   recordUsage(item)
@@ -495,6 +540,13 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'copy-url', label: 'Copy URL' },
         { id: 'copy-md', label: 'Copy Markdown Link' },
       ]
+    case 'folder':
+      return [
+        { id: 'browse', label: 'Browse Folder' },
+        { id: 'open-all', label: 'Open All in New Tabs' },
+        { id: 'rename', label: 'Rename…' },
+        { id: 'folder-delete', label: 'Delete Folder', danger: true },
+      ]
     default:
       return [{ id: 'run', label: 'Run Command' }]
   }
@@ -513,7 +565,12 @@ function openActions(): void {
   currentActions.forEach((action, index) => {
     const row = document.createElement('div')
     row.className = 'action-row' + (action.danger ? ' danger' : '')
-    row.textContent = action.label
+    const label = document.createElement('span')
+    label.textContent = action.label
+    const spacer = document.createElement('span')
+    spacer.className = 'spacer'
+    row.append(label, spacer)
+    if (index < 9) row.appendChild(kbd(String(index + 1)))
     row.addEventListener('mousedown', (e) => {
       e.preventDefault()
       void runAction(action, item)
@@ -574,6 +631,17 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
       await chrome.runtime.sendMessage({ type: 'restore-session', sessionId: item.sessionId })
       closePalette()
       return
+    case 'browse':
+      closeActions()
+      enterFolder(item)
+      return
+    case 'open-all':
+      await chrome.runtime.sendMessage({ type: 'open-folder-tabs', id: item.id })
+      closePalette()
+      return
+    case 'folder-delete':
+      await chrome.runtime.sendMessage({ type: 'folder-delete', id: item.id })
+      break
     case 'run':
       closeActions()
       await executeItem(item, false)
@@ -710,23 +778,29 @@ async function updateList(): Promise<void> {
       .map((f) => ({ f, s: localFuzzy(query, f.path.toLowerCase()) }))
       .filter((x) => x.s !== null)
       .sort((a, b) => b.s! - a.s!)
-      .map((x): RemoteItem => ({ kind: 'command', label: x.f.path, detail: '', id: x.f.id }))
-    renderItems('Folders', folders, 'folder')
+      .map((x): RemoteItem => ({ kind: 'folder', label: x.f.path, detail: '', id: x.f.id }))
+    renderItems('Folders', folders)
     return
   }
 
   const mode = currentMode()
   const query = paletteInput.value.replace(/^[>@#]/, '')
+  const browsing = mode === 'bookmarks' && browseStack.length > 0
+  const folderId = browsing ? browseStack[browseStack.length - 1].id : undefined
   const response = (await chrome.runtime.sendMessage({
     type: 'palette-query',
     mode,
     query,
+    folderId,
   })) as { items?: RemoteItem[] }
   if (token !== queryToken || uiState !== 'list' || !paletteList) return
-  renderItems(GROUP_LABELS[mode] ?? 'Results', response?.items ?? [])
+  const groupLabel = browsing
+    ? browseStack[browseStack.length - 1].label
+    : (GROUP_LABELS[mode] ?? 'Results')
+  renderItems(groupLabel, response?.items ?? [])
 }
 
-function renderItems(groupLabel: string, items: RemoteItem[], iconOverride?: string): void {
+function renderItems(groupLabel: string, items: RemoteItem[]): void {
   if (!paletteList) return
   paletteList.textContent = ''
   flatItems = items
@@ -758,8 +832,8 @@ function renderItems(groupLabel: string, items: RemoteItem[], iconOverride?: str
     detail.textContent = item.detail || (item.url ? shortUrl(item.url) : '')
     const type = document.createElement('span')
     type.className = 'type'
-    type.textContent = TYPE_LABELS[iconOverride ?? item.kind] ?? ''
-    row.append(iconFor(item, iconOverride), title, detail, type)
+    type.textContent = TYPE_LABELS[item.kind] ?? ''
+    row.append(iconFor(item), title, detail, type)
     row.addEventListener('mousedown', (e) => {
       e.preventDefault()
       void executeItem(item, e.metaKey || e.ctrlKey)
@@ -803,25 +877,23 @@ function labelEl(item: RemoteItem): HTMLElement {
   return span
 }
 
-function iconFor(item: RemoteItem, iconOverride?: string): HTMLElement {
+function iconFor(item: RemoteItem): HTMLElement {
   const icon = document.createElement('span')
-  icon.className = 'icon'
-  const kind = iconOverride ?? item.kind
-  if (kind === 'folder') {
-    icon.innerHTML = FOLDER_SVG
-  } else if (kind === 'history') {
-    icon.innerHTML = CLOCK_SVG
-  } else if ((kind === 'bookmark' || kind === 'tab' || kind === 'closed') && item.url) {
+  const kind = item.kind
+  if ((kind === 'bookmark' || kind === 'tab' || kind === 'closed') && item.url) {
+    icon.className = 'icon plain'
     const img = document.createElement('img')
     img.src =
       chrome.runtime.getURL('/_favicon/') + `?pageUrl=${encodeURIComponent(item.url)}&size=32`
     img.onerror = () => {
+      icon.className = `icon kind-${kind}`
       icon.innerHTML = BOOKMARK_SVG
     }
     icon.appendChild(img)
-  } else {
-    icon.innerHTML = COMMAND_SVG
+    return icon
   }
+  icon.className = `icon kind-${kind}`
+  icon.innerHTML = kind === 'folder' ? FOLDER_SVG : kind === 'history' ? CLOCK_SVG : COMMAND_SVG
   return icon
 }
 

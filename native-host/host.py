@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Code Panel native messaging host (macOS).
+"""SuperChrome native messaging host (macOS).
 
 Chrome launches this per message. Protocol: 4-byte little-endian length +
 JSON on stdin, same framing for the reply on stdout. Extensions can't open

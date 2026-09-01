@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Code Panel</title>
+    <title>SuperChrome</title>
     <style>
       * { box-sizing: border-box; }
       html, body { margin: 0; }
@@ -45,6 +45,13 @@
         background: #ffffff10; flex-shrink: 0;
       }
       .item .icon img { width: 18px; height: 18px; border-radius: 4px; }
+      .item .icon.plain { background: transparent; }
+      .item .icon.kind-command { background: #4c9df3; color: #ffffff; }
+      .item .icon.kind-folder { background: #e0a63c; color: #ffffff; }
+      .item .icon.kind-history { background: #9a6ee8; color: #ffffff; }
+      .item .icon.kind-bookmark, .item .icon.kind-tab, .item .icon.kind-closed {
+        background: #e05d5d; color: #ffffff;
+      }
       .item .title {
         overflow: hidden; text-overflow: ellipsis;
         flex-shrink: 0; max-width: 55%;
@@ -66,10 +73,11 @@
         z-index: 10;
       }
       .action-row {
-        display: flex; align-items: center;
+        display: flex; align-items: center; gap: 10px;
         height: 30px; padding: 0 10px; border-radius: 6px; cursor: pointer;
         color: #e0e0e0; white-space: nowrap;
       }
+      .action-row .spacer { flex: 1; min-width: 16px; }
       .action-row.selected { background: #ffffff24; }
       .action-row.danger { color: #ff8f8f; }
       ::-webkit-scrollbar { width: 10px; }

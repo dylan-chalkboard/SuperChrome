@@ -1,12 +1,12 @@
 #!/bin/bash
-# Registers the Code Panel native messaging host with Chrome (macOS).
+# Registers the SuperChrome native messaging host with Chrome (macOS).
 # Usage: ./install.sh <extension-id>   (the ID shown on chrome://extensions)
 set -euo pipefail
 
 EXT_ID="${1:-}"
 if [[ -z "$EXT_ID" ]]; then
   echo "Usage: ./install.sh <extension-id>"
-  echo "Find the ID on chrome://extensions (Developer mode on, shown on the Code Panel card)."
+  echo "Find the ID on chrome://extensions (Developer mode on, shown on the SuperChrome card)."
   exit 1
 fi
 
@@ -15,10 +15,10 @@ HOST_DIR="$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts"
 
 chmod +x "$SCRIPT_DIR/host.py"
 mkdir -p "$HOST_DIR"
-cat > "$HOST_DIR/com.codepanel.host.json" <<EOF
+cat > "$HOST_DIR/com.superchrome.host.json" <<EOF
 {
-  "name": "com.codepanel.host",
-  "description": "Code Panel native bridge",
+  "name": "com.superchrome.host",
+  "description": "SuperChrome native bridge",
   "path": "$SCRIPT_DIR/host.py",
   "type": "stdio",
   "allowed_origins": ["chrome-extension://$EXT_ID/"]

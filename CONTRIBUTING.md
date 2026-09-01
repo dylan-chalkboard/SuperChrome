@@ -1,4 +1,4 @@
-# Contributing to Code Panel
+# Contributing to SuperChrome
 
 Thanks for wanting to hack on this! It's a small codebase — you can read all of it in ten minutes.
 

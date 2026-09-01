@@ -107,7 +107,7 @@ const PALETTE_COMMANDS = [
 /* ---------- Ranking: fuzzy match blended with usage frecency ---------- */
 
 interface PaletteItem {
-  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed'
+  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder'
   label: string
   detail: string
   url?: string
@@ -183,9 +183,38 @@ async function queryPalette(
   mode: string,
   rawQuery: string,
   sender: chrome.runtime.MessageSender,
+  folderId?: string,
 ): Promise<PaletteItem[]> {
   const query = rawQuery.trim().toLowerCase()
   const usage = await getUsage()
+
+  // Browsing inside one folder: its direct children, subfolders included.
+  if (mode === 'bookmarks' && folderId) {
+    const children = await chrome.bookmarks.getChildren(folderId)
+    return rank(
+      children.map((c) =>
+        c.url
+          ? {
+              item: {
+                kind: 'bookmark' as const,
+                label: c.title || c.url,
+                detail: '',
+                url: c.url,
+                id: c.id,
+              },
+              text: `${c.title} ${c.url}`.toLowerCase(),
+              usageKey: `bookmark:${c.url}`,
+            }
+          : {
+              item: { kind: 'folder' as const, label: c.title, detail: '', id: c.id },
+              text: c.title.toLowerCase(),
+              usageKey: `folder:${c.id}`,
+            },
+      ),
+      query,
+      usage,
+    )
+  }
 
   if (mode === 'history') {
     const results = await chrome.history.search({
@@ -256,22 +285,37 @@ async function queryPalette(
 
   const [root] = await chrome.bookmarks.getTree()
   const flat: Array<{ id: string; title: string; url: string; path: string }> = []
-  for (const child of root.children ?? []) collectBookmarks(child, [], flat)
-  return rank(
-    flat.map((b) => ({
+  const folders: Array<{ id: string; path: string }> = []
+  for (const child of root.children ?? []) {
+    collectBookmarks(child, [], flat)
+    folders.push({ id: child.id, path: child.title })
+    collectFolders(child, [child.title], folders)
+  }
+  const bookmarkEntries = flat.map((b) => ({
+    item: {
+      kind: 'bookmark' as const,
+      label: b.title,
+      detail: b.path,
+      url: b.url,
+      id: b.id,
+    },
+    text: `${b.title} ${b.url}`.toLowerCase(),
+    usageKey: `bookmark:${b.url}`,
+  }))
+  const folderEntries = folders.map((f) => {
+    const segments = f.path.split(' / ')
+    return {
       item: {
-        kind: 'bookmark' as const,
-        label: b.title,
-        detail: b.path,
-        url: b.url,
-        id: b.id,
+        kind: 'folder' as const,
+        label: segments[segments.length - 1],
+        detail: segments.slice(0, -1).join(' / '),
+        id: f.id,
       },
-      text: `${b.title} ${b.url}`.toLowerCase(),
-      usageKey: `bookmark:${b.url}`,
-    })),
-    query,
-    usage,
-  ).slice(0, 50)
+      text: segments[segments.length - 1].toLowerCase(),
+      usageKey: `folder:${f.id}`,
+    }
+  })
+  return rank([...bookmarkEntries, ...folderEntries], query, usage).slice(0, 50)
 }
 
 function collectBookmarks(
@@ -320,6 +364,7 @@ interface Message {
   title?: string
   parentId?: string
   sessionId?: string
+  folderId?: string
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -335,7 +380,14 @@ async function handleMessage(
 ): Promise<unknown> {
   switch (message?.type) {
     case 'palette-query':
-      return { items: await queryPalette(message.mode ?? 'bookmarks', message.query ?? '', sender) }
+      return {
+        items: await queryPalette(
+          message.mode ?? 'bookmarks',
+          message.query ?? '',
+          sender,
+          message.folderId,
+        ),
+      }
     case 'record-usage': {
       if (!message.key) return {}
       const usage = await getUsage()
@@ -364,6 +416,17 @@ async function handleMessage(
     case 'bookmark-delete':
       if (message.id) await chrome.bookmarks.remove(message.id)
       return {}
+    case 'folder-delete':
+      if (message.id) await chrome.bookmarks.removeTree(message.id)
+      return {}
+    case 'open-folder-tabs': {
+      if (!message.id) return {}
+      const children = await chrome.bookmarks.getChildren(message.id)
+      for (const child of children) {
+        if (child.url) await chrome.tabs.create({ url: child.url, active: false })
+      }
+      return {}
+    }
     case 'history-delete':
       if (message.url) await chrome.history.deleteUrl({ url: message.url })
       return {}
@@ -465,7 +528,7 @@ async function runCommand(id: string, sender: chrome.runtime.MessageSender): Pro
       // Extensions can't open DevTools; the native host (native-host/) presses
       // Cmd+Opt+I via macOS. Falls back to chrome://inspect without it.
       try {
-        await chrome.runtime.sendNativeMessage('com.codepanel.host', { action: 'open-devtools' })
+        await chrome.runtime.sendNativeMessage('com.superchrome.host', { action: 'open-devtools' })
       } catch {
         await chrome.tabs.create({ url: 'chrome://inspect/' })
       }
