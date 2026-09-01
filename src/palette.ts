@@ -451,6 +451,12 @@ function renderFooter(): void {
   paletteFooter.appendChild(primary)
 
   if (uiState === 'list') {
+    if (browseStack.length && mode === 'bookmarks') {
+      const reorder = document.createElement('span')
+      reorder.className = 'action'
+      reorder.append(document.createTextNode('Reorder'), kbd('⌥↑↓'))
+      paletteFooter.appendChild(reorder)
+    }
     const actions = document.createElement('span')
     actions.className = 'action'
     actions.append(document.createTextNode('Actions'), kbd('⌘K'))
@@ -532,6 +538,19 @@ function onGlobalKey(e: KeyboardEvent): void {
     return
   }
 
+  if (
+    e.altKey &&
+    (e.key === 'ArrowUp' || e.key === 'ArrowDown') &&
+    uiState === 'list' &&
+    browseStack.length &&
+    currentMode() === 'bookmarks'
+  ) {
+    e.preventDefault()
+    const item = flatItems[selectedIndex]
+    if (item) void reorderItem(item, e.key === 'ArrowUp' ? -1 : 1)
+    return
+  }
+
   if (e.key === 'Escape') {
     e.preventDefault()
     if (uiState === 'move' || uiState === 'group') exitSubState(false)
@@ -591,6 +610,17 @@ function recordUsage(item: RemoteItem): void {
             ? `emoji:${item.emoji}`
             : null
   if (key) void chrome.runtime.sendMessage({ type: 'record-usage', key })
+}
+
+async function reorderItem(item: RemoteItem, delta: number): Promise<void> {
+  if (!item.id || (item.kind !== 'bookmark' && item.kind !== 'folder')) return
+  await chrome.runtime.sendMessage({ type: 'bookmark-reorder', id: item.id, delta })
+  await updateList()
+  const index = flatItems.findIndex((i) => i.id === item.id)
+  if (index >= 0) {
+    selectedIndex = index
+    highlightSelection()
+  }
 }
 
 function enterFolder(item: RemoteItem): void {
@@ -668,6 +698,12 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'copy-md', label: 'Copy Markdown Link' },
         { id: 'rename', label: 'Rename…' },
         { id: 'move', label: 'Move to Folder…' },
+        ...(browseStack.length && currentMode() === 'bookmarks'
+          ? [
+              { id: 'move-up', label: 'Move Up' },
+              { id: 'move-down', label: 'Move Down' },
+            ]
+          : []),
         { id: 'delete', label: 'Delete Bookmark', danger: true },
       ]
     case 'history':
@@ -703,6 +739,12 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'browse', label: 'Browse Folder' },
         { id: 'open-all', label: 'Open All in New Tabs' },
         { id: 'rename', label: 'Rename…' },
+        ...(browseStack.length && currentMode() === 'bookmarks'
+          ? [
+              { id: 'move-up', label: 'Move Up' },
+              { id: 'move-down', label: 'Move Down' },
+            ]
+          : []),
         { id: 'folder-delete', label: 'Delete Folder', danger: true },
       ]
     case 'download':
@@ -831,6 +873,11 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
     case 'ungroup':
       await chrome.runtime.sendMessage({ type: 'tab-ungroup', tabId: item.tabId })
       break
+    case 'move-up':
+    case 'move-down':
+      closeActions()
+      await reorderItem(item, action.id === 'move-up' ? -1 : 1)
+      return
     case 'insert':
       closeActions()
       if (item.kind === 'emoji') recordUsage(item)

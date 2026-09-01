@@ -126,6 +126,17 @@ let actionIndex = 0
 let actionTarget: RemoteItem | null = null
 let browseStack: Array<{ id: string; label: string }> = []
 
+async function reorderItem(item: RemoteItem, delta: number): Promise<void> {
+  if (!item.id || (item.kind !== 'bookmark' && item.kind !== 'folder')) return
+  await chrome.runtime.sendMessage({ type: 'bookmark-reorder', id: item.id, delta })
+  await updateList()
+  const index = flatItems.findIndex((i) => i.id === item.id)
+  if (index >= 0) {
+    selectedIndex = index
+    highlightSelection()
+  }
+}
+
 function enterFolder(item: RemoteItem): void {
   if (!item.id) return
   recordUsage(item)
@@ -182,6 +193,17 @@ inputEl.addEventListener('keydown', (e) => {
     if (item) void executeItem(item, false)
     return
   }
+  if (
+    e.altKey &&
+    (e.key === 'ArrowUp' || e.key === 'ArrowDown') &&
+    browseStack.length &&
+    currentMode() === 'bookmarks'
+  ) {
+    e.preventDefault()
+    const item = flatItems[selectedIndex]
+    if (item) void reorderItem(item, e.key === 'ArrowUp' ? -1 : 1)
+    return
+  }
   if (e.key === 'Backspace' && inputEl.value === '' && browseStack.length && currentMode() === 'bookmarks') {
     e.preventDefault()
     popFolder()
@@ -210,6 +232,12 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'open-new-tab', label: 'Open in New Tab' },
         { id: 'copy-url', label: 'Copy URL' },
         { id: 'copy-md', label: 'Copy Markdown Link' },
+        ...(browseStack.length && currentMode() === 'bookmarks'
+          ? [
+              { id: 'move-up', label: 'Move Up' },
+              { id: 'move-down', label: 'Move Down' },
+            ]
+          : []),
         { id: 'delete', label: 'Delete Bookmark', danger: true },
       ]
     case 'history':
@@ -363,6 +391,11 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
     case 'ungroup':
       await chrome.runtime.sendMessage({ type: 'tab-ungroup', tabId: item.tabId })
       break
+    case 'move-up':
+    case 'move-down':
+      closeActions()
+      await reorderItem(item, action.id === 'move-up' ? -1 : 1)
+      return
     case 'copy-text':
       await copyText(item.kind === 'emoji' ? (item.emoji ?? '') : (item.text ?? item.label))
       window.close()

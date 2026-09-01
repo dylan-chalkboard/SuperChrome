@@ -689,6 +689,7 @@ interface Message {
   text?: string
   groupId?: number
   downloadId?: number
+  delta?: number
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -740,6 +741,18 @@ async function handleMessage(
     case 'bookmark-delete':
       if (message.id) await chrome.bookmarks.remove(message.id)
       return {}
+    case 'bookmark-reorder': {
+      if (!message.id) return {}
+      const [node] = await chrome.bookmarks.get(message.id)
+      if (!node?.parentId) return {}
+      const siblings = await chrome.bookmarks.getChildren(node.parentId)
+      const pos = siblings.findIndex((s) => s.id === node.id)
+      const target = pos + (message.delta ?? 0)
+      if (pos < 0 || target < 0 || target >= siblings.length) return {}
+      // Chrome interprets the index against the pre-move list.
+      await chrome.bookmarks.move(node.id, { index: target > pos ? target + 1 : target })
+      return {}
+    }
     case 'folder-delete':
       if (message.id) await chrome.bookmarks.removeTree(message.id)
       return {}
