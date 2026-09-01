@@ -653,12 +653,44 @@ async function queryPalette(
         score: frecency(usage, entry.usageKey, decay),
       }))
       .sort((a, b) => b.score - a.score || a.index - b.index)
+    // Bookmarks section mirrors the bookmarks bar: its top level, folders
+    // first, plus the other root folders — drill in for everything else.
+    const bar = root.children?.[0]
+    const topLevel: Array<{ item: PaletteItem; usageKey: string }> = []
+    for (const child of bar?.children ?? []) {
+      topLevel.push(
+        child.url
+          ? {
+              item: {
+                kind: 'bookmark',
+                label: child.title || child.url,
+                detail: '',
+                url: child.url,
+                id: child.id,
+              },
+              usageKey: `bookmark:${child.url}`,
+            }
+          : {
+              item: { kind: 'folder', label: child.title, detail: '', id: child.id },
+              usageKey: `folder:${child.id}`,
+            },
+      )
+    }
+    for (const other of root.children?.slice(1) ?? []) {
+      if (other.children?.length) {
+        topLevel.push({
+          item: { kind: 'folder', label: other.title, detail: '', id: other.id },
+          usageKey: `folder:${other.id}`,
+        })
+      }
+    }
+    const visibleTop = topLevel.filter((entry) => !suggestedKeys.has(entry.usageKey))
     return [
       ...suggested.map((x): PaletteItem => ({ ...x.entry.item, group: 'Suggested' })),
-      ...[...folderEntries, ...bookmarkEntries]
-        .filter((entry) => !suggestedKeys.has(entry.usageKey))
-        .slice(0, 50)
-        .map((entry): PaletteItem => ({ ...entry.item, group: 'Bookmarks' })),
+      ...[
+        ...visibleTop.filter((e) => e.item.kind === 'folder'),
+        ...visibleTop.filter((e) => e.item.kind === 'bookmark'),
+      ].map((entry): PaletteItem => ({ ...entry.item, group: 'Bookmarks' })),
       ...allCommands.map((x): PaletteItem => ({ ...x.entry.item, group: 'Commands' })),
     ]
   }
