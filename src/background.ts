@@ -112,6 +112,8 @@ interface PaletteItem {
   id?: string
   tabId?: number
   commandId?: string
+  /** Indices into the ranked text that matched the query, for highlighting. */
+  positions?: number[]
 }
 
 type UsageMap = Record<string, { n: number; t: number }>
@@ -133,8 +135,12 @@ function frecency(usage: UsageMap, key: string): number {
   return entry.n * Math.exp(-days / 14)
 }
 
-function fuzzyScore(query: string, text: string): number | null {
-  if (!query) return 0
+function fuzzyMatch(
+  query: string,
+  text: string,
+): { score: number; positions: number[] } | null {
+  if (!query) return { score: 0, positions: [] }
+  const positions: number[] = []
   let qi = 0
   let score = 0
   let streak = 0
@@ -143,28 +149,29 @@ function fuzzyScore(query: string, text: string): number | null {
       streak++
       const wordStart = ti === 0 || ' /-_.:'.includes(text[ti - 1])
       score += 1 + streak * 2 + (wordStart ? 6 : 0)
+      positions.push(ti)
       qi++
     } else {
       streak = 0
     }
   }
-  return qi === query.length ? score - text.length * 0.01 : null
+  return qi === query.length ? { score: score - text.length * 0.01, positions } : null
 }
 
-function rank<T>(
+function rank<T extends object>(
   entries: Array<{ item: T; text: string; usageKey: string }>,
   query: string,
   usage: UsageMap,
-): T[] {
-  const scored: Array<{ item: T; score: number; index: number }> = []
+): Array<T & { positions?: number[] }> {
+  const scored: Array<{ item: T; score: number; index: number; positions: number[] }> = []
   entries.forEach((entry, index) => {
-    const fuzzy = fuzzyScore(query, entry.text)
-    if (fuzzy === null) return
+    const match = fuzzyMatch(query, entry.text)
+    if (!match) return
     const boost = Math.min(30, frecency(usage, entry.usageKey) * 5)
-    scored.push({ item: entry.item, score: fuzzy + boost, index })
+    scored.push({ item: entry.item, score: match.score + boost, index, positions: match.positions })
   })
   scored.sort((a, b) => b.score - a.score || a.index - b.index)
-  return scored.map((s) => s.item)
+  return scored.map((s) => (query ? { ...s.item, positions: s.positions } : s.item))
 }
 
 async function queryPalette(

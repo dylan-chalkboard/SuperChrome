@@ -55,7 +55,23 @@
         color: #ffffff4d; font-size: 13px;
       }
       .item .type { flex-shrink: 0; margin-left: auto; color: #ffffff4d; font-size: 12px; }
+      .item .title b { color: #ffffff; font-weight: 700; }
       .empty { padding: 16px; color: #ffffff59; }
+      .actions {
+        position: fixed; right: 10px; bottom: 10px;
+        min-width: 220px;
+        background: #232326;
+        border: 1px solid #ffffff24; border-radius: 10px; padding: 4px;
+        box-shadow: 0 8px 24px #00000088;
+        z-index: 10;
+      }
+      .action-row {
+        display: flex; align-items: center;
+        height: 30px; padding: 0 10px; border-radius: 6px; cursor: pointer;
+        color: #e0e0e0; white-space: nowrap;
+      }
+      .action-row.selected { background: #ffffff24; }
+      .action-row.danger { color: #ff8f8f; }
       ::-webkit-scrollbar { width: 10px; }
       ::-webkit-scrollbar-thumb { background: #ffffff1a; border-radius: 5px; }
     </style>

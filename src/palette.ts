@@ -14,6 +14,7 @@ interface RemoteItem {
   id?: string
   tabId?: number
   commandId?: string
+  positions?: number[]
 }
 
 interface FolderInfo {
@@ -97,6 +98,7 @@ const PALETTE_CSS = `
   flex-shrink: 0; max-width: 55%;
   color: #e8e8e8; font-weight: 500;
 }
+.item .title b { color: #ffffff; font-weight: 700; }
 .item .detail {
   flex: 1; overflow: hidden; text-overflow: ellipsis;
   color: #ffffff4d; font-size: 13px;
@@ -345,6 +347,13 @@ function onGlobalKey(e: KeyboardEvent): void {
     return
   }
 
+  if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9' && uiState === 'list') {
+    e.preventDefault()
+    const item = flatItems[Number(e.key) - 1]
+    if (item) void executeItem(item, false)
+    return
+  }
+
   if (uiState === 'actions') {
     if (e.key === 'Escape') {
       e.preventDefault()
@@ -455,6 +464,7 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'open', label: 'Open' },
         { id: 'open-new-tab', label: 'Open in New Tab' },
         { id: 'copy-url', label: 'Copy URL' },
+        { id: 'copy-md', label: 'Copy Markdown Link' },
         { id: 'rename', label: 'Rename…' },
         { id: 'move', label: 'Move to Folder…' },
         { id: 'delete', label: 'Delete Bookmark', danger: true },
@@ -464,12 +474,14 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'open', label: 'Open' },
         { id: 'open-new-tab', label: 'Open in New Tab' },
         { id: 'copy-url', label: 'Copy URL' },
+        { id: 'copy-md', label: 'Copy Markdown Link' },
         { id: 'delete-history', label: 'Remove from History', danger: true },
       ]
     case 'tab':
       return [
         { id: 'switch', label: 'Switch to Tab' },
         { id: 'copy-url', label: 'Copy URL' },
+        { id: 'copy-md', label: 'Copy Markdown Link' },
         { id: 'close-tab', label: 'Close Tab', danger: true },
       ]
     default:
@@ -537,6 +549,10 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
       return
     case 'copy-url':
       copyText(item.url ?? '')
+      closePalette()
+      return
+    case 'copy-md':
+      copyText(`[${item.label}](${item.url ?? ''})`)
       closePalette()
       return
     case 'switch':
@@ -717,9 +733,7 @@ function renderItems(groupLabel: string, items: RemoteItem[], iconOverride?: str
   items.forEach((item, index) => {
     const row = document.createElement('div')
     row.className = 'item'
-    const title = document.createElement('span')
-    title.className = 'title'
-    title.textContent = item.label
+    const title = labelEl(item)
     const detail = document.createElement('span')
     detail.className = 'detail'
     detail.textContent = item.detail || (item.url ? shortUrl(item.url) : '')
@@ -740,6 +754,34 @@ function renderItems(groupLabel: string, items: RemoteItem[], iconOverride?: str
     paletteList!.appendChild(row)
   })
   highlightSelection()
+}
+
+/** Title span with query-matched characters bolded. */
+function labelEl(item: RemoteItem): HTMLElement {
+  const span = document.createElement('span')
+  span.className = 'title'
+  const label = item.label
+  const matched = new Set((item.positions ?? []).filter((p) => p < label.length))
+  if (!matched.size) {
+    span.textContent = label
+    return span
+  }
+  let i = 0
+  while (i < label.length) {
+    const bold = matched.has(i)
+    let j = i
+    while (j < label.length && matched.has(j) === bold) j++
+    const chunk = label.slice(i, j)
+    if (bold) {
+      const b = document.createElement('b')
+      b.textContent = chunk
+      span.appendChild(b)
+    } else {
+      span.appendChild(document.createTextNode(chunk))
+    }
+    i = j
+  }
+  return span
 }
 
 function iconFor(item: RemoteItem, iconOverride?: string): HTMLElement {

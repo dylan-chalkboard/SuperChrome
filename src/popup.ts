@@ -15,6 +15,13 @@ interface RemoteItem {
   id?: string
   tabId?: number
   commandId?: string
+  positions?: number[]
+}
+
+interface PaletteAction {
+  id: string
+  label: string
+  danger?: boolean
 }
 
 const BOOKMARK_SVG =
@@ -56,8 +63,48 @@ function currentMode(): string {
   return 'bookmarks'
 }
 
-inputEl.addEventListener('input', () => void updateList())
+let actionsEl: HTMLElement | null = null
+let currentActions: PaletteAction[] = []
+let actionIndex = 0
+let actionTarget: RemoteItem | null = null
+
+inputEl.addEventListener('input', () => {
+  closeActions()
+  void updateList()
+})
 inputEl.addEventListener('keydown', (e) => {
+  if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+    e.preventDefault()
+    if (actionsEl) closeActions()
+    else openActions()
+    return
+  }
+  if (actionsEl) {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopPropagation()
+      closeActions()
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      actionIndex = (actionIndex + 1) % currentActions.length
+      highlightActions()
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      actionIndex = (actionIndex - 1 + currentActions.length) % currentActions.length
+      highlightActions()
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      const action = currentActions[actionIndex]
+      if (action && actionTarget) void runAction(action, actionTarget)
+    }
+    return
+  }
+  if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
+    e.preventDefault()
+    const item = flatItems[Number(e.key) - 1]
+    if (item) void executeItem(item, false)
+    return
+  }
   if (e.key === 'ArrowDown') {
     e.preventDefault()
     moveSelection(1)
@@ -70,6 +117,133 @@ inputEl.addEventListener('keydown', (e) => {
     if (item) void executeItem(item, e.metaKey || e.ctrlKey)
   }
 })
+
+/* ---------- Actions panel (⌘K) ---------- */
+
+function actionsFor(item: RemoteItem): PaletteAction[] {
+  switch (item.kind) {
+    case 'bookmark':
+      return [
+        { id: 'open', label: 'Open' },
+        { id: 'open-new-tab', label: 'Open in New Tab' },
+        { id: 'copy-url', label: 'Copy URL' },
+        { id: 'copy-md', label: 'Copy Markdown Link' },
+        { id: 'delete', label: 'Delete Bookmark', danger: true },
+      ]
+    case 'history':
+      return [
+        { id: 'open', label: 'Open' },
+        { id: 'open-new-tab', label: 'Open in New Tab' },
+        { id: 'copy-url', label: 'Copy URL' },
+        { id: 'copy-md', label: 'Copy Markdown Link' },
+        { id: 'delete-history', label: 'Remove from History', danger: true },
+      ]
+    case 'tab':
+      return [
+        { id: 'switch', label: 'Switch to Tab' },
+        { id: 'copy-url', label: 'Copy URL' },
+        { id: 'copy-md', label: 'Copy Markdown Link' },
+        { id: 'close-tab', label: 'Close Tab', danger: true },
+      ]
+    default:
+      return [{ id: 'run', label: 'Run Command' }]
+  }
+}
+
+function openActions(): void {
+  const item = flatItems[selectedIndex]
+  if (!item) return
+  actionTarget = item
+  currentActions = actionsFor(item)
+  actionIndex = 0
+  actionsEl = document.createElement('div')
+  actionsEl.className = 'actions'
+  currentActions.forEach((action, index) => {
+    const row = document.createElement('div')
+    row.className = 'action-row' + (action.danger ? ' danger' : '')
+    row.textContent = action.label
+    row.addEventListener('mousedown', (e) => {
+      e.preventDefault()
+      void runAction(action, item)
+    })
+    row.addEventListener('mousemove', () => {
+      if (actionIndex !== index) {
+        actionIndex = index
+        highlightActions()
+      }
+    })
+    actionsEl!.appendChild(row)
+  })
+  document.body.appendChild(actionsEl)
+  highlightActions()
+}
+
+function closeActions(): void {
+  actionsEl?.remove()
+  actionsEl = null
+  actionTarget = null
+}
+
+function highlightActions(): void {
+  actionsEl
+    ?.querySelectorAll<HTMLElement>('.action-row')
+    .forEach((row, i) => row.classList.toggle('selected', i === actionIndex))
+}
+
+async function runAction(action: PaletteAction, item: RemoteItem): Promise<void> {
+  switch (action.id) {
+    case 'open':
+    case 'open-new-tab':
+      recordUsage(item)
+      await chrome.runtime.sendMessage({
+        type: 'open-url',
+        url: item.url,
+        newTab: action.id === 'open-new-tab',
+      })
+      window.close()
+      return
+    case 'copy-url':
+      await copyText(item.url ?? '')
+      window.close()
+      return
+    case 'copy-md':
+      await copyText(`[${item.label}](${item.url ?? ''})`)
+      window.close()
+      return
+    case 'switch':
+      await chrome.runtime.sendMessage({ type: 'activate-tab', tabId: item.tabId })
+      window.close()
+      return
+    case 'run':
+      closeActions()
+      await executeItem(item, false)
+      return
+    case 'delete':
+      await chrome.runtime.sendMessage({ type: 'bookmark-delete', id: item.id })
+      break
+    case 'delete-history':
+      await chrome.runtime.sendMessage({ type: 'history-delete', url: item.url })
+      break
+    case 'close-tab':
+      await chrome.runtime.sendMessage({ type: 'close-tab-id', tabId: item.tabId })
+      break
+  }
+  closeActions()
+  void updateList()
+}
+
+async function copyText(text: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text)
+  } catch {
+    const area = document.createElement('textarea')
+    area.value = text
+    document.body.appendChild(area)
+    area.select()
+    document.execCommand('copy')
+    area.remove()
+  }
+}
 
 function moveSelection(delta: number): void {
   if (!flatItems.length) return
@@ -144,9 +318,7 @@ async function updateList(): Promise<void> {
   items.forEach((item, index) => {
     const row = document.createElement('div')
     row.className = 'item'
-    const title = document.createElement('span')
-    title.className = 'title'
-    title.textContent = item.label
+    const title = labelEl(item)
     const detail = document.createElement('span')
     detail.className = 'detail'
     detail.textContent = item.detail || (item.url ? shortUrl(item.url) : '')
@@ -164,6 +336,34 @@ async function updateList(): Promise<void> {
     listEl.appendChild(row)
   })
   highlightSelection()
+}
+
+/** Title span with query-matched characters bolded. */
+function labelEl(item: RemoteItem): HTMLElement {
+  const span = document.createElement('span')
+  span.className = 'title'
+  const label = item.label
+  const matched = new Set((item.positions ?? []).filter((p) => p < label.length))
+  if (!matched.size) {
+    span.textContent = label
+    return span
+  }
+  let i = 0
+  while (i < label.length) {
+    const bold = matched.has(i)
+    let j = i
+    while (j < label.length && matched.has(j) === bold) j++
+    const chunk = label.slice(i, j)
+    if (bold) {
+      const b = document.createElement('b')
+      b.textContent = chunk
+      span.appendChild(b)
+    } else {
+      span.appendChild(document.createTextNode(chunk))
+    }
+    i = j
+  }
+  return span
 }
 
 function iconFor(item: RemoteItem): HTMLElement {
