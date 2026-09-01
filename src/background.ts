@@ -444,8 +444,17 @@ async function queryPalette(
   }
 
   // Browsing inside one folder: its direct children, subfolders included.
+  // Empty query shows the folder's true order (reordering depends on it);
+  // frecency ranking only applies once the user types.
   if (mode === 'bookmarks' && folderId) {
     const children = await chrome.bookmarks.getChildren(folderId)
+    if (!query) {
+      return children.map((c): PaletteItem =>
+        c.url
+          ? { kind: 'bookmark', label: c.title || c.url, detail: '', url: c.url, id: c.id }
+          : { kind: 'folder', label: c.title, detail: '', id: c.id },
+      )
+    }
     return rank<PaletteItem>(
       children.map((c) =>
         c.url
