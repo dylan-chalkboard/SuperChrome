@@ -779,6 +779,10 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     void chrome.runtime.sendMessage({ type: 'activate-tab', tabId: item.tabId })
   } else if (item.kind === 'closed') {
     void chrome.runtime.sendMessage({ type: 'restore-session', sessionId: item.sessionId })
+  } else if (item.commandId === 'pick-color') {
+    closePalette()
+    void pickColor()
+    return
   } else if (item.commandId === 'copy-page-url') {
     copyText(location.href)
     closePalette()
@@ -1041,8 +1045,26 @@ function copyText(text: string): void {
     .then(() => showToast('Copied to clipboard'))
 }
 
+async function pickColor(): Promise<void> {
+  const EyeDropperCtor = (
+    window as unknown as { EyeDropper?: new () => { open(): Promise<{ sRGBHex: string }> } }
+  ).EyeDropper
+  if (!EyeDropperCtor) {
+    showToast('Color picker not supported here')
+    return
+  }
+  try {
+    const result = await new EyeDropperCtor().open()
+    const hex = result.sRGBHex.toUpperCase()
+    await navigator.clipboard.writeText(hex)
+    showToast(`${hex} copied`, hex)
+  } catch {
+    // User pressed Esc — nothing to do.
+  }
+}
+
 /** Transient confirmation pill, bottom-center, outliving the palette. */
-function showToast(message: string): void {
+function showToast(message: string, swatch?: string): void {
   const host = document.createElement('div')
   host.style.cssText =
     'position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:2147483647;'
@@ -1068,8 +1090,14 @@ function showToast(message: string): void {
   `
   const pill = document.createElement('div')
   pill.className = 'toast'
-  pill.innerHTML =
-    '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.2 3.2L13 5" stroke="#7bc97b" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  if (swatch) {
+    const chip = document.createElement('span')
+    chip.style.cssText = `width:14px;height:14px;border-radius:4px;border:1px solid #ffffff33;background:${swatch};`
+    pill.appendChild(chip)
+  } else {
+    pill.innerHTML =
+      '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.2 3.2L13 5" stroke="#7bc97b" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  }
   pill.appendChild(document.createTextNode(message))
   shadow.append(style, pill)
   document.documentElement.appendChild(host)

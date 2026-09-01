@@ -108,7 +108,7 @@ const GROUP_LABELS: Record<string, string> = {
 }
 
 // Page-local commands need the page's document; they can't run from a popup.
-const PAGE_ONLY_COMMANDS = new Set(['print-page'])
+const PAGE_ONLY_COMMANDS = new Set(['print-page', 'pick-color'])
 
 const PAGE_PARAMS = new URLSearchParams(location.search)
 const IS_TAB = PAGE_PARAMS.has('tab')
