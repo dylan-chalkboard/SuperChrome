@@ -21,9 +21,11 @@ Then load it in Chrome:
 
 Open with `Cmd+P` (bookmarks), `Cmd+Shift+P` (commands), or the toolbar icon:
 
-- Plain text → fuzzy-search **bookmarks** with favicons (Enter opens, `Cmd+Enter` new tab)
+- Plain text → fuzzy-search **bookmarks** with favicons, ranked by how often and recently you pick them (Enter opens, `Cmd+Enter` new tab)
 - `>` prefix → **commands**: bookmark/close/duplicate/pin tab, print, view source, and jump to any Chrome settings page (privacy, passwords, clear browsing data, flags, Web Store, chrome://inspect, …)
 - `@` prefix → **switch to an open tab**
+- `#` prefix → **search browser history** (empty query shows recent pages)
+- `Cmd+K` → **actions panel** for the selected item: open in new tab, copy URL, rename, move to folder, delete bookmark, remove from history, close tab
 - `Esc` or click outside to dismiss
 
 **Omnibox**: type `b` + Tab in the address bar to search bookmarks — works everywhere, including `chrome://` pages where content scripts can't run.

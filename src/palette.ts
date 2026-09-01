@@ -1,37 +1,31 @@
 /**
- * Bookmark palette content script. Self-contained by design: manifest content
- * scripts load as classic scripts, so this file must not import anything.
+ * Palette content script. Self-contained by design: manifest content scripts
+ * load as classic scripts, so this file must not import anything.
  *
- * Modes: plain text searches bookmarks, '>' prefix runs commands, '@' prefix
- * switches between open tabs.
+ * Modes: plain text = bookmarks, '>' = commands, '@' = open tabs, '#' = history.
+ * Cmd+K opens a Raycast-style actions panel for the selected item.
  */
 
-interface FlatBookmark {
-  title: string
-  url: string
+interface RemoteItem {
+  kind: 'bookmark' | 'tab' | 'history' | 'command'
+  label: string
+  detail: string
+  url?: string
+  id?: string
+  tabId?: number
+  commandId?: string
+}
+
+interface FolderInfo {
+  id: string
   path: string
 }
-interface TabInfo {
-  id?: number
-  title: string
-  url: string
-}
-interface CommandInfo {
+
+interface PaletteAction {
   id: string
   label: string
+  danger?: boolean
 }
-interface PaletteData {
-  bookmarks: FlatBookmark[]
-  tabs: TabInfo[]
-  commands: CommandInfo[]
-}
-
-type PaletteItem =
-  | { kind: 'bookmark'; label: string; detail: string; url: string }
-  | { kind: 'tab'; label: string; detail: string; tabId: number; url: string }
-  | { kind: 'command'; label: string; detail: string; commandId: string }
-
-type PaletteMode = 'bookmarks' | 'commands' | 'tabs'
 
 // IIFE + load guard: the manifest injection and the on-demand scripting
 // fallback can both run this file in the same isolated world.
@@ -120,6 +114,23 @@ const PALETTE_CSS = `
 }
 .footer .spacer { flex: 1; }
 .footer .action { display: flex; align-items: center; gap: 6px; }
+.actions {
+  position: absolute; right: 10px; bottom: 46px;
+  min-width: 230px;
+  background: rgba(30, 30, 32, 0.92);
+  backdrop-filter: blur(30px) saturate(1.6);
+  -webkit-backdrop-filter: blur(30px) saturate(1.6);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px; padding: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 8px 24px #00000088;
+}
+.action-row {
+  display: flex; align-items: center;
+  height: 30px; padding: 0 10px; border-radius: 6px; cursor: pointer;
+  color: #e0e0e0; white-space: nowrap;
+}
+.action-row.selected { background: rgba(255, 255, 255, 0.14); }
+.action-row.danger { color: #ff8f8f; }
 .list::-webkit-scrollbar { width: 10px; }
 .list::-webkit-scrollbar-thumb { background: #ffffff1a; border-radius: 5px; }
 `
@@ -128,20 +139,46 @@ const BOOKMARK_SVG =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 2.5h8V14l-4-2.5L4 14V2.5z" stroke="currentColor" stroke-linejoin="round"/></svg>'
 const COMMAND_SVG =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M5 4l4 4-4 4" stroke="currentColor" stroke-linecap="round"/></svg>'
+const CLOCK_SVG =
+  '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor"/><path d="M8 5v3.2l2.2 1.6" stroke="currentColor" stroke-linecap="round"/></svg>'
+const FOLDER_SVG =
+  '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1.5 3.5h4.5l1.5 2h7v7h-13v-9z" stroke="currentColor" stroke-linejoin="round"/></svg>'
 
-const TYPE_LABELS: Record<PaletteItem['kind'], string> = {
+const TYPE_LABELS: Record<string, string> = {
   bookmark: 'Bookmark',
   tab: 'Tab',
+  history: 'History',
   command: 'Command',
+  folder: 'Folder',
 }
+
+const GROUP_LABELS: Record<string, string> = {
+  bookmarks: 'Bookmarks',
+  commands: 'Commands',
+  tabs: 'Open Tabs',
+  history: 'History',
+}
+
+type UiState = 'list' | 'actions' | 'rename' | 'move'
 
 let paletteHost: HTMLDivElement | null = null
 let paletteInput: HTMLInputElement | null = null
 let paletteList: HTMLElement | null = null
 let paletteFooter: HTMLElement | null = null
-let paletteData: PaletteData | null = null
-let flatItems: PaletteItem[] = []
+let panelEl: HTMLElement | null = null
+let actionsEl: HTMLElement | null = null
+
+let uiState: UiState = 'list'
+let flatItems: RemoteItem[] = []
 let selectedIndex = 0
+let queryToken = 0
+
+let currentActions: PaletteAction[] = []
+let actionIndex = 0
+let actionTarget: RemoteItem | null = null
+let subStateTarget: RemoteItem | null = null
+let savedQuery = ''
+let foldersCache: FolderInfo[] | null = null
 
 chrome.runtime.onMessage.addListener((message: { type?: string; mode?: string }) => {
   if (message?.type === 'toggle-palette') {
@@ -152,14 +189,14 @@ chrome.runtime.onMessage.addListener((message: { type?: string; mode?: string })
 async function togglePalette(prefix: string): Promise<void> {
   if (paletteHost && paletteInput) {
     const currentPrefix = paletteInput.value.startsWith('>') ? '>' : ''
-    if (currentPrefix === prefix) {
+    if (currentPrefix === prefix && uiState === 'list') {
       closePalette()
     } else {
+      exitSubState(false)
       setInput(prefix)
     }
     return
   }
-  paletteData = (await chrome.runtime.sendMessage({ type: 'palette-data' })) as PaletteData
   openPalette(prefix)
 }
 
@@ -168,7 +205,7 @@ function setInput(value: string): void {
   paletteInput.value = value
   paletteInput.focus()
   paletteInput.setSelectionRange(value.length, value.length)
-  updateList()
+  void updateList()
 }
 
 function closePalette(): void {
@@ -180,37 +217,11 @@ function closePalette(): void {
   paletteInput = null
   paletteList = null
   paletteFooter = null
-}
-
-/**
- * Runs in capture phase on window while the palette is open, so page hotkey
- * handlers (Gmail, GitHub, …) never see keystrokes. stopPropagation skips all
- * downstream listeners — including our input's — so key handling lives here;
- * plain typing still lands in the focused input via the default action.
- */
-function onGlobalKey(e: KeyboardEvent): void {
-  if (!paletteHost) return
-  e.stopPropagation()
-  if (e.type !== 'keydown') return
-  if (e.key === 'Escape') {
-    e.preventDefault()
-    closePalette()
-  } else if (e.key === 'ArrowDown') {
-    e.preventDefault()
-    moveSelection(1)
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault()
-    moveSelection(-1)
-  } else if (e.key === 'Enter') {
-    e.preventDefault()
-    const item = flatItems[selectedIndex]
-    if (item) executeItem(item, e.metaKey || e.ctrlKey)
-  } else if (e.key === 'Tab') {
-    e.preventDefault()
-  } else if (paletteInput && document.activeElement !== paletteHost) {
-    // Page stole focus — reclaim it so typing keeps landing in the palette.
-    paletteInput.focus()
-  }
+  panelEl = null
+  actionsEl = null
+  uiState = 'list'
+  actionTarget = null
+  subStateTarget = null
 }
 
 function openPalette(prefix: string): void {
@@ -227,8 +238,8 @@ function openPalette(prefix: string): void {
     if (e.target === backdrop) closePalette()
   })
 
-  const panel = document.createElement('div')
-  panel.className = 'panel'
+  panelEl = document.createElement('div')
+  panelEl.className = 'panel'
 
   const inputRow = document.createElement('div')
   inputRow.className = 'input-row'
@@ -238,7 +249,11 @@ function openPalette(prefix: string): void {
   paletteInput.placeholder = 'Search bookmarks and commands…'
   paletteInput.spellcheck = false
   paletteInput.value = prefix
-  paletteInput.addEventListener('input', updateList)
+  paletteInput.addEventListener('input', () => {
+    if (uiState === 'actions') closeActions()
+    if (uiState === 'rename') return
+    void updateList()
+  })
   paletteInput.addEventListener('blur', () => {
     // Give row mousedown handlers a beat to run before tearing down.
     setTimeout(() => {
@@ -248,7 +263,7 @@ function openPalette(prefix: string): void {
 
   const hint = document.createElement('div')
   hint.className = 'hint'
-  hint.append(kbd('> Commands'), kbd('@ Tabs'))
+  hint.append(kbd('> Commands'), kbd('@ Tabs'), kbd('# History'))
 
   inputRow.append(paletteInput, hint)
 
@@ -258,8 +273,8 @@ function openPalette(prefix: string): void {
   paletteFooter = document.createElement('div')
   paletteFooter.className = 'footer'
 
-  panel.append(inputRow, paletteList, paletteFooter)
-  backdrop.appendChild(panel)
+  panelEl.append(inputRow, paletteList, paletteFooter)
+  backdrop.appendChild(panelEl)
   shadow.append(style, backdrop)
   document.documentElement.appendChild(paletteHost)
   for (const type of ['keydown', 'keypress', 'keyup'] as const) {
@@ -267,7 +282,7 @@ function openPalette(prefix: string): void {
   }
   paletteInput.focus()
   paletteInput.setSelectionRange(prefix.length, prefix.length)
-  updateList()
+  void updateList()
 }
 
 function kbd(text: string): HTMLElement {
@@ -277,7 +292,15 @@ function kbd(text: string): HTMLElement {
   return chip
 }
 
-function renderFooter(mode: PaletteMode): void {
+function currentMode(): string {
+  const raw = paletteInput?.value ?? ''
+  if (raw.startsWith('>')) return 'commands'
+  if (raw.startsWith('@')) return 'tabs'
+  if (raw.startsWith('#')) return 'history'
+  return 'bookmarks'
+}
+
+function renderFooter(): void {
   if (!paletteFooter) return
   paletteFooter.textContent = ''
   const brand = document.createElement('span')
@@ -286,17 +309,92 @@ function renderFooter(mode: PaletteMode): void {
   spacer.className = 'spacer'
   paletteFooter.append(brand, spacer)
 
+  const mode = currentMode()
   const primary = document.createElement('span')
   primary.className = 'action'
-  const primaryLabel = mode === 'commands' ? 'Run' : mode === 'tabs' ? 'Switch' : 'Open'
+  const primaryLabel =
+    uiState === 'move' ? 'Move Here' : mode === 'commands' ? 'Run' : mode === 'tabs' ? 'Switch' : 'Open'
   primary.append(document.createTextNode(primaryLabel), kbd('↵'))
   paletteFooter.appendChild(primary)
 
-  if (mode === 'bookmarks') {
-    const secondary = document.createElement('span')
-    secondary.className = 'action'
-    secondary.append(document.createTextNode('New Tab'), kbd('⌘↵'))
-    paletteFooter.appendChild(secondary)
+  if (uiState === 'list') {
+    const actions = document.createElement('span')
+    actions.className = 'action'
+    actions.append(document.createTextNode('Actions'), kbd('⌘K'))
+    paletteFooter.appendChild(actions)
+  }
+}
+
+/* ---------- Key handling ---------- */
+
+/**
+ * Runs in capture phase on window while the palette is open, so page hotkey
+ * handlers never see keystrokes. stopPropagation skips all downstream
+ * listeners — including our input's — so key handling lives here; plain
+ * typing still lands in the focused input via the default action.
+ */
+function onGlobalKey(e: KeyboardEvent): void {
+  if (!paletteHost) return
+  e.stopPropagation()
+  if (e.type !== 'keydown') return
+
+  if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+    e.preventDefault()
+    if (uiState === 'actions') closeActions()
+    else if (uiState === 'list') openActions()
+    return
+  }
+
+  if (uiState === 'actions') {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      closeActions()
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      actionIndex = (actionIndex + 1) % currentActions.length
+      highlightActions()
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      actionIndex = (actionIndex - 1 + currentActions.length) % currentActions.length
+      highlightActions()
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      const action = currentActions[actionIndex]
+      if (action && actionTarget) void runAction(action, actionTarget)
+    }
+    return
+  }
+
+  if (uiState === 'rename') {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      exitSubState(false)
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      void commitRename()
+    }
+    return
+  }
+
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    if (uiState === 'move') exitSubState(false)
+    else closePalette()
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    moveSelection(1)
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    moveSelection(-1)
+  } else if (e.key === 'Enter') {
+    e.preventDefault()
+    const item = flatItems[selectedIndex]
+    if (item) void executeItem(item, e.metaKey || e.ctrlKey)
+  } else if (e.key === 'Tab') {
+    e.preventDefault()
+  } else if (paletteInput && document.activeElement !== paletteHost) {
+    // Page stole focus — reclaim it so typing keeps landing in the palette.
+    paletteInput.focus()
   }
 }
 
@@ -313,8 +411,25 @@ function highlightSelection(): void {
   rows[selectedIndex]?.scrollIntoView({ block: 'nearest' })
 }
 
-function executeItem(item: PaletteItem, altAction: boolean): void {
-  if (item.kind === 'bookmark') {
+/* ---------- Executing items ---------- */
+
+function recordUsage(item: RemoteItem): void {
+  const key =
+    item.kind === 'bookmark'
+      ? `bookmark:${item.url}`
+      : item.kind === 'command'
+        ? `command:${item.commandId}`
+        : null
+  if (key) void chrome.runtime.sendMessage({ type: 'record-usage', key })
+}
+
+async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> {
+  if (uiState === 'move') {
+    await commitMove(item)
+    return
+  }
+  recordUsage(item)
+  if (item.kind === 'bookmark' || item.kind === 'history') {
     void chrome.runtime.sendMessage({ type: 'open-url', url: item.url, newTab: altAction })
   } else if (item.kind === 'tab') {
     void chrome.runtime.sendMessage({ type: 'activate-tab', tabId: item.tabId })
@@ -331,7 +446,210 @@ function executeItem(item: PaletteItem, altAction: boolean): void {
   closePalette()
 }
 
-function fuzzyScore(query: string, text: string): number | null {
+/* ---------- Actions panel (⌘K) ---------- */
+
+function actionsFor(item: RemoteItem): PaletteAction[] {
+  switch (item.kind) {
+    case 'bookmark':
+      return [
+        { id: 'open', label: 'Open' },
+        { id: 'open-new-tab', label: 'Open in New Tab' },
+        { id: 'copy-url', label: 'Copy URL' },
+        { id: 'rename', label: 'Rename…' },
+        { id: 'move', label: 'Move to Folder…' },
+        { id: 'delete', label: 'Delete Bookmark', danger: true },
+      ]
+    case 'history':
+      return [
+        { id: 'open', label: 'Open' },
+        { id: 'open-new-tab', label: 'Open in New Tab' },
+        { id: 'copy-url', label: 'Copy URL' },
+        { id: 'delete-history', label: 'Remove from History', danger: true },
+      ]
+    case 'tab':
+      return [
+        { id: 'switch', label: 'Switch to Tab' },
+        { id: 'copy-url', label: 'Copy URL' },
+        { id: 'close-tab', label: 'Close Tab', danger: true },
+      ]
+    default:
+      return [{ id: 'run', label: 'Run Command' }]
+  }
+}
+
+function openActions(): void {
+  const item = flatItems[selectedIndex]
+  if (!item || !panelEl) return
+  actionTarget = item
+  currentActions = actionsFor(item)
+  actionIndex = 0
+  uiState = 'actions'
+
+  actionsEl = document.createElement('div')
+  actionsEl.className = 'actions'
+  currentActions.forEach((action, index) => {
+    const row = document.createElement('div')
+    row.className = 'action-row' + (action.danger ? ' danger' : '')
+    row.textContent = action.label
+    row.addEventListener('mousedown', (e) => {
+      e.preventDefault()
+      void runAction(action, item)
+    })
+    row.addEventListener('mousemove', () => {
+      if (actionIndex !== index) {
+        actionIndex = index
+        highlightActions()
+      }
+    })
+    actionsEl!.appendChild(row)
+  })
+  panelEl.appendChild(actionsEl)
+  highlightActions()
+  renderFooter()
+}
+
+function closeActions(): void {
+  actionsEl?.remove()
+  actionsEl = null
+  actionTarget = null
+  uiState = 'list'
+  renderFooter()
+}
+
+function highlightActions(): void {
+  if (!actionsEl) return
+  actionsEl
+    .querySelectorAll<HTMLElement>('.action-row')
+    .forEach((row, i) => row.classList.toggle('selected', i === actionIndex))
+}
+
+async function runAction(action: PaletteAction, item: RemoteItem): Promise<void> {
+  switch (action.id) {
+    case 'open':
+    case 'open-new-tab':
+      recordUsage(item)
+      await chrome.runtime.sendMessage({
+        type: 'open-url',
+        url: item.url,
+        newTab: action.id === 'open-new-tab',
+      })
+      closePalette()
+      return
+    case 'copy-url':
+      copyText(item.url ?? '')
+      closePalette()
+      return
+    case 'switch':
+      await chrome.runtime.sendMessage({ type: 'activate-tab', tabId: item.tabId })
+      closePalette()
+      return
+    case 'run':
+      closeActions()
+      await executeItem(item, false)
+      return
+    case 'rename':
+      closeActions()
+      enterRename(item)
+      return
+    case 'move':
+      closeActions()
+      await enterMove(item)
+      return
+    case 'delete':
+      await chrome.runtime.sendMessage({ type: 'bookmark-delete', id: item.id })
+      break
+    case 'delete-history':
+      await chrome.runtime.sendMessage({ type: 'history-delete', url: item.url })
+      break
+    case 'close-tab':
+      await chrome.runtime.sendMessage({ type: 'close-tab-id', tabId: item.tabId })
+      break
+  }
+  closeActions()
+  void updateList()
+}
+
+function copyText(text: string): void {
+  void navigator.clipboard?.writeText(text).catch(() => {
+    const area = document.createElement('textarea')
+    area.value = text
+    document.body.appendChild(area)
+    area.select()
+    document.execCommand('copy')
+    area.remove()
+  })
+}
+
+/* ---------- Rename / move sub-states ---------- */
+
+function enterRename(item: RemoteItem): void {
+  if (!paletteInput || !paletteList) return
+  uiState = 'rename'
+  subStateTarget = item
+  savedQuery = paletteInput.value
+  paletteInput.value = item.label
+  paletteInput.placeholder = 'New name…'
+  paletteInput.focus()
+  paletteInput.select()
+  paletteList.textContent = ''
+  flatItems = []
+  const hint = document.createElement('div')
+  hint.className = 'empty'
+  hint.textContent = `Renaming "${item.label}" — ↵ to save, esc to cancel`
+  paletteList.appendChild(hint)
+  renderFooter()
+}
+
+async function commitRename(): Promise<void> {
+  const title = paletteInput?.value.trim()
+  if (subStateTarget?.id && title) {
+    await chrome.runtime.sendMessage({ type: 'bookmark-rename', id: subStateTarget.id, title })
+  }
+  exitSubState(true)
+}
+
+async function enterMove(item: RemoteItem): Promise<void> {
+  if (!paletteInput) return
+  uiState = 'move'
+  subStateTarget = item
+  savedQuery = paletteInput.value
+  paletteInput.value = ''
+  paletteInput.placeholder = `Move "${item.label}" to folder…`
+  paletteInput.focus()
+  if (!foldersCache) {
+    const response = (await chrome.runtime.sendMessage({ type: 'folders' })) as {
+      folders?: FolderInfo[]
+    }
+    foldersCache = response?.folders ?? []
+  }
+  void updateList()
+}
+
+async function commitMove(folderItem: RemoteItem): Promise<void> {
+  if (subStateTarget?.id && folderItem.id) {
+    await chrome.runtime.sendMessage({
+      type: 'bookmark-move',
+      id: subStateTarget.id,
+      parentId: folderItem.id,
+    })
+  }
+  exitSubState(true)
+}
+
+function exitSubState(_commit: boolean): void {
+  if (uiState === 'actions') closeActions()
+  if (!paletteInput) return
+  uiState = 'list'
+  subStateTarget = null
+  paletteInput.value = savedQuery
+  paletteInput.placeholder = 'Search bookmarks and commands…'
+  paletteInput.focus()
+  void updateList()
+}
+
+/* ---------- List rendering ---------- */
+
+function localFuzzy(query: string, text: string): number | null {
   if (!query) return 0
   let qi = 0
   let score = 0
@@ -339,99 +657,100 @@ function fuzzyScore(query: string, text: string): number | null {
   for (let ti = 0; ti < text.length && qi < query.length; ti++) {
     if (text[ti] === query[qi]) {
       streak++
-      const wordStart = ti === 0 || ' /-_.:'.includes(text[ti - 1])
-      score += 1 + streak * 2 + (wordStart ? 6 : 0)
+      score += 1 + streak * 2
       qi++
     } else {
       streak = 0
     }
   }
-  return qi === query.length ? score - text.length * 0.01 : null
+  return qi === query.length ? score : null
 }
 
-function updateList(): void {
-  if (!paletteInput || !paletteList || !paletteData) return
-  const raw = paletteInput.value
-  const mode: PaletteMode = raw.startsWith('>')
-    ? 'commands'
-    : raw.startsWith('@')
-      ? 'tabs'
-      : 'bookmarks'
-  const query = raw.replace(/^[>@]/, '').trim().toLowerCase()
+async function updateList(): Promise<void> {
+  if (!paletteInput || !paletteList) return
+  const token = ++queryToken
+  renderFooter()
 
-  paletteList.textContent = ''
-  flatItems = []
-  selectedIndex = 0
-  renderFooter(mode)
+  if (uiState === 'rename') return
 
-  if (mode === 'commands') {
-    const items = scoreAndSort(
-      paletteData.commands.map((c) => ({
-        item: { kind: 'command', label: c.label, detail: '', commandId: c.id } as PaletteItem,
-        text: c.label.toLowerCase(),
-      })),
-      query,
-    )
-    appendGroup('Commands', items)
-  } else if (mode === 'tabs') {
-    const items = scoreAndSort(
-      paletteData.tabs
-        .filter((t) => t.id !== undefined)
-        .map((t) => ({
-          item: {
-            kind: 'tab',
-            label: t.title || t.url,
-            detail: shortUrl(t.url),
-            tabId: t.id!,
-            url: t.url,
-          } as PaletteItem,
-          text: `${t.title} ${t.url}`.toLowerCase(),
-        })),
-      query,
-    )
-    appendGroup('Open Tabs', items)
-  } else {
-    const items = scoreAndSort(
-      paletteData.bookmarks.map((b) => ({
-        item: {
-          kind: 'bookmark',
-          label: b.title,
-          detail: b.path || shortUrl(b.url),
-          url: b.url,
-        } as PaletteItem,
-        text: `${b.title} ${b.url}`.toLowerCase(),
-      })),
-      query,
-    ).slice(0, 50)
-    appendGroup('Bookmarks', items)
+  if (uiState === 'move') {
+    const query = paletteInput.value.trim().toLowerCase()
+    const folders = (foldersCache ?? [])
+      .map((f) => ({ f, s: localFuzzy(query, f.path.toLowerCase()) }))
+      .filter((x) => x.s !== null)
+      .sort((a, b) => b.s! - a.s!)
+      .map((x): RemoteItem => ({ kind: 'command', label: x.f.path, detail: '', id: x.f.id }))
+    renderItems('Folders', folders, 'folder')
+    return
   }
 
-  if (!flatItems.length) {
+  const mode = currentMode()
+  const query = paletteInput.value.replace(/^[>@#]/, '')
+  const response = (await chrome.runtime.sendMessage({
+    type: 'palette-query',
+    mode,
+    query,
+  })) as { items?: RemoteItem[] }
+  if (token !== queryToken || uiState !== 'list' || !paletteList) return
+  renderItems(GROUP_LABELS[mode] ?? 'Results', response?.items ?? [])
+}
+
+function renderItems(groupLabel: string, items: RemoteItem[], iconOverride?: string): void {
+  if (!paletteList) return
+  paletteList.textContent = ''
+  flatItems = items
+  selectedIndex = 0
+
+  if (!items.length) {
     const empty = document.createElement('div')
     empty.className = 'empty'
     empty.textContent = 'No results'
     paletteList.appendChild(empty)
+    return
   }
+
+  const label = document.createElement('div')
+  label.className = 'group-label'
+  label.textContent = groupLabel
+  paletteList.appendChild(label)
+
+  items.forEach((item, index) => {
+    const row = document.createElement('div')
+    row.className = 'item'
+    const title = document.createElement('span')
+    title.className = 'title'
+    title.textContent = item.label
+    const detail = document.createElement('span')
+    detail.className = 'detail'
+    detail.textContent = item.detail || (item.url ? shortUrl(item.url) : '')
+    const type = document.createElement('span')
+    type.className = 'type'
+    type.textContent = TYPE_LABELS[iconOverride ?? item.kind] ?? ''
+    row.append(iconFor(item, iconOverride), title, detail, type)
+    row.addEventListener('mousedown', (e) => {
+      e.preventDefault()
+      void executeItem(item, e.metaKey || e.ctrlKey)
+    })
+    row.addEventListener('mousemove', () => {
+      if (selectedIndex !== index) {
+        selectedIndex = index
+        highlightSelection()
+      }
+    })
+    paletteList!.appendChild(row)
+  })
   highlightSelection()
 }
 
-function scoreAndSort(
-  entries: Array<{ item: PaletteItem; text: string }>,
-  query: string,
-): PaletteItem[] {
-  const scored: Array<{ item: PaletteItem; score: number }> = []
-  for (const entry of entries) {
-    const score = fuzzyScore(query, entry.text)
-    if (score !== null) scored.push({ item: entry.item, score })
-  }
-  scored.sort((a, b) => b.score - a.score)
-  return scored.map((s) => s.item)
-}
-
-function iconFor(item: PaletteItem): HTMLElement {
+function iconFor(item: RemoteItem, iconOverride?: string): HTMLElement {
   const icon = document.createElement('span')
   icon.className = 'icon'
-  if (item.kind === 'bookmark' || item.kind === 'tab') {
+  const kind = iconOverride ?? item.kind
+  if (kind === 'folder') {
+    icon.innerHTML = FOLDER_SVG
+  } else if (kind === 'history') {
+    icon.innerHTML = CLOCK_SVG
+  } else if ((kind === 'bookmark' || kind === 'tab') && item.url) {
     const img = document.createElement('img')
     img.src =
       chrome.runtime.getURL('/_favicon/') + `?pageUrl=${encodeURIComponent(item.url)}&size=32`
@@ -443,41 +762,6 @@ function iconFor(item: PaletteItem): HTMLElement {
     icon.innerHTML = COMMAND_SVG
   }
   return icon
-}
-
-function appendGroup(label: string, items: PaletteItem[]): void {
-  if (!items.length || !paletteList) return
-  const groupLabel = document.createElement('div')
-  groupLabel.className = 'group-label'
-  groupLabel.textContent = label
-  paletteList.appendChild(groupLabel)
-  for (const item of items) {
-    const index = flatItems.length
-    flatItems.push(item)
-    const row = document.createElement('div')
-    row.className = 'item'
-    const title = document.createElement('span')
-    title.className = 'title'
-    title.textContent = item.label
-    const detail = document.createElement('span')
-    detail.className = 'detail'
-    detail.textContent = item.detail
-    const type = document.createElement('span')
-    type.className = 'type'
-    type.textContent = TYPE_LABELS[item.kind]
-    row.append(iconFor(item), title, detail, type)
-    row.addEventListener('mousedown', (e) => {
-      e.preventDefault()
-      executeItem(item, e.metaKey || e.ctrlKey)
-    })
-    row.addEventListener('mousemove', () => {
-      if (selectedIndex !== index) {
-        selectedIndex = index
-        highlightSelection()
-      }
-    })
-    paletteList.appendChild(row)
-  }
 }
 
 function shortUrl(url: string): string {

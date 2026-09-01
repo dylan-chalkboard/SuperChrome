@@ -7,8 +7,7 @@ async function togglePaletteIn(
     await chrome.tabs.sendMessage(tabId, { type: 'toggle-palette', mode })
   } catch {
     // Content script isn't there (tab predates the extension, or injection was
-    // missed) — inject on demand and retry. Still impossible on chrome://
-    // pages, the Web Store, and the PDF viewer.
+    // missed) — inject on demand and retry.
     try {
       await chrome.scripting.executeScript({ target: { tabId }, files: ['palette.js'] })
       await chrome.tabs.sendMessage(tabId, { type: 'toggle-palette', mode })
@@ -103,10 +102,190 @@ const PALETTE_COMMANDS = [
   { id: 'open-version', label: 'Open Chrome Version' },
 ]
 
-interface FlatBookmark {
-  title: string
-  url: string
-  path: string
+/* ---------- Ranking: fuzzy match blended with usage frecency ---------- */
+
+interface PaletteItem {
+  kind: 'bookmark' | 'tab' | 'history' | 'command'
+  label: string
+  detail: string
+  url?: string
+  id?: string
+  tabId?: number
+  commandId?: string
+}
+
+type UsageMap = Record<string, { n: number; t: number }>
+
+async function getUsage(): Promise<UsageMap> {
+  try {
+    const result = await chrome.storage.local.get('usage')
+    return result.usage ?? {}
+  } catch {
+    return {}
+  }
+}
+
+/** Usage count decayed by a two-week half-life-ish curve. */
+function frecency(usage: UsageMap, key: string): number {
+  const entry = usage[key]
+  if (!entry) return 0
+  const days = (Date.now() - entry.t) / 86_400_000
+  return entry.n * Math.exp(-days / 14)
+}
+
+function fuzzyScore(query: string, text: string): number | null {
+  if (!query) return 0
+  let qi = 0
+  let score = 0
+  let streak = 0
+  for (let ti = 0; ti < text.length && qi < query.length; ti++) {
+    if (text[ti] === query[qi]) {
+      streak++
+      const wordStart = ti === 0 || ' /-_.:'.includes(text[ti - 1])
+      score += 1 + streak * 2 + (wordStart ? 6 : 0)
+      qi++
+    } else {
+      streak = 0
+    }
+  }
+  return qi === query.length ? score - text.length * 0.01 : null
+}
+
+function rank<T>(
+  entries: Array<{ item: T; text: string; usageKey: string }>,
+  query: string,
+  usage: UsageMap,
+): T[] {
+  const scored: Array<{ item: T; score: number; index: number }> = []
+  entries.forEach((entry, index) => {
+    const fuzzy = fuzzyScore(query, entry.text)
+    if (fuzzy === null) return
+    const boost = Math.min(30, frecency(usage, entry.usageKey) * 5)
+    scored.push({ item: entry.item, score: fuzzy + boost, index })
+  })
+  scored.sort((a, b) => b.score - a.score || a.index - b.index)
+  return scored.map((s) => s.item)
+}
+
+async function queryPalette(
+  mode: string,
+  rawQuery: string,
+  sender: chrome.runtime.MessageSender,
+): Promise<PaletteItem[]> {
+  const query = rawQuery.trim().toLowerCase()
+  const usage = await getUsage()
+
+  if (mode === 'history') {
+    const results = await chrome.history.search({
+      text: rawQuery.trim(),
+      maxResults: 50,
+      startTime: 0,
+    })
+    return results
+      .filter((r) => r.url)
+      .map((r) => ({ kind: 'history' as const, label: r.title || r.url!, detail: '', url: r.url }))
+  }
+
+  if (mode === 'commands') {
+    return rank(
+      PALETTE_COMMANDS.map((c) => ({
+        item: { kind: 'command' as const, label: c.label, detail: '', commandId: c.id },
+        text: c.label.toLowerCase(),
+        usageKey: `command:${c.id}`,
+      })),
+      query,
+      usage,
+    )
+  }
+
+  if (mode === 'tabs') {
+    const tabs = sender.tab
+      ? await chrome.tabs.query({ windowId: sender.tab.windowId })
+      : await chrome.tabs.query({ currentWindow: true })
+    return rank(
+      tabs
+        .filter((t) => t.id !== undefined)
+        .map((t) => ({
+          item: {
+            kind: 'tab' as const,
+            label: t.title || t.url || '',
+            detail: '',
+            tabId: t.id,
+            url: t.url ?? '',
+          },
+          text: `${t.title} ${t.url}`.toLowerCase(),
+          usageKey: `tab:${t.url}`,
+        })),
+      query,
+      usage,
+    )
+  }
+
+  const [root] = await chrome.bookmarks.getTree()
+  const flat: Array<{ id: string; title: string; url: string; path: string }> = []
+  for (const child of root.children ?? []) collectBookmarks(child, [], flat)
+  return rank(
+    flat.map((b) => ({
+      item: {
+        kind: 'bookmark' as const,
+        label: b.title,
+        detail: b.path,
+        url: b.url,
+        id: b.id,
+      },
+      text: `${b.title} ${b.url}`.toLowerCase(),
+      usageKey: `bookmark:${b.url}`,
+    })),
+    query,
+    usage,
+  ).slice(0, 50)
+}
+
+function collectBookmarks(
+  node: chrome.bookmarks.BookmarkTreeNode,
+  path: string[],
+  out: Array<{ id: string; title: string; url: string; path: string }>,
+): void {
+  for (const child of node.children ?? []) {
+    if (child.url) {
+      out.push({
+        id: child.id,
+        title: child.title || child.url,
+        url: child.url,
+        path: path.join(' / '),
+      })
+    } else {
+      collectBookmarks(child, [...path, child.title], out)
+    }
+  }
+}
+
+function collectFolders(
+  node: chrome.bookmarks.BookmarkTreeNode,
+  path: string[],
+  out: Array<{ id: string; path: string }>,
+): void {
+  for (const child of node.children ?? []) {
+    if (child.url) continue
+    const childPath = [...path, child.title]
+    out.push({ id: child.id, path: childPath.join(' / ') })
+    collectFolders(child, childPath, out)
+  }
+}
+
+/* ---------- Message handling ---------- */
+
+interface Message {
+  type?: string
+  url?: string
+  newTab?: boolean
+  id?: string
+  tabId?: number
+  mode?: string
+  query?: string
+  key?: string
+  title?: string
+  parentId?: string
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -117,50 +296,60 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 })
 
 async function handleMessage(
-  message: { type?: string; url?: string; newTab?: boolean; id?: string; tabId?: number },
+  message: Message,
   sender: chrome.runtime.MessageSender,
 ): Promise<unknown> {
   switch (message?.type) {
-    case 'palette-data': {
-      const [root] = await chrome.bookmarks.getTree()
-      const bookmarks: FlatBookmark[] = []
-      for (const child of root.children ?? []) collectBookmarks(child, [], bookmarks)
-      const tabs = sender.tab
-        ? await chrome.tabs.query({ windowId: sender.tab.windowId })
-        : await chrome.tabs.query({ currentWindow: true })
-      return {
-        bookmarks,
-        tabs: tabs.map((t) => ({ id: t.id, title: t.title ?? '', url: t.url ?? '' })),
-        commands: PALETTE_COMMANDS,
-      }
-    }
-    case 'activate-tab': {
-      if (message.tabId !== undefined) await chrome.tabs.update(message.tabId, { active: true })
+    case 'palette-query':
+      return { items: await queryPalette(message.mode ?? 'bookmarks', message.query ?? '', sender) }
+    case 'record-usage': {
+      if (!message.key) return {}
+      const usage = await getUsage()
+      const entry = usage[message.key]
+      usage[message.key] = { n: (entry?.n ?? 0) + 1, t: Date.now() }
+      await chrome.storage.local.set({ usage }).catch(() => {})
       return {}
     }
+    case 'folders': {
+      const [root] = await chrome.bookmarks.getTree()
+      const folders: Array<{ id: string; path: string }> = []
+      for (const child of root.children ?? []) {
+        folders.push({ id: child.id, path: child.title })
+        collectFolders(child, [child.title], folders)
+      }
+      return { folders }
+    }
+    case 'bookmark-rename':
+      if (message.id && message.title) await chrome.bookmarks.update(message.id, { title: message.title })
+      return {}
+    case 'bookmark-move':
+      if (message.id && message.parentId) {
+        await chrome.bookmarks.move(message.id, { parentId: message.parentId })
+      }
+      return {}
+    case 'bookmark-delete':
+      if (message.id) await chrome.bookmarks.remove(message.id)
+      return {}
+    case 'history-delete':
+      if (message.url) await chrome.history.deleteUrl({ url: message.url })
+      return {}
+    case 'close-tab-id':
+      if (message.tabId !== undefined) await chrome.tabs.remove(message.tabId)
+      return {}
+    case 'activate-tab':
+      if (message.tabId !== undefined) await chrome.tabs.update(message.tabId, { active: true })
+      return {}
     case 'open-url': {
       const tab = await senderTab(sender)
       if (message.newTab || !tab?.id) await chrome.tabs.create({ url: message.url })
       else await chrome.tabs.update(tab.id, { url: message.url })
       return {}
     }
-    case 'run-command': {
+    case 'run-command':
       if (message.id) await runCommand(message.id, sender)
       return {}
-    }
   }
   return {}
-}
-
-function collectBookmarks(
-  node: chrome.bookmarks.BookmarkTreeNode,
-  path: string[],
-  out: FlatBookmark[],
-): void {
-  for (const child of node.children ?? []) {
-    if (child.url) out.push({ title: child.title || child.url, url: child.url, path: path.join(' / ') })
-    else collectBookmarks(child, [...path, child.title], out)
-  }
 }
 
 async function runCommand(id: string, sender: chrome.runtime.MessageSender): Promise<void> {
@@ -193,7 +382,7 @@ async function runCommand(id: string, sender: chrome.runtime.MessageSender): Pro
       break
     case 'open-devtools':
       // Extensions can't open DevTools; the native host (native-host/) presses
-      // Cmd+Opt+I via macOS. No-op if the host isn't installed.
+      // Cmd+Opt+I via macOS. Falls back to chrome://inspect without it.
       try {
         await chrome.runtime.sendNativeMessage('com.codepanel.host', { action: 'open-devtools' })
       } catch {
