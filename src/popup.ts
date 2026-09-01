@@ -8,7 +8,7 @@
  */
 
 interface RemoteItem {
-  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji' | 'clip'
+  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji'
   label: string
   detail: string
   url?: string
@@ -18,7 +18,6 @@ interface RemoteItem {
   sessionId?: string
   emoji?: string
   text?: string
-  clipT?: number
   group?: string
   positions?: number[]
 }
@@ -37,8 +36,6 @@ const CLOCK_SVG =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor"/><path d="M8 5v3.2l2.2 1.6" stroke="currentColor" stroke-linecap="round"/></svg>'
 const FOLDER_SVG =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1.5 3.5h4.5l1.5 2h7v7h-13v-9z" stroke="currentColor" stroke-linejoin="round"/></svg>'
-const CLIP_SVG =
-  '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="3.5" y="3.5" width="9" height="11" rx="1.5" stroke="currentColor"/><path d="M5.5 3.5v-1h5v1" stroke="currentColor"/><path d="M6 7.5h4M6 10h4" stroke="currentColor" stroke-linecap="round"/></svg>'
 
 const TYPE_LABELS: Record<string, string> = {
   bookmark: 'Bookmark',
@@ -49,7 +46,6 @@ const TYPE_LABELS: Record<string, string> = {
   folder: 'Folder',
   calc: 'Calculator',
   emoji: 'Emoji',
-  clip: 'Clip',
 }
 
 const GROUP_LABELS: Record<string, string> = {
@@ -58,7 +54,6 @@ const GROUP_LABELS: Record<string, string> = {
   tabs: 'Open Tabs',
   history: 'History',
   emoji: 'Emoji',
-  clipboard: 'Clipboard',
 }
 
 // Page-local commands need the page's document; they can't run from a popup.
@@ -77,7 +72,6 @@ function currentMode(): string {
   if (raw.startsWith('@')) return 'tabs'
   if (raw.startsWith('#')) return 'history'
   if (raw.startsWith(':')) return 'emoji'
-  if (raw.startsWith('!')) return 'clipboard'
   return 'bookmarks'
 }
 
@@ -204,11 +198,6 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
       return [{ id: 'copy-text', label: 'Copy Result' }]
     case 'emoji':
       return [{ id: 'copy-text', label: 'Copy Emoji' }]
-    case 'clip':
-      return [
-        { id: 'copy-text', label: 'Copy' },
-        { id: 'clip-delete', label: 'Remove from History', danger: true },
-      ]
     default:
       return [{ id: 'run', label: 'Run Command' }]
   }
@@ -307,9 +296,6 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
       await copyText(item.kind === 'emoji' ? (item.emoji ?? '') : (item.text ?? item.label))
       window.close()
       return
-    case 'clip-delete':
-      await chrome.runtime.sendMessage({ type: 'clip-delete', clipT: item.clipT })
-      break
     case 'run':
       closeActions()
       await executeItem(item, false)
@@ -372,7 +358,7 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     enterFolder(item)
     return
   }
-  if (item.kind === 'calc' || item.kind === 'clip' || item.kind === 'emoji') {
+  if (item.kind === 'calc' || item.kind === 'emoji') {
     recordUsage(item)
     await copyText(item.kind === 'emoji' ? (item.emoji ?? '') : (item.text ?? item.label))
     window.close()
@@ -399,7 +385,7 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
 async function updateList(): Promise<void> {
   const token = ++queryToken
   const mode = currentMode()
-  const query = inputEl.value.replace(/^[>@#:!]/, '')
+  const query = inputEl.value.replace(/^[>@#:]/, '')
   const browsing = mode === 'bookmarks' && browseStack.length > 0
   const response = (await chrome.runtime.sendMessage({
     type: 'palette-query',
@@ -512,14 +498,7 @@ function iconFor(item: RemoteItem): HTMLElement {
     icon.textContent = '='
     return icon
   }
-  icon.innerHTML =
-    kind === 'folder'
-      ? FOLDER_SVG
-      : kind === 'history'
-        ? CLOCK_SVG
-        : kind === 'clip'
-          ? CLIP_SVG
-          : COMMAND_SVG
+  icon.innerHTML = kind === 'folder' ? FOLDER_SVG : kind === 'history' ? CLOCK_SVG : COMMAND_SVG
   return icon
 }
 

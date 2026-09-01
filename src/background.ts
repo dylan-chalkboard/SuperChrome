@@ -162,7 +162,7 @@ const PALETTE_COMMANDS = [
 /* ---------- Ranking: fuzzy match blended with usage frecency ---------- */
 
 interface PaletteItem {
-  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji' | 'clip'
+  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji'
   label: string
   detail: string
   url?: string
@@ -172,7 +172,6 @@ interface PaletteItem {
   sessionId?: string
   emoji?: string
   text?: string
-  clipT?: number
   /** Overrides the mode's default group header in the results list. */
   group?: string
   /** Indices into the ranked text that matched the query, for highlighting. */
@@ -331,30 +330,6 @@ function tryCalculate(raw: string): string | null {
   }
 }
 
-/* ---------- Clipboard history (captured by content-script copy events) ---------- */
-
-interface Clip {
-  text: string
-  t: number
-}
-
-async function getClips(): Promise<Clip[]> {
-  try {
-    const { clips } = await chrome.storage.local.get('clips')
-    return clips ?? []
-  } catch {
-    return []
-  }
-}
-
-function ago(t: number): string {
-  const s = Math.max(0, (Date.now() - t) / 1000)
-  if (s < 60) return 'just now'
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`
-  return `${Math.floor(s / 86400)}d ago`
-}
-
 async function queryPalette(
   mode: string,
   rawQuery: string,
@@ -376,26 +351,6 @@ async function queryPalette(
       usage,
       decay,
     ).slice(0, 50)
-  }
-
-  if (mode === 'clipboard') {
-    const clips = await getClips()
-    return rank<PaletteItem>(
-      clips.map((clip) => ({
-        item: {
-          kind: 'clip' as const,
-          label: clip.text.replace(/\s+/g, ' ').slice(0, 80),
-          detail: ago(clip.t),
-          text: clip.text,
-          clipT: clip.t,
-        },
-        text: clip.text.toLowerCase().slice(0, 200),
-        usageKey: `clip:${clip.t}`,
-      })),
-      query,
-      usage,
-      decay,
-    )
   }
 
   // Browsing inside one folder: its direct children, subfolders included.
@@ -594,7 +549,6 @@ interface Message {
   sessionId?: string
   folderId?: string
   text?: string
-  clipT?: number
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -618,22 +572,6 @@ async function handleMessage(
           message.folderId,
         ),
       }
-    case 'clip-add': {
-      const text = message.text?.trim()
-      if (!text || text.length > 10_000) return {}
-      const clips = await getClips()
-      if (clips[0]?.text === text) return {}
-      const next = [{ text, t: Date.now() }, ...clips.filter((c) => c.text !== text)].slice(0, 50)
-      await chrome.storage.local.set({ clips: next }).catch(() => {})
-      return {}
-    }
-    case 'clip-delete': {
-      const clips = await getClips()
-      await chrome.storage.local
-        .set({ clips: clips.filter((c) => c.t !== message.clipT) })
-        .catch(() => {})
-      return {}
-    }
     case 'record-usage': {
       if (!message.key) return {}
       const usage = await getUsage()

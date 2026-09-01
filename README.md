@@ -33,7 +33,6 @@ Open with `Cmd+P` (bookmarks), `Cmd+Shift+P` (commands), or the toolbar icon:
 - `@` prefix → **switch to an open tab**
 - `#` prefix → **search browser history** (empty query shows recent pages)
 - `:` prefix → **emoji search** — Enter inserts into the field you were typing in (or copies)
-- `!` prefix → **clipboard history** — the last 50 things you copied on web pages; Enter re-inserts or copies
 - **Inline calculator** — type math (`142*12`, `18% of 240`, `2^10`) and the result appears as the first row; Enter copies it
 - `Cmd+K` → **actions panel** for the selected item: open in new tab, copy URL, rename, move to folder, delete bookmark, remove from history, close tab
 - `Esc` or click outside to dismiss
