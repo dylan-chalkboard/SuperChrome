@@ -108,11 +108,17 @@ const PALETTE_CSS = `
   position: relative; z-index: 1;
 }
 .emoji-grid {
-  display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; padding: 2px;
+  display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; padding: 2px;
 }
 .emoji-cell {
-  display: flex; align-items: center; justify-content: center;
-  height: 44px; font-size: 22px; border-radius: 8px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; height: 58px; padding: 4px; border-radius: 8px; cursor: pointer;
+  min-width: 0;
+}
+.emoji-cell .glyph { font-size: 22px; line-height: 1; }
+.emoji-cell .emoji-name {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 9px; color: #ffffff59;
 }
 .emoji-cell.selected, .emoji-cell:hover { background: rgba(255, 255, 255, 0.14); }
 .item .icon {
@@ -288,7 +294,7 @@ let browseStack: Array<{ id: string; label: string }> = []
 let lastFocused: HTMLElement | null = null
 let prefersNewTab = false
 let selectorEl: HTMLElement | null = null
-const GRID_COLS = 10
+const GRID_COLS = 8
 let reduceMotionPref = false
 
 function reducedMotion(): boolean {
@@ -1265,8 +1271,14 @@ function renderEmojiGrid(items: RemoteItem[]): void {
   items.forEach((item, index) => {
     const cell = document.createElement('div')
     cell.className = 'emoji-cell'
-    cell.textContent = item.emoji ?? ''
     cell.title = item.label
+    const glyph = document.createElement('span')
+    glyph.className = 'glyph'
+    glyph.textContent = item.emoji ?? ''
+    const name = document.createElement('span')
+    name.className = 'emoji-name'
+    name.textContent = item.label
+    cell.append(glyph, name)
     cell.addEventListener('mousedown', (e) => {
       e.preventDefault()
       void executeItem(item, e.metaKey || e.ctrlKey)

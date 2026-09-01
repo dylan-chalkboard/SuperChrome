@@ -141,7 +141,7 @@ let flatItems: RemoteItem[] = []
 let selectedIndex = 0
 let queryToken = 0
 let selectorEl: HTMLElement | null = null
-const GRID_COLS = 8
+const GRID_COLS = 6
 
 function currentMode(): string {
   const raw = inputEl.value
@@ -605,8 +605,14 @@ async function updateList(): Promise<void> {
     items.forEach((item, index) => {
       const cell = document.createElement('div')
       cell.className = 'emoji-cell'
-      cell.textContent = item.emoji ?? ''
       cell.title = item.label
+      const glyph = document.createElement('span')
+      glyph.className = 'glyph'
+      glyph.textContent = item.emoji ?? ''
+      const name = document.createElement('span')
+      name.className = 'emoji-name'
+      name.textContent = item.label
+      cell.append(glyph, name)
       cell.addEventListener('click', (e) => void executeItem(item, e.metaKey || e.ctrlKey))
       cell.addEventListener('mousemove', () => {
         if (selectedIndex !== index) {
