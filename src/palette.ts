@@ -96,6 +96,11 @@ const PALETTE_CSS = `
 .input-row.mode-downloads { --mode-tint: rgba(58, 169, 159, 0.22); border-bottom-color: rgba(58, 169, 159, 0.35); }
 .input-row.mode-snippets { --mode-tint: rgba(232, 150, 74, 0.22); border-bottom-color: rgba(232, 150, 74, 0.35); }
 .input-row.mode-library { --mode-tint: rgba(232, 195, 65, 0.22); border-bottom-color: rgba(232, 195, 65, 0.35); }
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.actions, .brand-menu { animation: menu-in 0.14s ease-out; }
 @keyframes glyph-in {
   from { opacity: 0; transform: translateX(-4px); }
   to { opacity: 1; transform: none; }
@@ -389,11 +394,11 @@ const PALETTE_CSS = `
 .light .logo-img { filter: invert(1); }
 @media (prefers-reduced-motion: reduce) {
   .panel, .selector, .toast, .input-row, .input-row::before, .hint .kbd { transition: none !important; }
-  .mode-glyph { animation: none !important; }
+  .mode-glyph, .actions, .brand-menu { animation: none !important; }
 }
 .panel.no-motion, .no-motion .selector { transition: none !important; }
 .no-motion .input-row, .no-motion .input-row::before, .no-motion .hint .kbd { transition: none !important; }
-.no-motion .mode-glyph { animation: none !important; }
+.no-motion .mode-glyph, .no-motion .actions, .no-motion .brand-menu { animation: none !important; }
 `
 
 const TYPE_LABELS: Record<string, string> = {

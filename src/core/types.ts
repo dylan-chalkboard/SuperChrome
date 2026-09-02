@@ -15,6 +15,8 @@ export interface PaletteItem {
   color?: string
   groupColor?: string
   grouped?: boolean
+  /** Right-column override ("Active", "3 items", "2d ago"); kind label otherwise. */
+  typeText?: string
   downloadId?: number
   /** Overrides the mode's default group header in the results list. */
   group?: string

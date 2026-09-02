@@ -28,34 +28,51 @@ export async function searchTabs(
     chrome.tabGroups.query({}),
   ])
   const groupsById = new Map(tabGroups.map((g) => [g.id, g]))
-  const open = rank(
-    tabs
-      .filter((t) => t.id !== undefined)
-      .map((t) => {
+  const openTabs = tabs.filter((t) => t.id !== undefined)
+  const tabItem = (t: chrome.tabs.Tab, section: string): PaletteItem => {
+    const tabGroup = t.groupId !== undefined ? groupsById.get(t.groupId) : undefined
+    const windowNote = t.windowId === currentWindowId ? '' : 'Other window'
+    return {
+      kind: 'tab' as const,
+      label: t.title || t.url || '',
+      detail:
+        section !== 'Open Tabs' || !tabGroup?.title
+          ? windowNote
+          : `${tabGroup.title}${windowNote ? ` · ${windowNote}` : ''}`,
+      tabId: t.id,
+      url: t.url ?? '',
+      group: section,
+      groupColor: tabGroup ? GROUP_COLORS[tabGroup.color] : undefined,
+      grouped: !!tabGroup,
+      typeText: t.active && t.windowId === currentWindowId ? 'Active' : undefined,
+    }
+  }
+
+  let open: PaletteItem[]
+  if (query) {
+    open = rank(
+      openTabs.map((t) => {
         const tabGroup = t.groupId !== undefined ? groupsById.get(t.groupId) : undefined
-        const windowNote = t.windowId === currentWindowId ? '' : 'Other window'
         return {
-          item: {
-            kind: 'tab' as const,
-            label: t.title || t.url || '',
-            detail: tabGroup?.title
-              ? `${tabGroup.title}${windowNote ? ` · ${windowNote}` : ''}`
-              : windowNote,
-            tabId: t.id,
-            url: t.url ?? '',
-            group: 'Open Tabs',
-            groupColor: tabGroup ? GROUP_COLORS[tabGroup.color] : undefined,
-            grouped: !!tabGroup,
-            typeText: t.active && t.windowId === currentWindowId ? 'Active' : undefined,
-          },
+          item: tabItem(t, 'Open Tabs'),
           text: `${t.title} ${t.url} ${tabGroup?.title ?? ''}`.toLowerCase(),
           usageKey: `tab:${t.url}`,
         }
       }),
-    query,
-    usage,
-    decay,
-  )
+      query,
+      usage,
+      decay,
+    )
+  } else {
+    // Browsing: sectioned like the tab strip — ungrouped tabs first, then
+    // each tab group as its own labeled section.
+    const ungrouped = openTabs.filter((t) => !groupsById.has(t.groupId ?? -1))
+    open = ungrouped.map((t) => tabItem(t, 'Open Tabs'))
+    for (const g of tabGroups) {
+      const members = openTabs.filter((t) => t.groupId === g.id)
+      open.push(...members.map((t) => tabItem(t, g.title || 'Untitled group')))
+    }
+  }
   const sessions = await chrome.sessions.getRecentlyClosed({ maxResults: 10 })
   const closed = rank(
     sessions
