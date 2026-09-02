@@ -189,8 +189,10 @@ const PALETTE_CSS = `
   width: 40px; height: 40px; border-radius: 10px;
   background: #ffffff10; color: #ffffff;
   display: flex; align-items: center; justify-content: center;
+  transition: box-shadow 0.12s ease;
 }
-.fav-item:hover .fav-tile, .fav-item.selected .fav-tile { outline: 2px solid rgba(255, 255, 255, 0.35); }
+.fav-item:hover .fav-tile, .fav-item.selected .fav-tile { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35); }
+.fav-star { display: flex; flex-shrink: 0; color: #e8c341; }
 .fav-tile img { width: 24px; height: 24px; border-radius: 5px; }
 .fav-tile svg { width: 20px; height: 20px; }
 .fav-cap {
@@ -253,11 +255,12 @@ const PALETTE_CSS = `
 .brand-menu .menu-version {
   padding: 6px 10px 4px; font-size: 11px; color: #ffffff40; cursor: default;
 }
-.brand-menu .menu-icon {
+.menu-icon {
   display: flex; align-items: center; justify-content: center;
   width: 16px; color: #cccccc99; flex: none;
 }
-.light .brand-menu .menu-icon { color: #00000059; }
+.action-row.danger .menu-icon { color: inherit; }
+.light .menu-icon { color: #00000059; }
 .light .brand-menu { background: #ffffff; border-color: rgba(0, 0, 0, 0.12); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25); }
 .light .brand-menu .action-row:hover { background: rgba(0, 0, 0, 0.08); }
 .light .brand-menu .menu-version { color: #00000045; }
@@ -344,7 +347,7 @@ const PALETTE_CSS = `
 .light .item .icon { background: #00000010; }
 .light .item .icon.plain, .light .item .icon.kind-folder { background: transparent; }
 .light .fav-tile { background: #0000000d; }
-.light .fav-item:hover .fav-tile, .light .fav-item.selected .fav-tile { outline-color: rgba(0, 0, 0, 0.25); }
+.light .fav-item:hover .fav-tile, .light .fav-item.selected .fav-tile { box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.25); }
 .light .fav-cap { color: #00000059; }
 .light .emoji-cell.selected, .light .emoji-cell:hover { background: rgba(0, 0, 0, 0.08); }
 .light .emoji-cell .emoji-name { color: #00000059; }
@@ -1103,14 +1106,14 @@ function favTileEl(f: FavoriteEntry, index: number): HTMLElement {
 /** Move keyboard focus into (index ≥ 0) or out of (-1) the favorites bar. */
 function setFavIndex(index: number): void {
   favIndex = index
-  paletteList
-    ?.querySelectorAll<HTMLElement>('.fav-item')
-    .forEach((el, i) => el.classList.toggle('selected', i === favIndex))
+  const tiles = paletteList?.querySelectorAll<HTMLElement>('.fav-item')
+  tiles?.forEach((el, i) => el.classList.toggle('selected', i === favIndex))
   if (favIndex >= 0) {
     if (selectorEl) selectorEl.style.opacity = '0'
     paletteList
       ?.querySelectorAll<HTMLElement>('.item')
       .forEach((row) => row.classList.remove('selected'))
+    tiles?.[favIndex]?.scrollIntoView({ block: 'nearest' })
   } else {
     highlightSelection()
   }
@@ -1209,8 +1212,53 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
   }
 }
 
+const STAR_SVG =
+  '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.2L8 11.5l-3.8 2 .7-4.2-3.1-3 4.3-.6z"/></svg>'
+const PENCIL_SVG =
+  '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 13l.8-3L11 2.8l2.2 2.2L6 12.2 3 13z" stroke="currentColor" stroke-linejoin="round"/></svg>'
+const FOLDER_OUTLINE_SVG =
+  '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1.5 3.5h4.5l1.5 2h7v7h-13v-9z" stroke="currentColor" stroke-linejoin="round"/></svg>'
+const ARROW_UP_SVG =
+  '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 13V3M3.5 7L8 2.5 12.5 7" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+const ARROW_DOWN_SVG =
+  '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3.5 9L8 13.5 12.5 9" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+
+/** Per-action icons for the ⌘K menu, mirroring the brand menu's style. */
+const ACTION_ICONS: Record<string, string> = {
+  open: CMD_ICONS.external,
+  'open-new-tab': CMD_ICONS.tab,
+  switch: CMD_ICONS.switch,
+  reopen: CMD_ICONS.reset,
+  browse: FOLDER_OUTLINE_SVG,
+  'open-all': CMD_ICONS.tab,
+  'copy-url': CMD_ICONS.link,
+  'copy-md': CMD_ICONS.link,
+  'copy-text': CMD_ICONS.doc,
+  'favorite-add': STAR_SVG,
+  'favorite-remove': STAR_SVG,
+  rename: PENCIL_SVG,
+  move: FOLDER_OUTLINE_SVG,
+  'move-up': ARROW_UP_SVG,
+  'move-down': ARROW_DOWN_SVG,
+  'add-to-group': CMD_ICONS.group,
+  'new-group': CMD_ICONS.group,
+  ungroup: CMD_ICONS.group,
+  insert: CMD_ICONS.form,
+  run: COMMAND_SVG,
+  delete: CMD_ICONS.trash,
+  'folder-delete': CMD_ICONS.trash,
+  'delete-history': CMD_ICONS.trash,
+  'close-tab': CMD_ICONS.tab,
+  'download-open': CMD_ICONS.download,
+  'download-show': FOLDER_OUTLINE_SVG,
+}
+
 function openActions(): void {
-  const item = flatItems[selectedIndex]
+  // ⌘K acts on the focused favorite tile when the bar has keyboard focus.
+  const item =
+    favIndex >= 0 && favBarItems[favIndex]
+      ? favToItem(favBarItems[favIndex])
+      : flatItems[selectedIndex]
   if (!item || !panelEl) return
   closeBrandMenu()
   actionTarget = item
@@ -1223,11 +1271,14 @@ function openActions(): void {
   currentActions.forEach((action, index) => {
     const row = document.createElement('div')
     row.className = 'action-row' + (action.danger ? ' danger' : '')
+    const glyph = document.createElement('span')
+    glyph.className = 'menu-icon'
+    glyph.innerHTML = ACTION_ICONS[action.id] ?? COMMAND_SVG
     const label = document.createElement('span')
     label.textContent = action.label
     const spacer = document.createElement('span')
     spacer.className = 'spacer'
-    row.append(label, spacer)
+    row.append(glyph, label, spacer)
     if (index < 9) row.appendChild(kbd(String(index + 1)))
     row.addEventListener('mousedown', (e) => {
       e.preventDefault()
@@ -1967,6 +2018,13 @@ function renderItems(groupLabel: string, items: RemoteItem[], favorites?: Favori
       dot.className = 'group-dot'
       dot.style.background = item.groupColor
       row.appendChild(dot)
+    }
+    if (isFavorite(item)) {
+      const star = document.createElement('span')
+      star.className = 'fav-star'
+      star.title = 'Favorited'
+      star.innerHTML = STAR_SVG
+      row.appendChild(star)
     }
     row.appendChild(type)
     row.addEventListener('mousedown', (e) => {
