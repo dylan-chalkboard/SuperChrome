@@ -1,40 +1,33 @@
 /**
- * Palette content script. Self-contained by design: manifest content scripts
- * load as classic scripts, so this file must not import anything.
+ * Palette content script. Chrome loads content scripts as classic scripts, so
+ * dist/palette.js must stay a self-contained IIFE — but the source can import
+ * freely: a second build pass (vite.palette.config.ts) inlines everything.
  *
  * Modes: plain text = bookmarks, '>' = commands, '@' = open tabs, '#' = history.
  * Cmd+K opens a Raycast-style actions panel for the selected item.
  */
 
-interface RemoteItem {
-  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji' | 'download' | 'search' | 'snippet'
-  label: string
-  detail: string
-  url?: string
-  id?: string
-  tabId?: number
-  commandId?: string
-  sessionId?: string
-  emoji?: string
-  text?: string
-  icon?: string
-  color?: string
-  groupColor?: string
-  grouped?: boolean
-  downloadId?: number
-  group?: string
-  positions?: number[]
-}
+import { tileGradient } from './features/gradients'
+import {
+  favToItem,
+  favoriteActionFor,
+  loadFavorites,
+  toggleFavorite,
+} from './ui/shared/favorites'
+import {
+  BOOKMARK_SVG,
+  CLOCK_SVG,
+  CMD_ICONS,
+  COMMAND_SVG,
+  DOC_SVG,
+  FOLDER_SVG,
+} from './ui/shared/icons'
+import { MODE_PLACEHOLDERS, MODE_PREFIX, PREFIX_CHARS, mode } from './ui/shared/mode'
+import type { FavoriteEntry, PaletteAction, RemoteItem } from './ui/shared/types'
 
 interface FolderInfo {
   id: string
   path: string
-}
-
-interface PaletteAction {
-  id: string
-  label: string
-  danger?: boolean
 }
 
 // IIFE + load guard: the manifest injection and the on-demand scripting
@@ -261,61 +254,6 @@ const PALETTE_CSS = `
 .no-motion .mode-glyph { animation: none !important; }
 `
 
-const BOOKMARK_SVG =
-  '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 2.5h8V14l-4-2.5L4 14V2.5z" stroke="currentColor" stroke-linejoin="round"/></svg>'
-const COMMAND_SVG =
-  '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M5 4l4 4-4 4" stroke="currentColor" stroke-linecap="round"/></svg>'
-const CLOCK_SVG =
-  '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor"/><path d="M8 5v3.2l2.2 1.6" stroke="currentColor" stroke-linecap="round"/></svg>'
-const DOC_SVG =
-  '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 1.5h5.5L12.5 5v9.5h-8.5v-13z" stroke="currentColor" stroke-linejoin="round"/><path d="M9.5 1.5V5H12.5" stroke="currentColor" stroke-linejoin="round"/></svg>'
-const FOLDER_SVG =
-  '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1.5 3.5h4.5l1.5 2h7v7h-13v-9z" stroke="currentColor" stroke-linejoin="round"/></svg>'
-
-const CMD_ICONS: Record<string, string> = {
-  'arrow-left': '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M13 8H3M7 3.5L2.5 8 7 12.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  'arrow-right': '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 3.5L13.5 8 9 12.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  tab: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5" stroke="currentColor"/><path d="M1.5 5.5h13" stroke="currentColor"/></svg>',
-  switch: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 5.5h8M9.5 2.5l3 3-3 3M12 10.5H4M6.5 7.5l-3 3 3 3" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  pin: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="3" stroke="currentColor"/><path d="M8 9v5" stroke="currentColor" stroke-linecap="round"/></svg>',
-  split: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="3" width="13" height="10" rx="1.5" stroke="currentColor"/><path d="M8 3v10" stroke="currentColor"/></svg>',
-  external: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M6.5 3.5H3v9.5h9.5V9.5M9.5 3h3.5v3.5M12.7 3.3L8 8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  merge: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M5 2.5v3a3 3 0 003 3 3 3 0 003-3v-3M8 8.5V14M5.5 11.5L8 14l2.5-2.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  group: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="5" cy="5" r="2" stroke="currentColor"/><circle cx="11" cy="5" r="2" stroke="currentColor"/><circle cx="8" cy="11" r="2" stroke="currentColor"/></svg>',
-  incognito: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="4.5" cy="10.5" r="2" stroke="currentColor"/><circle cx="11.5" cy="10.5" r="2" stroke="currentColor"/><path d="M6.5 10.5h3M2 7.5h12M5 7l1-3.5h4L11 7" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  'zoom-in': '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.5" stroke="currentColor"/><path d="M10.5 10.5L14 14M5 7h4M7 5v4" stroke="currentColor" stroke-linecap="round"/></svg>',
-  'zoom-out': '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.5" stroke="currentColor"/><path d="M10.5 10.5L14 14M5 7h4" stroke="currentColor" stroke-linecap="round"/></svg>',
-  zoom: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.5" stroke="currentColor"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-linecap="round"/></svg>',
-  fullscreen: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  gear: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="currentColor"/><path d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2" stroke="currentColor" stroke-linecap="round"/></svg>',
-  code: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M5.5 4.5L2 8l3.5 3.5M10.5 4.5L14 8l-3.5 3.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  bookmark: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 2.5h8V14l-4-2.5L4 14V2.5z" stroke="currentColor" stroke-linejoin="round"/></svg>',
-  clock: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor"/><path d="M8 5v3.2l2.2 1.6" stroke="currentColor" stroke-linecap="round"/></svg>',
-  download: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 7l3 3 3-3M3 13.5h10" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  save: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 3h8.5L13 4.5V13H3z" stroke="currentColor" stroke-linejoin="round"/><path d="M5 3v3h5V3M5 13V9.5h6V13" stroke="currentColor" stroke-linejoin="round"/></svg>',
-  search: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.5" stroke="currentColor"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-linecap="round"/></svg>',
-  printer: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4.5 6V2.5h7V6M2.5 6h11v5h-2.5M4.5 9h7v4.5h-7zM4.5 11H2.5V6" stroke="currentColor" stroke-linejoin="round"/></svg>',
-  gauge: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2.5 11.5a5.5 5.5 0 0111 0" stroke="currentColor" stroke-linecap="round"/><path d="M8 11.5L10.5 7" stroke="currentColor" stroke-linecap="round"/></svg>',
-  shield: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2l5 1.8v3.7c0 3.2-2 5.4-5 6.5-3-1.1-5-3.3-5-6.5V3.8z" stroke="currentColor" stroke-linejoin="round"/></svg>',
-  key: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="5.5" cy="10.5" r="3" stroke="currentColor"/><path d="M8 8l5.5-5.5M11 5l2 2M9.5 6.5L11 8" stroke="currentColor" stroke-linecap="round"/></svg>',
-  trash: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 4.5h10M6.5 4.5v-2h3v2M4.5 4.5l.7 9h5.6l.7-9M6.7 7v4M9.3 7v4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  puzzle: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M6 2.5h4v3h3v4h-3v3H6v-3H3v-4h3z" stroke="currentColor" stroke-linejoin="round"/></svg>',
-  keyboard: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="4.5" width="12" height="7" rx="1" stroke="currentColor"/><path d="M4.5 7h.1M7 7h.1M9.5 7h.1M11.5 7h.1M5 9.5h6" stroke="currentColor" stroke-linecap="round"/></svg>',
-  flag: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 14V2.5M4 3h8l-2 2.5 2 2.5H4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  info: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor"/><path d="M8 7.5V11M8 5.2v.2" stroke="currentColor" stroke-linecap="round"/></svg>',
-  globe: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor"/><path d="M2 8h12M8 2c-3.5 3.5-3.5 8.5 0 12M8 2c3.5 3.5 3.5 8.5 0 12" stroke="currentColor"/></svg>',
-  paint: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2s4.5 5.2 4.5 8.2a4.5 4.5 0 01-9 0C3.5 7.2 8 2 8 2z" stroke="currentColor" stroke-linejoin="round"/></svg>',
-  reset: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M13 8a5 5 0 11-1.5-3.5M13 2.5V5h-2.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  link: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M6.5 9.5l3-3M5 7L3.2 8.8a2.5 2.5 0 003.5 3.5L8.5 10.5M11 9l1.8-1.8a2.5 2.5 0 00-3.5-3.5L7.5 5.5" stroke="currentColor" stroke-linecap="round"/></svg>',
-  doc: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 1.5h5.5L12.5 5v9.5h-8.5v-13z" stroke="currentColor" stroke-linejoin="round"/><path d="M9.5 1.5V5H12.5" stroke="currentColor" stroke-linejoin="round"/></svg>',
-  image: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor"/><circle cx="5.5" cy="6.5" r="1.2" stroke="currentColor"/><path d="M2 11l3.5-3 3 2.5L11 8l3 3" stroke="currentColor" stroke-linejoin="round"/></svg>',
-  film: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor"/><path d="M5 3v10M11 3v10M2 6h3M2 10h3M11 6h3M11 10h3" stroke="currentColor"/></svg>',
-  music: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M6 12.5V3.5l7-1.5v9" stroke="currentColor" stroke-linejoin="round"/><circle cx="4" cy="12.5" r="2" stroke="currentColor"/><circle cx="11" cy="11.5" r="2" stroke="currentColor"/></svg>',
-  archive: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="4.5" width="11" height="9" rx="1" stroke="currentColor"/><path d="M2 2.5h12v2H2zM6.5 7.5h3" stroke="currentColor" stroke-linejoin="round"/></svg>',
-  table: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor"/><path d="M2 6.5h12M2 9.5h12M6.5 3v10M10.5 3v10" stroke="currentColor"/></svg>',
-  form: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="3" width="11" height="10" rx="1" stroke="currentColor"/><path d="M5 6h6M5 8.5h6M5 11h3" stroke="currentColor" stroke-linecap="round"/></svg>',
-}
-
 const TYPE_LABELS: Record<string, string> = {
   bookmark: 'Bookmark',
   tab: 'Tab',
@@ -354,7 +292,6 @@ let modeGlyphEl: HTMLElement | null = null
  * it can render as a colored glyph; the input holds only the query text.
  */
 let modePrefix = ''
-const PREFIX_CHARS = '>@#:~;'
 let actionsEl: HTMLElement | null = null
 
 let uiState: UiState = 'list'
@@ -393,14 +330,6 @@ function insertOrCopy(text: string): void {
     if (document.execCommand('insertText', false, text)) return
   }
   copyText(text)
-}
-
-const MODE_PREFIX: Record<string, string> = {
-  bookmarks: '',
-  commands: '>',
-  tabs: '@',
-  history: '#',
-  snippets: ';',
 }
 
 chrome.runtime.onMessage.addListener((message: { type?: string; mode?: string }) => {
@@ -590,23 +519,7 @@ function kbd(text: string): HTMLElement {
 }
 
 function currentMode(): string {
-  if (modePrefix === '>') return 'commands'
-  if (modePrefix === '@') return 'tabs'
-  if (modePrefix === '#') return 'history'
-  if (modePrefix === ':') return 'emoji'
-  if (modePrefix === '~') return 'downloads'
-  if (modePrefix === ';') return 'snippets'
-  return 'bookmarks'
-}
-
-const MODE_PLACEHOLDERS: Record<string, string> = {
-  bookmarks: 'Search bookmarks and commands…',
-  commands: 'Search commands…',
-  tabs: 'Search open tabs…',
-  history: 'Search history…',
-  emoji: 'Search emoji…',
-  downloads: 'Search files…',
-  snippets: 'Search snippets…',
+  return mode(modePrefix)
 }
 
 /** Tint the input row, color the prefix glyph, and light up the mode's chip. */
@@ -996,91 +909,10 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
 
 /* ---------- Favorites bar ---------- */
 
-interface FavoriteEntry {
-  kind: 'bookmark' | 'command' | 'folder'
-  label: string
-  url?: string
-  commandId?: string
-  id?: string
-  icon?: string
-  color?: string
-}
-
-let favoritesCache: FavoriteEntry[] | null = null
 /** Favorites currently rendered in the bar; empty when the bar is hidden. */
 let favBarItems: FavoriteEntry[] = []
 /** Index of the keyboard-selected favorite tile, or -1 when the list has focus. */
 let favIndex = -1
-
-async function loadFavorites(): Promise<FavoriteEntry[]> {
-  try {
-    const { favorites } = await chrome.storage.sync.get('favorites')
-    favoritesCache = Array.isArray(favorites) ? favorites : []
-  } catch {
-    favoritesCache = []
-  }
-  return favoritesCache
-}
-
-function favKey(f: FavoriteEntry): string {
-  if (f.kind === 'command') return `command:${f.commandId}`
-  if (f.kind === 'folder') return `folder:${f.id}`
-  return `url:${f.url}`
-}
-
-/** Storage key for an item, or null for kinds that can't be favorited. */
-function favoriteKeyOf(item: RemoteItem): string | null {
-  if (item.kind === 'command' && item.commandId) return `command:${item.commandId}`
-  if (item.kind === 'folder' && item.id) return `folder:${item.id}`
-  const urlKinds: RemoteItem['kind'][] = ['bookmark', 'history', 'tab', 'closed']
-  if (item.url && urlKinds.includes(item.kind)) return `url:${item.url}`
-  return null
-}
-
-function isFavorite(item: RemoteItem): boolean {
-  const key = favoriteKeyOf(item)
-  return !!key && !!favoritesCache?.some((f) => favKey(f) === key)
-}
-
-function favoriteActionFor(item: RemoteItem): PaletteAction[] {
-  if (!favoriteKeyOf(item)) return []
-  return isFavorite(item)
-    ? [{ id: 'favorite-remove', label: 'Remove from Favorites' }]
-    : [{ id: 'favorite-add', label: 'Add to Favorites' }]
-}
-
-async function toggleFavorite(item: RemoteItem): Promise<void> {
-  const key = favoriteKeyOf(item)
-  if (!key) return
-  const favorites = await loadFavorites()
-  const index = favorites.findIndex((f) => favKey(f) === key)
-  if (index >= 0) {
-    favorites.splice(index, 1)
-  } else if (item.kind === 'command') {
-    favorites.push({
-      kind: 'command',
-      label: item.label,
-      commandId: item.commandId,
-      icon: item.icon,
-      color: item.color,
-    })
-  } else if (item.kind === 'folder') {
-    favorites.push({ kind: 'folder', label: item.label, id: item.id })
-  } else {
-    favorites.push({ kind: 'bookmark', label: item.label, url: item.url })
-  }
-  favoritesCache = favorites
-  await chrome.storage.sync.set({ favorites })
-  showToast(index >= 0 ? 'Removed from Favorites' : 'Added to Favorites')
-}
-
-function favToItem(f: FavoriteEntry): RemoteItem {
-  if (f.kind === 'command') {
-    return { kind: 'command', label: f.label, detail: '', commandId: f.commandId, icon: f.icon, color: f.color }
-  }
-  if (f.kind === 'folder') return { kind: 'folder', label: f.label, detail: '', id: f.id }
-  return { kind: 'bookmark', label: f.label, detail: '', url: f.url }
-}
 
 function favTileEl(f: FavoriteEntry, index: number): HTMLElement {
   const el = document.createElement('div')
@@ -1370,9 +1202,11 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
       await chrome.runtime.sendMessage({ type: 'close-tab-id', tabId: item.tabId })
       break
     case 'favorite-add':
-    case 'favorite-remove':
-      await toggleFavorite(item)
+    case 'favorite-remove': {
+      const toast = await toggleFavorite(item)
+      if (toast) showToast(toast)
       break
+    }
   }
   closeActions()
   void updateList()
@@ -1831,36 +1665,6 @@ function iconFor(item: RemoteItem): HTMLElement {
           ? CMD_ICONS.doc
           : COMMAND_SVG
   return icon
-}
-
-/** Mirror of lib.ts tileGradient — this file can't import (classic content script). */
-function tileGradient(color: string): string {
-  const m = /^#([0-9a-f]{6})$/i.exec(color.trim())
-  if (!m) return color
-  const [r, g, b] = [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16) / 255)
-  const max = Math.max(r, g, b)
-  const min = Math.min(r, g, b)
-  const d = max - min
-  if (d === 0) return color
-  const l = (max + min) / 2
-  const s = d / (1 - Math.abs(2 * l - 1))
-  let h = 0
-  if (max === r) h = ((g - b) / d + 6) % 6
-  else if (max === g) h = (b - r) / d + 2
-  else h = (r - g) / d + 4
-  h *= 60
-  const hex = (hue: number) => {
-    const f = (n: number) => {
-      const k = (n + hue / 30) % 12
-      const c = l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1))
-      return Math.round(c * 255)
-        .toString(16)
-        .padStart(2, '0')
-    }
-    return `#${f(0)}${f(8)}${f(4)}`
-  }
-  const stop = (dh: number) => hex((h + dh + 360) % 360)
-  return `linear-gradient(135deg, ${stop(-20)}, ${stop(20)})`
 }
 
 function shortUrl(url: string): string {
