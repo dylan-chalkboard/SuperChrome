@@ -9,6 +9,8 @@
  */
 
 import { getSettings } from './core/settings'
+import { FOLDER_COLORS, folderSvg } from './features/bookmarks/colors'
+import { folderColorOf, loadFolderColors, setFolderColor } from './ui/shared/folder-colors'
 import type { UserSettings } from './core/settings'
 import {
   LIBRARY_CSS,
@@ -33,14 +35,7 @@ import {
   loadFavorites,
   toggleFavorite,
 } from './ui/shared/favorites'
-import {
-  BOOKMARK_SVG,
-  CLOCK_SVG,
-  CMD_ICONS,
-  COMMAND_SVG,
-  DOC_SVG,
-  FOLDER_SVG,
-} from './ui/shared/icons'
+import { BOOKMARK_SVG, CLOCK_SVG, CMD_ICONS, COMMAND_SVG, DOC_SVG } from './ui/shared/icons'
 import { MODE_PLACEHOLDERS, MODE_PREFIX, PREFIX_CHARS, mode } from './ui/shared/mode'
 import type { FavoriteEntry, PaletteAction, RemoteItem } from './ui/shared/types'
 
@@ -599,6 +594,7 @@ function openPalette(prefix: string): void {
   panelEl.className = 'panel'
   // Warm the cache so ⌘K can label Add/Remove from Favorites synchronously.
   void loadFavorites()
+  void loadFolderColors()
 
   const inputRow = document.createElement('div')
   inputRow.className = 'input-row'
@@ -935,6 +931,8 @@ function onGlobalKey(e: KeyboardEvent): void {
     e.preventDefault()
     if (uiState === 'move' || uiState === 'group') exitSubState(false)
     else if (browseStack.length && currentMode() === 'bookmarks') popFolder()
+    // Inside a prefix mode, Esc steps back to home; only home Esc closes.
+    else if (modePrefix) setInput('')
     else closePalette()
   } else if (
     e.key === 'Backspace' &&
@@ -1164,7 +1162,7 @@ function favTileEl(f: FavoriteEntry, index: number): HTMLElement {
     tile.innerHTML = (f.icon && CMD_ICONS[f.icon]) || COMMAND_SVG
   } else if (f.kind === 'folder') {
     tile.classList.add('kind-folder')
-    tile.innerHTML = FOLDER_SVG
+    tile.innerHTML = folderSvg(folderColorOf(f.id))
   } else if (f.url) {
     const img = document.createElement('img')
     img.src =
@@ -1262,6 +1260,7 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'browse', label: 'Browse Folder' },
         { id: 'open-all', label: 'Open All in New Tabs' },
         ...favoriteActionFor(item),
+        { id: 'folder-color', label: 'Set Color…' },
         { id: 'rename', label: 'Rename…' },
         ...(inFolderContext()
           ? [
@@ -1322,6 +1321,7 @@ const ACTION_ICONS: Record<string, string> = {
   move: FOLDER_OUTLINE_SVG,
   'move-up': ARROW_UP_SVG,
   'move-down': ARROW_DOWN_SVG,
+  'folder-color': CMD_ICONS.paint,
   'add-to-group': CMD_ICONS.group,
   'new-group': CMD_ICONS.group,
   ungroup: CMD_ICONS.group,
@@ -1394,7 +1394,61 @@ function highlightActions(): void {
     .forEach((row, i) => row.classList.toggle('selected', i === actionIndex))
 }
 
+/** Swatch submenu for a folder's color, reusing the actions-panel machinery. */
+function openColorPicker(item: RemoteItem): void {
+  if (!panelEl) return
+  actionTarget = item
+  const current = folderColorOf(item.id)
+  currentActions = [
+    { id: 'folder-color:none', label: 'Blue (default)' },
+    ...Object.keys(FOLDER_COLORS)
+      .filter((name) => name !== 'blue')
+      .map((name) => ({ id: `folder-color:${name}`, label: name[0].toUpperCase() + name.slice(1) })),
+  ]
+  actionIndex = Math.max(0, currentActions.findIndex((a) => a.id === `folder-color:${current}`))
+  uiState = 'actions'
+  actionsEl?.remove()
+  actionsEl = document.createElement('div')
+  actionsEl.className = 'actions'
+  currentActions.forEach((action, index) => {
+    const row = document.createElement('div')
+    row.className = 'action-row'
+    const name = action.id.slice('folder-color:'.length)
+    const pair = FOLDER_COLORS[name] ?? FOLDER_COLORS.blue
+    const dot = document.createElement('span')
+    dot.className = 'menu-icon'
+    dot.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="${pair[0]}"/></svg>`
+    const label = document.createElement('span')
+    label.textContent = action.label
+    const spacer = document.createElement('span')
+    spacer.className = 'spacer'
+    row.append(dot, label, spacer)
+    if (index < 9) row.appendChild(kbd(String(index + 1)))
+    row.addEventListener('mousedown', (e) => {
+      e.preventDefault()
+      void runAction(action, item)
+    })
+    row.addEventListener('mousemove', () => {
+      if (actionIndex !== index) {
+        actionIndex = index
+        highlightActions()
+      }
+    })
+    actionsEl!.appendChild(row)
+  })
+  panelEl.appendChild(actionsEl)
+  highlightActions()
+  renderFooter()
+}
+
 async function runAction(action: PaletteAction, item: RemoteItem): Promise<void> {
+  if (action.id.startsWith('folder-color:')) {
+    const name = action.id.slice('folder-color:'.length)
+    if (item.id) await setFolderColor(item.id, name === 'none' ? null : name)
+    closeActions()
+    void updateList()
+    return
+  }
   switch (action.id) {
     case 'open':
     case 'open-new-tab':
@@ -1486,6 +1540,10 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
     case 'close-tab':
       await chrome.runtime.sendMessage({ type: 'close-tab-id', tabId: item.tabId })
       break
+    case 'folder-color':
+      closeActions()
+      openColorPicker(item)
+      return
     case 'favorite-add':
     case 'favorite-remove': {
       const toast = await toggleFavorite(item)
@@ -2212,7 +2270,7 @@ function iconFor(item: RemoteItem): HTMLElement {
   }
   icon.innerHTML =
     kind === 'folder'
-      ? FOLDER_SVG
+      ? folderSvg(folderColorOf(item.id))
       : kind === 'history'
         ? CLOCK_SVG
         : kind === 'snippet'
