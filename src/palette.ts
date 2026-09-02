@@ -433,7 +433,7 @@ let backBtnEl: HTMLElement | null = null
 let hintEl: HTMLElement | null = null
 let modeGlyphEl: HTMLElement | null = null
 /**
- * The typed mode prefix ('>', '@', '#', '$', '~', '%', '!'), held outside the input so
+ * The typed mode prefix ('>', '@', '#', ':', '~', '%', '!'), held outside the input so
  * it can render as a colored glyph; the input holds only the query text.
  */
 let modePrefix = ''
@@ -636,7 +636,7 @@ function openPalette(prefix: string): void {
     ['> Cmds', 'commands'],
     ['@ Tabs', 'tabs'],
     ['# History', 'history'],
-    ['$ Emoji', 'emoji'],
+    [': Emoji', 'emoji'],
     ['~ Downloads', 'downloads'],
     ['% Snips', 'snippets'],
     ['! Bookmarks', 'library'],
@@ -1124,7 +1124,7 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     const prefixes: Record<string, string> = {
       'mode-commands': '>',
       'mode-history': '#',
-      'mode-emoji': '$',
+      'mode-emoji': ':',
       'mode-snippets': '%',
       'mode-library': '!',
       'open-downloads': '~',

@@ -1,11 +1,11 @@
-export const PREFIX_CHARS = '>@#$~%!'
+export const PREFIX_CHARS = '>@#:~%!'
 
 /** The palette mode selected by a typed prefix character. */
 export function mode(prefix: string): string {
   if (prefix === '>') return 'commands'
   if (prefix === '@') return 'tabs'
   if (prefix === '#') return 'history'
-  if (prefix === '$') return 'emoji'
+  if (prefix === ':') return 'emoji'
   if (prefix === '~') return 'downloads'
   if (prefix === '%') return 'snippets'
   if (prefix === '!') return 'library'
