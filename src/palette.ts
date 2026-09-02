@@ -76,7 +76,7 @@ const PALETTE_CSS = `
 }
 .input-row[class*=" mode-"]::before { opacity: 1; }
 .input-row.mode-commands { --mode-tint: rgba(76, 157, 243, 0.22); border-bottom-color: rgba(76, 157, 243, 0.35); }
-.input-row.mode-tabs { --mode-tint: rgba(58, 181, 198, 0.22); border-bottom-color: rgba(58, 181, 198, 0.35); }
+.input-row.mode-tabs { --mode-tint: rgba(224, 97, 158, 0.22); border-bottom-color: rgba(224, 97, 158, 0.35); }
 .input-row.mode-history { --mode-tint: rgba(154, 110, 232, 0.22); border-bottom-color: rgba(154, 110, 232, 0.35); }
 .input-row.mode-emoji { --mode-tint: rgba(76, 175, 125, 0.22); border-bottom-color: rgba(76, 175, 125, 0.35); }
 .input-row.mode-downloads { --mode-tint: rgba(154, 110, 232, 0.22); border-bottom-color: rgba(154, 110, 232, 0.35); }
@@ -91,7 +91,7 @@ const PALETTE_CSS = `
 }
 [class*=" mode-"] > .mode-glyph { display: block; animation: glyph-in 0.18s ease-out; }
 .mode-commands .mode-glyph { color: #4c9df3; }
-.mode-tabs .mode-glyph { color: #3ab5c6; }
+.mode-tabs .mode-glyph { color: #e0619e; }
 .mode-history .mode-glyph { color: #9a6ee8; }
 .mode-emoji .mode-glyph { color: #4caf7d; }
 .mode-downloads .mode-glyph { color: #9a6ee8; }
@@ -119,7 +119,7 @@ const PALETTE_CSS = `
   max-width: 0; opacity: 0; padding-left: 0; padding-right: 0; margin-right: 0;
 }
 .kbd.chip-commands.active { background: #4c9df3; color: #ffffff; }
-.kbd.chip-tabs.active { background: #3ab5c6; color: #ffffff; }
+.kbd.chip-tabs.active { background: #e0619e; color: #ffffff; }
 .kbd.chip-history.active { background: #9a6ee8; color: #ffffff; }
 .kbd.chip-emoji.active { background: #4caf7d; color: #ffffff; }
 .kbd.chip-downloads.active { background: #9a6ee8; color: #ffffff; }
