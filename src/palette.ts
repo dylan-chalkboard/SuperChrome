@@ -4,7 +4,7 @@
  * freely: a second build pass (vite.palette.config.ts) inlines everything.
  *
  * Modes: plain text = bookmarks, '>' = commands, '@' = open tabs, '#' = history,
- * '!' = the bookmarks section (library view with save flow and Inbox triage).
+ * '*' = the bookmarks section (library view with save flow and Inbox triage).
  * Cmd+K opens a Raycast-style actions panel for the selected item.
  */
 
@@ -439,7 +439,7 @@ let backBtnEl: HTMLElement | null = null
 let hintEl: HTMLElement | null = null
 let modeGlyphEl: HTMLElement | null = null
 /**
- * The typed mode prefix ('>', '@', '#', ':', '~', '%', '!'), held outside the input so
+ * The typed mode prefix ('>', '@', '#', ':', '~', '%', '*'), held outside the input so
  * it can render as a colored glyph; the input holds only the query text.
  */
 let modePrefix = ''
@@ -645,7 +645,7 @@ function openPalette(prefix: string): void {
     [': Emoji', 'emoji'],
     ['~ Downloads', 'downloads'],
     ['% Snips', 'snippets'],
-    ['! Bookmarks', 'library'],
+    ['* Bookmarks', 'library'],
   ]
   for (const [text, chipMode] of chipModes) {
     const [pfx, ...rest] = text.split(' ')
@@ -1150,7 +1150,7 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
       'mode-history': '#',
       'mode-emoji': ':',
       'mode-snippets': '%',
-      'mode-library': '!',
+      'mode-library': '*',
       'open-downloads': '~',
     }
     setInput(prefixes[item.commandId] ?? '')
@@ -1160,7 +1160,7 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     return
   } else if (item.commandId === 'bookmark-tab') {
     // Save flow instead of a blind create: open the library section's panel.
-    modePrefix = '!'
+    modePrefix = '*'
     if (paletteInput) paletteInput.value = ''
     updateModeStyling()
     renderFooter()
@@ -2433,7 +2433,7 @@ function shortUrl(url: string): string {
 
 /* ---------- Library section wiring ---------- */
 
-// The '!' section view lives in features/bookmarks/view.ts; it renders into
+// The '*' section view lives in features/bookmarks/view.ts; it renders into
 // the palette's list through these hooks so rows keep the shared selection,
 // Enter, and ⌘K machinery.
 initLibrary({

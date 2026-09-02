@@ -1,5 +1,5 @@
 /**
- * Pure logic for the bookmarks section ('!' library mode): breadcrumb
+ * Pure logic for the bookmarks section ('*' library mode): breadcrumb
  * building, folder-picker flattening/filtering, Inbox resolution, the
  * new-vs-already-saved decision, and triage queue ordering. No Chrome APIs —
  * everything here is unit-tested.

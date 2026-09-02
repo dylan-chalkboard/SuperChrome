@@ -1,5 +1,5 @@
 /**
- * Library ('!') section view: rendering and key handling for the section
+ * Library ('*') section view: rendering and key handling for the section
  * shell, the save flow, and Inbox triage. palette.ts routes here when the
  * mode is 'library' (the settings-view pattern). Browse/search rows reuse the
  * palette's .item machinery through kit.renderRows, so arrows, Enter, and ⌘K

@@ -3,9 +3,9 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
-## Unreleased
+## 0.21.0
 
-- **Bookmarks section** (`!` prefix, gold): a dedicated library view with a
+- **Bookmarks section** (`*` prefix, red): a dedicated library view with a
   clickable breadcrumb, folders-first rows showing item counts and bookmark
   ages, and a global bookmark-only search (results carry their folder path;
   Enter on a folder jumps into it)
@@ -23,6 +23,24 @@ All notable changes to SuperChrome. Versions follow the extension's
   group named after the folder
 - Single **Open palette** keyboard shortcut (`Cmd+P`) — the dedicated
   command-mode binding was removed; type `>` for commands
+- Library polish: large breadcrumb title, `⌘D` opens the save flow, root
+  shows Bookmarks Bar / Other Bookmarks as labeled sections (account
+  bookmark storage handled), red ribbon icon on Browse Bookmarks, and the
+  whole mode wears bookmark red
+- **Folder colors**: `⌘K` → Set Color… tints the folder glyph everywhere
+  (eight presets, synced)
+- **Tab groups**: `@` browsing sections tabs by group (duplicates
+  disambiguated), the active tab is marked, groups are editable from `⌘K`
+  (rename, recolor, ungroup all), and "New Group from Tab" works again
+- **Mode launchers** ("Search History", "Browse Bookmarks", …) searchable
+  from the home view; mode chips condensed to colored glyphs that expand on
+  hover; Esc steps out of a mode instead of closing; mode-specific
+  placeholders
+- `~` Files renamed to Downloads (teal); "Open Downloads" enters the mode
+- **Reopen Closed Tab** command; recently-closed trimmed to a 3-item tail
+  while browsing `@`
+- First-item keyboard selection scrolls the list to the very top; both
+  footer menus fade in
 
 ## 0.20.0
 

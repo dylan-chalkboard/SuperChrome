@@ -55,7 +55,7 @@ export async function browseBookmarkFolder(
 }
 
 /**
- * Library ('!') mode typing: a global bookmark-only search — bookmarks and
+ * Library ('*') mode typing: a global bookmark-only search — bookmarks and
  * folders across the whole tree, no commands/history/calculator. Rows carry
  * their folder path so results read in context.
  */
