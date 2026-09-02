@@ -6,13 +6,16 @@ import {
   collectFolders,
   fileType,
   frecency,
+  DEFAULT_QUICKLINKS,
   hostOf,
+  matchQuicklink,
   rank,
   tileGradient,
   tryCalculate,
+  tryConvert,
   urlFromQuery,
 } from './lib'
-import type { UsageMap } from './lib'
+import type { Quicklink, Snippet, UsageMap } from './lib'
 
 type PaletteMode = 'bookmarks' | 'commands' | 'tabs' | 'history'
 
@@ -24,6 +27,8 @@ interface UserSettings {
   openInNewTab: boolean
   reduceMotion: boolean
   disabledSites: string[]
+  quicklinks: Quicklink[]
+  snippets: Snippet[]
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -34,6 +39,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   openInNewTab: false,
   reduceMotion: false,
   disabledSites: [],
+  quicklinks: DEFAULT_QUICKLINKS,
+  snippets: [],
 }
 
 async function getSettings(): Promise<UserSettings> {
@@ -241,7 +248,7 @@ const COMMAND_META: Record<string, { icon: string; color: string }> = {
 /* ---------- Ranking: fuzzy match blended with usage frecency ---------- */
 
 interface PaletteItem {
-  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji' | 'download' | 'search'
+  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji' | 'download' | 'search' | 'snippet'
   label: string
   detail: string
   url?: string
@@ -310,7 +317,8 @@ async function queryPalette(
 ): Promise<PaletteItem[]> {
   const query = rawQuery.trim().toLowerCase()
   const usage = await getUsage()
-  const decay = (await getSettings()).frecencyDecayDays
+  const settings = await getSettings()
+  const decay = settings.frecencyDecayDays
 
   if (mode === 'emoji') {
     return rank<PaletteItem>(
@@ -357,6 +365,24 @@ async function queryPalette(
               usageKey: `folder:${c.id}`,
             },
       ),
+      query,
+      usage,
+      decay,
+    )
+  }
+
+  if (mode === 'snippets') {
+    return rank<PaletteItem>(
+      settings.snippets.map((s) => ({
+        item: {
+          kind: 'snippet' as const,
+          label: s.name,
+          detail: s.text.split('\n')[0].slice(0, 60),
+          text: s.text,
+        },
+        text: `${s.name} ${s.text}`.toLowerCase(),
+        usageKey: `snippet:${s.name}`,
+      })),
       query,
       usage,
       decay,
@@ -581,7 +607,7 @@ async function queryPalette(
     usage,
     decay,
   ).slice(0, 50)
-  const calc = tryCalculate(rawQuery)
+  const calc = tryCalculate(rawQuery) ?? tryConvert(rawQuery)
   if (calc !== null) {
     results.unshift({
       kind: 'calc',
@@ -589,6 +615,19 @@ async function queryPalette(
       detail: `${rawQuery.trim()} =`,
       text: calc,
       group: 'Calculator',
+    })
+  }
+  // Quicklinks: "yt lofi beats" searches the keyword's site directly.
+  const quicklink = matchQuicklink(rawQuery, settings.quicklinks)
+  if (quicklink) {
+    results.unshift({
+      kind: 'search',
+      label: `Search ${quicklink.name} for “${quicklink.query}”`,
+      detail: '',
+      url: quicklink.url,
+      icon: 'search',
+      color: tileGradient('#e8964a'),
+      group: 'Quicklink',
     })
   }
   // Address-bar behavior: a URL-shaped query gets a direct "Open" row on top.

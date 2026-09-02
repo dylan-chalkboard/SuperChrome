@@ -122,6 +122,22 @@
       </div>
 
       <div class="card">
+        <h2>Quicklinks</h2>
+        <div class="row" style="align-items:flex-start; flex-direction:column">
+          <label style="margin-bottom:8px">Keyword searches: type the keyword plus a query in the palette (e.g. “yt lofi beats”). One per line as keyword | Name | URL with {query}<span class="hint">e.g. np | npm | https://www.npmjs.com/search?q={query}</span></label>
+          <textarea id="quicklinks" spellcheck="false" placeholder="yt | YouTube | https://www.youtube.com/results?search_query={query}"></textarea>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Snippets</h2>
+        <div class="row" style="align-items:flex-start; flex-direction:column">
+          <label style="margin-bottom:8px">Reusable text, inserted from the palette's <b>;</b> mode. First line is the name, the rest is the snippet; separate snippets with a line containing only ---<span class="hint">e.g. sig ⏎ Best, ⏎ Dylan</span></label>
+          <textarea id="snippets" spellcheck="false" placeholder="sig&#10;Best,&#10;Dylan&#10;---&#10;standup&#10;Yesterday: &#10;Today: &#10;Blockers: none"></textarea>
+        </div>
+      </div>
+
+      <div class="card">
         <h2>Disabled sites</h2>
         <div class="row" style="align-items:flex-start; flex-direction:column">
           <label style="margin-bottom:8px">The overlay won't open on these hosts (the popup opens instead) — one per line, subdomains included<span class="hint">e.g. figma.com</span></label>

@@ -48,6 +48,7 @@
       .input-row.mode-history { --mode-tint: rgba(154, 110, 232, 0.22); border-bottom-color: rgba(154, 110, 232, 0.35); }
       .input-row.mode-emoji { --mode-tint: rgba(76, 175, 125, 0.22); border-bottom-color: rgba(76, 175, 125, 0.35); }
       .input-row.mode-downloads { --mode-tint: rgba(154, 110, 232, 0.22); border-bottom-color: rgba(154, 110, 232, 0.35); }
+      .input-row.mode-snippets { --mode-tint: rgba(232, 150, 74, 0.22); border-bottom-color: rgba(232, 150, 74, 0.35); }
       @keyframes glyph-in {
         from { opacity: 0; transform: translateX(-4px); }
         to { opacity: 1; transform: none; }
@@ -62,13 +63,15 @@
       .mode-history .mode-glyph { color: #9a6ee8; }
       .mode-emoji .mode-glyph { color: #4caf7d; }
       .mode-downloads .mode-glyph { color: #9a6ee8; }
+      .mode-snippets .mode-glyph { color: #e8964a; }
       .mode-commands .input, .mode-tabs .input, .mode-history .input,
-      .mode-emoji .input, .mode-downloads .input { padding-left: 6px; }
+      .mode-emoji .input, .mode-downloads .input, .mode-snippets .input { padding-left: 6px; }
       .kbd.chip-commands.active { background: #4c9df3; color: #ffffff; }
       .kbd.chip-tabs.active { background: #3ab5c6; color: #ffffff; }
       .kbd.chip-history.active { background: #9a6ee8; color: #ffffff; }
       .kbd.chip-emoji.active { background: #4caf7d; color: #ffffff; }
       .kbd.chip-downloads.active { background: #9a6ee8; color: #ffffff; }
+      .kbd.chip-snippets.active { background: #e8964a; color: #ffffff; }
       .input {
         flex: 1; min-width: 0;
         background: transparent; border: none; outline: none;
@@ -160,6 +163,7 @@
         background: var(--sc-fallback, linear-gradient(135deg, #e05d89, #e0895d)); color: #ffffff;
       }
       .item .icon.kind-download { background: linear-gradient(135deg, #3aa97a, #3a8ea9); color: #ffffff; }
+      .item .icon.kind-snippet { background: linear-gradient(135deg, #e8614a, #e8cb4a); color: #ffffff; }
       .group-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
       .item .icon.kind-calc { background: linear-gradient(135deg, #4caf5c, #4caf9e); color: #ffffff; font-weight: 700; font-size: 14px; }
       .item .icon.emoji-glyph { font-size: 17px; }
@@ -208,7 +212,7 @@
     <div class="panel">
     <div class="input-row">
       <span class="mode-glyph" id="modeGlyph"></span><input id="input" class="input" autofocus placeholder="Search bookmarks and commands…" spellcheck="false" autocomplete="off" />
-      <div class="hint"><span class="kbd chip-commands">&gt; Commands</span><span class="kbd chip-tabs">@ Tabs</span><span class="kbd chip-history"># History</span><span class="kbd chip-emoji">: Emoji</span><span class="kbd chip-downloads">~ Files</span><button id="gear" title="SuperChrome Settings"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="currentColor"/><path d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2" stroke="currentColor" stroke-linecap="round"/></svg></button></div>
+      <div class="hint"><span class="kbd chip-commands">&gt; Commands</span><span class="kbd chip-tabs">@ Tabs</span><span class="kbd chip-history"># History</span><span class="kbd chip-emoji">: Emoji</span><span class="kbd chip-downloads">~ Files</span><span class="kbd chip-snippets">; Snips</span><button id="gear" title="SuperChrome Settings"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="currentColor"/><path d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2" stroke="currentColor" stroke-linecap="round"/></svg></button></div>
     </div>
     <div id="list" class="list"></div>
     </div>

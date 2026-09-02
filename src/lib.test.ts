@@ -9,8 +9,15 @@ import {
   fuzzyMatch,
   hostOf,
   rank,
+  DEFAULT_QUICKLINKS,
+  matchQuicklink,
+  parseQuicklinks,
+  parseSnippets,
+  serializeQuicklinks,
+  serializeSnippets,
   tileGradient,
   tryCalculate,
+  tryConvert,
   urlFromQuery,
 } from './lib'
 import type { BookmarkNodeLike, UsageMap } from './lib'
@@ -165,6 +172,77 @@ describe('ago', () => {
     expect(ago(NOW - 5 * 60_000)).toBe('5m ago')
     expect(ago(NOW - 3 * 3_600_000)).toBe('3h ago')
     expect(ago(NOW - 2 * DAY)).toBe('2d ago')
+  })
+})
+
+describe('snippets', () => {
+  it('parses ----separated blocks with name on the first line', () => {
+    const text = 'sig\nBest,\nDylan\n---\naddr\n123 Main St\nBrooklyn, NY'
+    expect(parseSnippets(text)).toEqual([
+      { name: 'sig', text: 'Best,\nDylan' },
+      { name: 'addr', text: '123 Main St\nBrooklyn, NY' },
+    ])
+  })
+  it('preserves blank lines inside a body and drops empty blocks', () => {
+    const text = 'letter\nHi there,\n\nThanks!\n---\n\n---\nnameonly'
+    expect(parseSnippets(text)).toEqual([{ name: 'letter', text: 'Hi there,\n\nThanks!' }])
+  })
+  it('round-trips through serialize', () => {
+    const snippets = [
+      { name: 'sig', text: 'Best,\nDylan' },
+      { name: 'poem', text: 'line one\n\nline three' },
+    ]
+    expect(parseSnippets(serializeSnippets(snippets))).toEqual(snippets)
+  })
+})
+
+describe('quicklinks', () => {
+  it('matches a keyword and encodes the query', () => {
+    expect(matchQuicklink('yt lofi beats', DEFAULT_QUICKLINKS)).toEqual({
+      name: 'YouTube',
+      url: 'https://www.youtube.com/results?search_query=lofi%20beats',
+      query: 'lofi beats',
+    })
+  })
+  it('is case-insensitive on the keyword and needs a query after it', () => {
+    expect(matchQuicklink('GH superchrome', DEFAULT_QUICKLINKS)?.name).toBe('GitHub')
+    expect(matchQuicklink('yt', DEFAULT_QUICKLINKS)).toBeNull()
+    expect(matchQuicklink('yt ', DEFAULT_QUICKLINKS)).toBeNull()
+    expect(matchQuicklink('unknown thing', DEFAULT_QUICKLINKS)).toBeNull()
+  })
+  it('parses and serializes the options-page text format', () => {
+    const text = 'yt | YouTube | https://youtube.com/results?q={query}\nbad line\nnp | npm | https://npmjs.com/search?q={query}'
+    const links = parseQuicklinks(text)
+    expect(links).toHaveLength(2)
+    expect(links[1]).toEqual({ keyword: 'np', name: 'npm', template: 'https://npmjs.com/search?q={query}' })
+    expect(parseQuicklinks(serializeQuicklinks(links))).toEqual(links)
+  })
+  it('drops templates missing the {query} placeholder', () => {
+    expect(parseQuicklinks('x | X | https://example.com')).toEqual([])
+  })
+})
+
+describe('tryConvert', () => {
+  it('converts lengths', () => {
+    expect(tryConvert('5km in miles')).toBe('3.10686 mi')
+    expect(tryConvert('6ft in cm')).toBe('182.88 cm')
+    expect(tryConvert('26.2 miles to km')).toBe('42.1648 km')
+  })
+  it('converts mass, time, and data', () => {
+    expect(tryConvert('150lb in kg')).toBe('68.0389 kg')
+    expect(tryConvert('3h in min')).toBe('180 min')
+    expect(tryConvert('1.5gb in mb')).toBe('1500 MB')
+  })
+  it('converts temperatures', () => {
+    expect(tryConvert('72f in c')).toBe('22.2222 °C')
+    expect(tryConvert('100c to f')).toBe('212 °F')
+    expect(tryConvert('0c in k')).toBe('273.15 K')
+  })
+  it('rejects mismatched groups and non-conversions', () => {
+    expect(tryConvert('5km in kg')).toBeNull()
+    expect(tryConvert('5 in miles')).toBeNull()
+    expect(tryConvert('google.com')).toBeNull()
+    expect(tryConvert('2+2')).toBeNull()
   })
 })
 

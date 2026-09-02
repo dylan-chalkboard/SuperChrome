@@ -143,6 +143,159 @@ export function tryCalculate(raw: string): string | null {
   }
 }
 
+/* ---------- Unit conversions: "5km in miles", "72f in c", "3h in min" ---------- */
+
+interface UnitDef {
+  group: string
+  factor: number
+  label: string
+}
+
+function unitTable(): Record<string, UnitDef> {
+  const table: Record<string, UnitDef> = {}
+  const add = (group: string, factor: number, label: string, aliases: string[]): void => {
+    for (const alias of aliases) table[alias] = { group, factor, label }
+  }
+  add('length', 0.001, 'mm', ['mm', 'millimeter', 'millimeters'])
+  add('length', 0.01, 'cm', ['cm', 'centimeter', 'centimeters'])
+  add('length', 1, 'm', ['m', 'meter', 'meters', 'metre', 'metres'])
+  add('length', 1000, 'km', ['km', 'kilometer', 'kilometers', 'kilometre', 'kilometres'])
+  add('length', 0.0254, 'in', ['in', 'inch', 'inches'])
+  add('length', 0.3048, 'ft', ['ft', 'foot', 'feet'])
+  add('length', 0.9144, 'yd', ['yd', 'yard', 'yards'])
+  add('length', 1609.344, 'mi', ['mi', 'mile', 'miles'])
+  add('mass', 0.001, 'g', ['g', 'gram', 'grams'])
+  add('mass', 0.000001, 'mg', ['mg'])
+  add('mass', 1, 'kg', ['kg', 'kilogram', 'kilograms', 'kilo', 'kilos'])
+  add('mass', 0.028349523125, 'oz', ['oz', 'ounce', 'ounces'])
+  add('mass', 0.45359237, 'lb', ['lb', 'lbs', 'pound', 'pounds'])
+  add('mass', 6.35029318, 'st', ['st', 'stone'])
+  add('time', 1, 's', ['s', 'sec', 'secs', 'second', 'seconds'])
+  add('time', 60, 'min', ['min', 'mins', 'minute', 'minutes'])
+  add('time', 3600, 'h', ['h', 'hr', 'hrs', 'hour', 'hours'])
+  add('time', 86400, 'd', ['d', 'day', 'days'])
+  add('time', 604800, 'wk', ['wk', 'week', 'weeks'])
+  add('data', 1, 'B', ['b', 'byte', 'bytes'])
+  add('data', 1e3, 'KB', ['kb'])
+  add('data', 1e6, 'MB', ['mb'])
+  add('data', 1e9, 'GB', ['gb'])
+  add('data', 1e12, 'TB', ['tb'])
+  add('temp', 0, '°C', ['c', 'celsius', '°c'])
+  add('temp', 0, '°F', ['f', 'fahrenheit', '°f'])
+  add('temp', 0, 'K', ['k', 'kelvin'])
+  return table
+}
+
+const UNITS = unitTable()
+
+function toCelsius(value: number, label: string): number {
+  if (label === '°F') return ((value - 32) * 5) / 9
+  if (label === 'K') return value - 273.15
+  return value
+}
+
+function fromCelsius(value: number, label: string): number {
+  if (label === '°F') return (value * 9) / 5 + 32
+  if (label === 'K') return value + 273.15
+  return value
+}
+
+/** Convert "5km in miles" style queries; null when it isn't one. */
+export function tryConvert(raw: string): string | null {
+  const q = raw.trim().toLowerCase().replace(/,/g, '')
+  const match = /^(-?\d+(?:\.\d+)?)\s*([a-z°]+)\s+(?:in|to|as)\s+([a-z°]+)$/i.exec(q)
+  if (!match) return null
+  const from = UNITS[match[2]]
+  const to = UNITS[match[3]]
+  if (!from || !to || from.group !== to.group) return null
+  const value = Number(match[1])
+  const result =
+    from.group === 'temp'
+      ? fromCelsius(toCelsius(value, from.label), to.label)
+      : (value * from.factor) / to.factor
+  if (!Number.isFinite(result)) return null
+  return `${Number(result.toPrecision(6))} ${to.label}`
+}
+
+/* ---------- Quicklinks: keyword searches with a {query} placeholder ---------- */
+
+export interface Quicklink {
+  keyword: string
+  name: string
+  template: string
+}
+
+export const DEFAULT_QUICKLINKS: Quicklink[] = [
+  { keyword: 'g', name: 'Google', template: 'https://www.google.com/search?q={query}' },
+  { keyword: 'yt', name: 'YouTube', template: 'https://www.youtube.com/results?search_query={query}' },
+  { keyword: 'gh', name: 'GitHub', template: 'https://github.com/search?q={query}' },
+  { keyword: 'w', name: 'Wikipedia', template: 'https://en.wikipedia.org/wiki/Special:Search?search={query}' },
+  { keyword: 'maps', name: 'Google Maps', template: 'https://www.google.com/maps/search/{query}' },
+]
+
+/** Match "yt lofi beats" against quicklink keywords; null when no keyword fits. */
+export function matchQuicklink(
+  raw: string,
+  links: Quicklink[],
+): { name: string; url: string; query: string } | null {
+  const q = raw.trim()
+  const space = q.indexOf(' ')
+  if (space < 0) return null
+  const keyword = q.slice(0, space).toLowerCase()
+  const rest = q.slice(space + 1).trim()
+  if (!rest) return null
+  const link = links.find((l) => l.keyword.toLowerCase() === keyword)
+  if (!link?.template.includes('{query}')) return null
+  return {
+    name: link.name,
+    url: link.template.replace('{query}', encodeURIComponent(rest)),
+    query: rest,
+  }
+}
+
+/** One quicklink per line: "keyword | Name | https://…{query}". Invalid lines drop. */
+export function parseQuicklinks(text: string): Quicklink[] {
+  return text
+    .split('\n')
+    .map((line) => line.split('|').map((part) => part.trim()))
+    .filter((parts) => parts.length === 3 && parts.every(Boolean) && parts[2].includes('{query}'))
+    .map(([keyword, name, template]) => ({ keyword: keyword.toLowerCase(), name, template }))
+}
+
+export function serializeQuicklinks(links: Quicklink[]): string {
+  return links.map((l) => `${l.keyword} | ${l.name} | ${l.template}`).join('\n')
+}
+
+/* ---------- Snippets: reusable text inserted like emoji ---------- */
+
+export interface Snippet {
+  name: string
+  text: string
+}
+
+/**
+ * Options-page format: snippets separated by lines containing only `---`;
+ * the first line of each block is the name, the rest is the snippet body
+ * (blank lines inside a body are preserved).
+ */
+export function parseSnippets(text: string): Snippet[] {
+  return text
+    .split(/^---\s*$/m)
+    .map((block) => block.replace(/^\n+|\n+$/g, ''))
+    .filter(Boolean)
+    .map((block) => {
+      const newline = block.indexOf('\n')
+      const name = (newline < 0 ? block : block.slice(0, newline)).trim()
+      const body = newline < 0 ? '' : block.slice(newline + 1)
+      return { name, text: body }
+    })
+    .filter((s) => s.name && s.text)
+}
+
+export function serializeSnippets(snippets: Snippet[]): string {
+  return snippets.map((s) => `${s.name}\n${s.text}`).join('\n---\n')
+}
+
 /* ---------- Small helpers ---------- */
 
 /**

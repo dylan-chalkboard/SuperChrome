@@ -1,3 +1,12 @@
+import {
+  DEFAULT_QUICKLINKS,
+  parseQuicklinks,
+  parseSnippets,
+  serializeQuicklinks,
+  serializeSnippets,
+} from './lib'
+import type { Quicklink, Snippet } from './lib'
+
 interface UserSettings {
   glassOpacity: number
   iconColors: { command: string; folder: string; history: string; fallback: string }
@@ -6,6 +15,8 @@ interface UserSettings {
   openInNewTab: boolean
   reduceMotion: boolean
   disabledSites: string[]
+  quicklinks: Quicklink[]
+  snippets: Snippet[]
 }
 
 const DEFAULTS: UserSettings = {
@@ -16,6 +27,8 @@ const DEFAULTS: UserSettings = {
   openInNewTab: false,
   reduceMotion: false,
   disabledSites: [],
+  quicklinks: DEFAULT_QUICKLINKS,
+  snippets: [],
 }
 
 const el = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T
@@ -31,6 +44,8 @@ const newTab = el<HTMLInputElement>('new-tab')
 const reduceMotion = el<HTMLInputElement>('reduce-motion')
 const decay = el<HTMLInputElement>('decay')
 const sites = el<HTMLTextAreaElement>('sites')
+const quicklinks = el<HTMLTextAreaElement>('quicklinks')
+const snippets = el<HTMLTextAreaElement>('snippets')
 const status = el<HTMLSpanElement>('status')
 
 function populate(s: UserSettings): void {
@@ -45,6 +60,8 @@ function populate(s: UserSettings): void {
   reduceMotion.checked = s.reduceMotion
   decay.value = String(s.frecencyDecayDays)
   sites.value = s.disabledSites.join('\n')
+  quicklinks.value = serializeQuicklinks(s.quicklinks)
+  snippets.value = serializeSnippets(s.snippets)
 }
 
 function cleanHost(line: string): string {
@@ -69,6 +86,8 @@ function collect(): UserSettings {
     openInNewTab: newTab.checked,
     reduceMotion: reduceMotion.checked,
     disabledSites: sites.value.split('\n').map(cleanHost).filter(Boolean),
+    quicklinks: parseQuicklinks(quicklinks.value),
+    snippets: parseSnippets(snippets.value),
   }
 }
 
@@ -88,7 +107,7 @@ function save(): void {
   }, 200)
 }
 
-for (const input of [opacity, colorCommand, colorFolder, colorHistory, colorFallback, defaultMode, newTab, reduceMotion, decay, sites]) {
+for (const input of [opacity, colorCommand, colorFolder, colorHistory, colorFallback, defaultMode, newTab, reduceMotion, decay, sites, quicklinks, snippets]) {
   input.addEventListener('input', save)
   input.addEventListener('change', save)
 }
@@ -104,6 +123,8 @@ async function boot(): Promise<void> {
     ...DEFAULTS,
     ...settings,
     iconColors: { ...DEFAULTS.iconColors, ...settings?.iconColors },
+    quicklinks: settings?.quicklinks ?? DEFAULTS.quicklinks,
+    snippets: settings?.snippets ?? DEFAULTS.snippets,
   })
 }
 

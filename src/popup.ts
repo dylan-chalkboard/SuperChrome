@@ -8,7 +8,7 @@
  */
 
 interface RemoteItem {
-  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji' | 'download' | 'search'
+  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji' | 'download' | 'search' | 'snippet'
   label: string
   detail: string
   url?: string
@@ -99,6 +99,7 @@ const TYPE_LABELS: Record<string, string> = {
   emoji: 'Emoji',
   download: 'Download',
   search: 'Search',
+  snippet: 'Snippet',
 }
 
 const GROUP_LABELS: Record<string, string> = {
@@ -108,6 +109,7 @@ const GROUP_LABELS: Record<string, string> = {
   history: 'History',
   emoji: 'Emoji',
   downloads: 'Downloads',
+  snippets: 'Snippets',
 }
 
 // Page-local commands need the page's document; they can't run from a popup.
@@ -151,7 +153,7 @@ const GRID_COLS = 6
  * it can render as a colored glyph; the input holds only the query text.
  */
 let modePrefix = ''
-const PREFIX_CHARS = '>@#:~'
+const PREFIX_CHARS = '>@#:~;'
 
 function currentMode(): string {
   if (modePrefix === '>') return 'commands'
@@ -159,6 +161,7 @@ function currentMode(): string {
   if (modePrefix === '#') return 'history'
   if (modePrefix === ':') return 'emoji'
   if (modePrefix === '~') return 'downloads'
+  if (modePrefix === ';') return 'snippets'
   return 'bookmarks'
 }
 
@@ -185,6 +188,7 @@ const MODE_PLACEHOLDERS: Record<string, string> = {
   history: 'Search history…',
   emoji: 'Search emoji…',
   downloads: 'Search files…',
+  snippets: 'Search snippets…',
 }
 
 /** Tint the input row, color the prefix glyph, and light up the mode's chip. */
@@ -556,6 +560,8 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
       return [{ id: 'copy-text', label: 'Copy Result' }]
     case 'emoji':
       return [{ id: 'copy-text', label: 'Copy Emoji' }]
+    case 'snippet':
+      return [{ id: 'copy-text', label: 'Copy Snippet' }]
     default:
       return [{ id: 'run', label: 'Run Command' }, ...favoriteActionFor(item)]
   }
@@ -783,7 +789,7 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     closeSelf()
     return
   }
-  if (item.kind === 'calc' || item.kind === 'emoji') {
+  if (item.kind === 'calc' || item.kind === 'emoji' || item.kind === 'snippet') {
     recordUsage(item)
     await copyText(item.kind === 'emoji' ? (item.emoji ?? '') : (item.text ?? item.label))
     return
@@ -1018,7 +1024,14 @@ function iconFor(item: RemoteItem): HTMLElement {
     icon.innerHTML = (item.icon && CMD_ICONS[item.icon]) || DOC_SVG
     return icon
   }
-  icon.innerHTML = kind === 'folder' ? FOLDER_SVG : kind === 'history' ? CLOCK_SVG : COMMAND_SVG
+  icon.innerHTML =
+    kind === 'folder'
+      ? FOLDER_SVG
+      : kind === 'history'
+        ? CLOCK_SVG
+        : kind === 'snippet'
+          ? CMD_ICONS.doc
+          : COMMAND_SVG
   return icon
 }
 
@@ -1065,12 +1078,14 @@ const HASH_PREFIX: Record<string, string> = {
   '#commands': '>',
   '#tabs': '@',
   '#history': '#',
+  '#snippets': ';',
 }
 const MODE_PREFIX: Record<string, string> = {
   bookmarks: '',
   commands: '>',
   tabs: '@',
   history: '#',
+  snippets: ';',
 }
 
 async function applyStartupSettings(): Promise<void> {

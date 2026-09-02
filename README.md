@@ -33,7 +33,9 @@ Open with `Cmd+P` (bookmarks), `Cmd+Shift+P` (commands), or the toolbar icon:
 - `@` prefix → **switch to an open tab**
 - `#` prefix → **search browser history** (empty query shows recent pages)
 - `:` prefix → **emoji search** — Enter inserts into the field you were typing in (or copies)
-- **Inline calculator** — type math (`142*12`, `18% of 240`, `2^10`) and the result appears as the first row; Enter copies it
+- `;` prefix → **snippets** — reusable text blocks (defined in Settings); Enter inserts into the field you were typing in
+- **Quicklinks** — keyword searches like `yt lofi beats` or `gh superchrome` (defaults: g, yt, gh, w, maps; add your own in Settings)
+- **Inline calculator** — type math (`142*12`, `18% of 240`, `2^10`) or conversions (`5km in miles`, `72f in c`, `3h in min`) and the result appears as the first row; Enter copies it
 - **URL navigation** — type an address (`google.com`, `localhost:3000`) and an "Open" row appears on top, address-bar style
 - **Mode colors** — prefix modes tint the header and render the typed prefix as a colored glyph (commands blue, tabs cyan, history and files purple, emoji green)
 - `Cmd+K` → **actions panel** for the selected item: open in new tab, copy URL, rename, move to folder, add to favorites, delete bookmark, remove from history, close tab

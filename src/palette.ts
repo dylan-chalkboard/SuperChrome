@@ -7,7 +7,7 @@
  */
 
 interface RemoteItem {
-  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji' | 'download' | 'search'
+  kind: 'bookmark' | 'tab' | 'history' | 'command' | 'closed' | 'folder' | 'calc' | 'emoji' | 'download' | 'search' | 'snippet'
   label: string
   detail: string
   url?: string
@@ -87,6 +87,7 @@ const PALETTE_CSS = `
 .input-row.mode-history { --mode-tint: rgba(154, 110, 232, 0.22); border-bottom-color: rgba(154, 110, 232, 0.35); }
 .input-row.mode-emoji { --mode-tint: rgba(76, 175, 125, 0.22); border-bottom-color: rgba(76, 175, 125, 0.35); }
 .input-row.mode-downloads { --mode-tint: rgba(154, 110, 232, 0.22); border-bottom-color: rgba(154, 110, 232, 0.35); }
+.input-row.mode-snippets { --mode-tint: rgba(232, 150, 74, 0.22); border-bottom-color: rgba(232, 150, 74, 0.35); }
 @keyframes glyph-in {
   from { opacity: 0; transform: translateX(-4px); }
   to { opacity: 1; transform: none; }
@@ -101,8 +102,9 @@ const PALETTE_CSS = `
 .mode-history .mode-glyph { color: #9a6ee8; }
 .mode-emoji .mode-glyph { color: #4caf7d; }
 .mode-downloads .mode-glyph { color: #9a6ee8; }
+.mode-snippets .mode-glyph { color: #e8964a; }
 .mode-commands .input, .mode-tabs .input, .mode-history .input,
-.mode-emoji .input, .mode-downloads .input { padding-left: 7px; }
+.mode-emoji .input, .mode-downloads .input, .mode-snippets .input { padding-left: 7px; }
 .input {
   flex: 1; min-width: 0;
   background: transparent; border: none; outline: none;
@@ -128,6 +130,7 @@ const PALETTE_CSS = `
 .kbd.chip-history.active { background: #9a6ee8; color: #ffffff; }
 .kbd.chip-emoji.active { background: #4caf7d; color: #ffffff; }
 .kbd.chip-downloads.active { background: #9a6ee8; color: #ffffff; }
+.kbd.chip-snippets.active { background: #e8964a; color: #ffffff; }
 .list { height: 55vh; overflow-y: auto; padding: 8px; position: relative; }
 .selector {
   position: absolute; left: 8px; right: 8px; top: 0; height: 40px;
@@ -195,6 +198,7 @@ const PALETTE_CSS = `
   background: var(--sc-fallback, linear-gradient(135deg, #e05d89, #e0895d)); color: #ffffff;
 }
 .item .icon.kind-download { background: linear-gradient(135deg, #3aa97a, #3a8ea9); color: #ffffff; }
+.item .icon.kind-snippet { background: linear-gradient(135deg, #e8614a, #e8cb4a); color: #ffffff; }
 .group-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .item .icon.kind-calc { background: linear-gradient(135deg, #4caf5c, #4caf9e); color: #ffffff; font-weight: 700; font-size: 14px; }
 .item .icon.emoji-glyph { font-size: 17px; }
@@ -323,6 +327,7 @@ const TYPE_LABELS: Record<string, string> = {
   emoji: 'Emoji',
   download: 'Download',
   search: 'Search',
+  snippet: 'Snippet',
 }
 
 const GROUP_LABELS: Record<string, string> = {
@@ -332,6 +337,7 @@ const GROUP_LABELS: Record<string, string> = {
   history: 'History',
   emoji: 'Emoji',
   downloads: 'Downloads',
+  snippets: 'Snippets',
 }
 
 type UiState = 'list' | 'actions' | 'rename' | 'move' | 'group'
@@ -348,7 +354,7 @@ let modeGlyphEl: HTMLElement | null = null
  * it can render as a colored glyph; the input holds only the query text.
  */
 let modePrefix = ''
-const PREFIX_CHARS = '>@#:~'
+const PREFIX_CHARS = '>@#:~;'
 let actionsEl: HTMLElement | null = null
 
 let uiState: UiState = 'list'
@@ -394,6 +400,7 @@ const MODE_PREFIX: Record<string, string> = {
   commands: '>',
   tabs: '@',
   history: '#',
+  snippets: ';',
 }
 
 chrome.runtime.onMessage.addListener((message: { type?: string; mode?: string }) => {
@@ -538,6 +545,7 @@ function openPalette(prefix: string): void {
     ['# History', 'history'],
     [': Emoji', 'emoji'],
     ['~ Files', 'downloads'],
+    ['; Snips', 'snippets'],
   ]
   for (const [text, chipMode] of chipModes) {
     const chip = kbd(text)
@@ -587,6 +595,7 @@ function currentMode(): string {
   if (modePrefix === '#') return 'history'
   if (modePrefix === ':') return 'emoji'
   if (modePrefix === '~') return 'downloads'
+  if (modePrefix === ';') return 'snippets'
   return 'bookmarks'
 }
 
@@ -597,6 +606,7 @@ const MODE_PLACEHOLDERS: Record<string, string> = {
   history: 'Search history…',
   emoji: 'Search emoji…',
   downloads: 'Search files…',
+  snippets: 'Search snippets…',
 }
 
 /** Tint the input row, color the prefix glyph, and light up the mode's chip. */
@@ -637,7 +647,7 @@ function renderFooter(): void {
         ? 'Run'
         : mode === 'tabs'
           ? 'Switch'
-          : mode === 'emoji'
+          : mode === 'emoji' || mode === 'snippets'
             ? 'Insert'
             : 'Open'
   primary.append(document.createTextNode(primaryLabel), kbd('↵'))
@@ -887,7 +897,9 @@ function recordUsage(item: RemoteItem): void {
           ? `folder:${item.id}`
           : item.kind === 'emoji'
             ? `emoji:${item.emoji}`
-            : null
+            : item.kind === 'snippet'
+              ? `snippet:${item.label}`
+              : null
   if (key) void chrome.runtime.sendMessage({ type: 'record-usage', key })
 }
 
@@ -943,6 +955,11 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
   if (item.kind === 'emoji') {
     recordUsage(item)
     insertOrCopy(item.emoji ?? '')
+    return
+  }
+  if (item.kind === 'snippet') {
+    recordUsage(item)
+    insertOrCopy(item.text ?? '')
     return
   }
   recordUsage(item)
@@ -1198,6 +1215,11 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
       return [
         { id: 'insert', label: 'Insert' },
         { id: 'copy-text', label: 'Copy Emoji' },
+      ]
+    case 'snippet':
+      return [
+        { id: 'insert', label: 'Insert' },
+        { id: 'copy-text', label: 'Copy Snippet' },
       ]
     default:
       return [{ id: 'run', label: 'Run Command' }, ...favoriteActionFor(item)]
@@ -1800,7 +1822,14 @@ function iconFor(item: RemoteItem): HTMLElement {
     icon.innerHTML = (item.icon && CMD_ICONS[item.icon]) || DOC_SVG
     return icon
   }
-  icon.innerHTML = kind === 'folder' ? FOLDER_SVG : kind === 'history' ? CLOCK_SVG : COMMAND_SVG
+  icon.innerHTML =
+    kind === 'folder'
+      ? FOLDER_SVG
+      : kind === 'history'
+        ? CLOCK_SVG
+        : kind === 'snippet'
+          ? CMD_ICONS.doc
+          : COMMAND_SVG
   return icon
 }
 
