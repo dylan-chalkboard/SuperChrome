@@ -110,12 +110,19 @@ const PALETTE_CSS = `
   font-size: 15px; font-family: inherit;
 }
 .input::placeholder { color: #ffffff40; }
-.hint { display: flex; gap: 6px; margin-right: 14px; flex-shrink: 0; }
+.hint { display: flex; margin-right: 14px; flex-shrink: 0; }
 .kbd {
   background: #ffffff14; color: #cccccc99;
   border-radius: 4px; padding: 2px 7px; font-size: 11px;
 }
-.input-row[class*=" mode-"] .hint .kbd:not(.active) { display: none; }
+.hint .kbd {
+  margin-right: 6px; max-width: 100px; overflow: hidden; white-space: nowrap;
+  transition: max-width 0.25s ease, opacity 0.2s, padding 0.25s ease, margin-right 0.25s ease;
+}
+.hint .kbd:last-child { margin-right: 0; }
+.input-row[class*=" mode-"] .hint .kbd:not(.active) {
+  max-width: 0; opacity: 0; padding-left: 0; padding-right: 0; margin-right: 0;
+}
 .kbd.chip-commands.active { background: linear-gradient(135deg, #4cd5f3, #4c65f3); color: #ffffff; }
 .kbd.chip-tabs.active { background: linear-gradient(135deg, #3ac6a8, #3a86c6); color: #ffffff; }
 .kbd.chip-history.active { background: linear-gradient(135deg, #716ee8, #c36ee8); color: #ffffff; }
@@ -242,11 +249,11 @@ const PALETTE_CSS = `
 .list::-webkit-scrollbar { width: 10px; }
 .list::-webkit-scrollbar-thumb { background: #ffffff1a; border-radius: 5px; }
 @media (prefers-reduced-motion: reduce) {
-  .panel, .selector, .toast, .input-row, .input-row::before { transition: none !important; }
+  .panel, .selector, .toast, .input-row, .input-row::before, .hint .kbd { transition: none !important; }
   .mode-glyph { animation: none !important; }
 }
 .panel.no-motion, .no-motion .selector { transition: none !important; }
-.no-motion .input-row, .no-motion .input-row::before { transition: none !important; }
+.no-motion .input-row, .no-motion .input-row::before, .no-motion .hint .kbd { transition: none !important; }
 .no-motion .mode-glyph { animation: none !important; }
 `
 
