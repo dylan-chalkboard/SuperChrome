@@ -112,14 +112,28 @@ async function libraryList(
   folderId?: string,
 ): Promise<{ items: LibraryChild[]; path: Array<{ id: string; label: string }> }> {
   if (!folderId) {
-    // Root: each top-level root becomes its own labeled section, folders
-    // first within each, with the Bookmarks Bar always on top.
+    // Root: each real root becomes its own labeled section, folders first
+    // within each, Bookmarks Bar sections on top. Chrome may split the tree
+    // into local AND account-synced roots (account bookmark storage), so
+    // roots are discovered by folderType rather than assumed at depth 1,
+    // and empty duplicates (e.g. the unused local roots) are dropped.
     const [root] = await chrome.bookmarks.getTree()
-    const roots = [...(root.children ?? [])].sort((a, b) =>
-      a.id === '1' ? -1 : b.id === '1' ? 1 : 0,
-    )
+    const sections: chrome.bookmarks.BookmarkTreeNode[] = []
+    const visit = (node: chrome.bookmarks.BookmarkTreeNode): void => {
+      if (!node.children) return
+      if (folderTypeOf(node)) {
+        sections.push(node)
+        return
+      }
+      for (const child of node.children) visit(child)
+    }
+    for (const child of root.children ?? []) visit(child)
+    if (!sections.length) sections.push(...(root.children ?? []))
+    const populated = sections.filter((s) => s.children?.length)
+    const shown = populated.length ? populated : sections
+    shown.sort((a, b) => barRank(a) - barRank(b))
     const items: LibraryChild[] = []
-    for (const top of roots) {
+    for (const top of shown) {
       const kids = foldersFirst((top.children ?? []).map(libraryChild))
       for (const child of kids) items.push({ ...child, group: top.title })
     }
@@ -136,11 +150,38 @@ async function libraryList(
   return { items, path }
 }
 
-/** The "Other Bookmarks" root: id '2' in Chrome, second root as a fallback. */
+/** folderType shipped in Chrome 134; older trees just report undefined. */
+function folderTypeOf(node: chrome.bookmarks.BookmarkTreeNode): string | undefined {
+  return (node as { folderType?: string }).folderType
+}
+
+function barRank(node: chrome.bookmarks.BookmarkTreeNode): number {
+  return folderTypeOf(node) === 'bookmarks-bar' || node.id === '1' ? 0 : 1
+}
+
+/**
+ * The "Other Bookmarks" root — preferring the account-synced one (where the
+ * user's real tree lives under account bookmark storage), then any populated
+ * one, then the classic id-'2' local root.
+ */
 async function otherBookmarksNode(): Promise<chrome.bookmarks.BookmarkTreeNode | undefined> {
   const [root] = await chrome.bookmarks.getTree()
+  const others: chrome.bookmarks.BookmarkTreeNode[] = []
+  const visit = (node: chrome.bookmarks.BookmarkTreeNode): void => {
+    if (!node.children) return
+    if (folderTypeOf(node) === 'other') {
+      others.push(node)
+      return
+    }
+    for (const child of node.children) visit(child)
+  }
+  for (const child of root.children ?? []) visit(child)
+  const syncing = others.find((o) => (o as { syncing?: boolean }).syncing)
+  const populated = others.find((o) => o.children?.length)
   const children = root.children ?? []
-  return children.find((c) => c.id === '2') ?? children[1] ?? children[0]
+  return (
+    syncing ?? populated ?? others[0] ?? children.find((c) => c.id === '2') ?? children[1] ?? children[0]
+  )
 }
 
 /** Folder path of a node's ancestors, top-level roots included, for display. */
