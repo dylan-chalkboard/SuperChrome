@@ -75,5 +75,7 @@ export async function searchTabs(
     usage,
     decay,
   )
-  return [...open, ...closed]
+  // Browsing '@' is about OPEN tabs — recently closed stays a small tail
+  // (top 3) until a query pulls specific ones back in.
+  return [...open, ...(query ? closed : closed.slice(0, 3))]
 }
