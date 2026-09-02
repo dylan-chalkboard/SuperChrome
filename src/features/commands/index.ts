@@ -29,6 +29,7 @@ export const PALETTE_COMMANDS = [
   { id: 'go-back', label: 'Go Back' },
   { id: 'go-forward', label: 'Go Forward' },
   { id: 'new-tab', label: 'New Tab' },
+  { id: 'reopen-tab', label: 'Reopen Closed Tab' },
   { id: 'duplicate-tab', label: 'Duplicate Tab' },
   { id: 'toggle-pin', label: 'Pin/Unpin Tab' },
   { id: 'move-tab-new-window', label: 'Move Tab to New Window' },
@@ -76,6 +77,7 @@ export const COMMAND_META: Record<string, { icon: string; color: string }> = {
   'go-back': { icon: 'arrow-left', color: '#4c9df3' },
   'go-forward': { icon: 'arrow-right', color: '#4c9df3' },
   'new-tab': { icon: 'tab', color: '#4c9df3' },
+  'reopen-tab': { icon: 'reset', color: '#e0619e' },
   'duplicate-tab': { icon: 'tab', color: '#4c9df3' },
   'toggle-pin': { icon: 'pin', color: '#4c9df3' },
   'move-tab-new-window': { icon: 'external', color: '#3ab5c6' },
@@ -152,6 +154,10 @@ export async function runCommand(
   switch (id) {
     case 'new-tab':
       await chrome.tabs.create({})
+      break
+    case 'reopen-tab':
+      // No argument = restore the most recently closed tab or window.
+      await chrome.sessions.restore().catch(() => {})
       break
     case 'go-back':
       if (tab?.id) await chrome.tabs.goBack(tab.id).catch(() => {})
