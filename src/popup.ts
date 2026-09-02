@@ -178,6 +178,15 @@ function captureModePrefix(): void {
   }
 }
 
+const MODE_PLACEHOLDERS: Record<string, string> = {
+  bookmarks: 'Search bookmarks and commands…',
+  commands: 'Search commands…',
+  tabs: 'Search open tabs…',
+  history: 'Search history…',
+  emoji: 'Search emoji…',
+  downloads: 'Search files…',
+}
+
 /** Tint the input row, color the prefix glyph, and light up the mode's chip. */
 function updateModeStyling(): void {
   const inputRow = document.querySelector<HTMLElement>('.input-row')
@@ -186,6 +195,7 @@ function updateModeStyling(): void {
   inputRow.className = 'input-row' + (mode === 'bookmarks' ? '' : ` mode-${mode}`)
   const glyph = document.getElementById('modeGlyph')
   if (glyph) glyph.textContent = modePrefix
+  inputEl.placeholder = MODE_PLACEHOLDERS[mode] ?? MODE_PLACEHOLDERS.bookmarks
   inputRow.querySelectorAll<HTMLElement>('.kbd').forEach((chip) => {
     chip.classList.toggle('active', chip.classList.contains(`chip-${mode}`))
   })

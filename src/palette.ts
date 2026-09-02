@@ -583,12 +583,25 @@ function currentMode(): string {
   return 'bookmarks'
 }
 
+const MODE_PLACEHOLDERS: Record<string, string> = {
+  bookmarks: 'Search bookmarks and commands…',
+  commands: 'Search commands…',
+  tabs: 'Search open tabs…',
+  history: 'Search history…',
+  emoji: 'Search emoji…',
+  downloads: 'Search files…',
+}
+
 /** Tint the input row, color the prefix glyph, and light up the mode's chip. */
 function updateModeStyling(): void {
   if (!inputRowEl) return
   const mode = currentMode()
   inputRowEl.className = 'input-row' + (mode === 'bookmarks' ? '' : ` mode-${mode}`)
   if (modeGlyphEl) modeGlyphEl.textContent = modePrefix
+  // Sub-states (rename, move, group) own the placeholder while active.
+  if (paletteInput && uiState === 'list') {
+    paletteInput.placeholder = MODE_PLACEHOLDERS[mode] ?? MODE_PLACEHOLDERS.bookmarks
+  }
   inputRowEl.querySelectorAll<HTMLElement>('.kbd').forEach((chip) => {
     chip.classList.toggle('active', chip.classList.contains(`chip-${mode}`))
   })
