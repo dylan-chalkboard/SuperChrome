@@ -432,10 +432,13 @@ async function toggleFavorite(item: RemoteItem): Promise<void> {
   showToast(index >= 0 ? 'Removed from Favorites' : 'Added to Favorites')
 }
 
-function favTileEl(f: FavoriteEntry): HTMLElement {
+function favTileEl(f: FavoriteEntry, index: number): HTMLElement {
   const el = document.createElement('div')
   el.className = 'fav-item'
   el.title = f.label
+  el.addEventListener('mousemove', () => {
+    if (favIndex !== index) setFavIndex(index)
+  })
   const tile = document.createElement('div')
   tile.className = 'fav-tile'
   if (f.kind === 'command') {
@@ -889,7 +892,7 @@ async function updateList(): Promise<void> {
   if (favBarItems.length) {
     const bar = document.createElement('div')
     bar.className = 'fav-bar'
-    for (const f of favBarItems) bar.appendChild(favTileEl(f))
+    favBarItems.forEach((f, i) => bar.appendChild(favTileEl(f, i)))
     listEl.appendChild(bar)
   }
 
