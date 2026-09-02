@@ -226,14 +226,28 @@ const PALETTE_CSS = `
 .light .footer { background: #ececef; }
 .footer .spacer { flex: 1; }
 .footer .action { display: flex; align-items: center; gap: 6px; }
-.footer .brand-logo { width: 26px; height: 26px; opacity: 0.5; }
-.footer .gear {
-  display: flex; align-items: center; justify-content: center;
-  width: 26px; height: 26px; padding: 0;
-  background: none; border: none; border-radius: 6px;
-  color: #cccccc80; cursor: pointer;
+.footer .brand-logo { width: 26px; height: 26px; opacity: 0.5; cursor: pointer; }
+.footer .brand-logo:hover { opacity: 0.9; }
+.brand-menu {
+  position: absolute; left: 10px; bottom: 46px;
+  min-width: 210px; z-index: 5;
+  background: #232326;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px; padding: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 8px 24px #00000088;
 }
-.footer .gear:hover { background: #ffffff14; color: #e8e8e8; }
+.brand-menu .action-row:hover { background: rgba(255, 255, 255, 0.14); }
+.brand-menu .menu-version {
+  padding: 6px 10px 4px; font-size: 11px; color: #ffffff40; cursor: default;
+}
+.brand-menu .menu-icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 16px; color: #cccccc99; flex: none;
+}
+.light .brand-menu .menu-icon { color: #00000059; }
+.light .brand-menu { background: #ffffff; border-color: rgba(0, 0, 0, 0.12); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25); }
+.light .brand-menu .action-row:hover { background: rgba(0, 0, 0, 0.08); }
+.light .brand-menu .menu-version { color: #00000045; }
 .actions {
   position: absolute; right: 10px; bottom: 46px;
   min-width: 230px;
@@ -326,8 +340,6 @@ const PALETTE_CSS = `
 .light .action-row.selected { background: rgba(0, 0, 0, 0.08); }
 .light .action-row.danger { color: #d03d3d; }
 .light .footer { border-top-color: #00000010; color: #00000066; }
-.light .footer .gear { color: #00000066; }
-.light .footer .gear:hover { background: #00000010; color: #303036; }
 .light .empty { color: #00000059; }
 .light .list::-webkit-scrollbar-thumb { background: #00000022; }
 /* The logo asset is white; invert to black anywhere it shows in light mode. */
@@ -381,6 +393,7 @@ let modeGlyphEl: HTMLElement | null = null
  */
 let modePrefix = ''
 let actionsEl: HTMLElement | null = null
+let brandMenuEl: HTMLElement | null = null
 
 let uiState: UiState = 'list'
 let flatItems: RemoteItem[] = []
@@ -463,7 +476,8 @@ async function applyUserSettings(): Promise<void> {
     }
     prefersNewTab = settings.openInNewTab === true
     reduceMotionPref = settings.reduceMotion === true
-    if (reduceMotionPref) panelEl.classList.add('no-motion')
+    // toggle, not add: live settings edits can turn this back off.
+    panelEl.classList.toggle('no-motion', reduceMotionPref)
     renderFooter()
   } catch {
     // Defaults baked into the CSS cover this.
@@ -642,6 +656,10 @@ function renderFooter(): void {
   brand.alt = 'SuperChrome'
   brand.title = 'SuperChrome'
   brand.draggable = false
+  brand.addEventListener('mousedown', (e) => {
+    e.preventDefault()
+    toggleBrandMenu()
+  })
   const spacer = document.createElement('span')
   spacer.className = 'spacer'
   paletteFooter.append(brand, spacer)
@@ -687,17 +705,6 @@ function renderFooter(): void {
     paletteFooter.appendChild(actions)
   }
 
-  const gear = document.createElement('button')
-  gear.className = 'gear'
-  gear.title = 'SuperChrome Settings'
-  gear.innerHTML =
-    '<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="currentColor"/><path d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2" stroke="currentColor" stroke-linecap="round"/></svg>'
-  gear.addEventListener('mousedown', (e) => {
-    e.preventDefault()
-    if (uiState === 'settings') exitSettings()
-    else enterSettings()
-  })
-  paletteFooter.appendChild(gear)
 }
 
 /* ---------- Key handling ---------- */
@@ -712,6 +719,12 @@ function onGlobalKey(e: KeyboardEvent): void {
   if (!paletteHost) return
   e.stopPropagation()
   if (e.type !== 'keydown') return
+
+  if (brandMenuEl && e.key === 'Escape') {
+    e.preventDefault()
+    closeBrandMenu()
+    return
+  }
 
   // Settings view owns the keyboard: form controls get everything but Esc.
   if (uiState === 'settings') {
@@ -1171,6 +1184,7 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
 function openActions(): void {
   const item = flatItems[selectedIndex]
   if (!item || !panelEl) return
+  closeBrandMenu()
   actionTarget = item
   currentActions = actionsFor(item)
   actionIndex = 0
@@ -1505,6 +1519,64 @@ function exitSubState(_commit: boolean): void {
   void updateList()
 }
 
+/* ---------- Brand menu (bottom-left logo) ---------- */
+
+function closeBrandMenu(): void {
+  brandMenuEl?.remove()
+  brandMenuEl = null
+}
+
+function toggleBrandMenu(): void {
+  if (brandMenuEl) {
+    closeBrandMenu()
+    return
+  }
+  if (!panelEl) return
+  brandMenuEl = document.createElement('div')
+  brandMenuEl.className = 'brand-menu'
+
+  const menuRow = (icon: string, label: string, run: () => void): void => {
+    const row = document.createElement('div')
+    row.className = 'action-row'
+    const glyph = document.createElement('span')
+    glyph.className = 'menu-icon'
+    glyph.innerHTML = icon
+    const text = document.createElement('span')
+    text.textContent = label
+    row.append(glyph, text)
+    row.addEventListener('mousedown', (e) => {
+      e.preventDefault()
+      closeBrandMenu()
+      run()
+    })
+    brandMenuEl!.appendChild(row)
+  }
+
+  const FEEDBACK_SVG =
+    '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 3.5h12v8H8l-3.5 3v-3H2v-8z" stroke="currentColor" stroke-linejoin="round"/></svg>'
+
+  menuRow(CMD_ICONS.gear, 'Settings', () => enterSettings())
+  menuRow(FEEDBACK_SVG, 'Send Feedback', () => {
+    void chrome.runtime.sendMessage({
+      type: 'open-url',
+      url: 'https://github.com/dylan-chalkboard/SuperChrome/issues/new',
+      newTab: true,
+    })
+    closePalette()
+  })
+  menuRow(CMD_ICONS.keyboard, 'Keyboard Shortcuts', () => {
+    void chrome.runtime.sendMessage({ type: 'run-command', id: 'open-shortcuts' })
+    closePalette()
+  })
+
+  const version = document.createElement('div')
+  version.className = 'menu-version'
+  version.textContent = `SuperChrome v${chrome.runtime.getManifest().version}`
+  brandMenuEl.appendChild(version)
+
+  panelEl.appendChild(brandMenuEl)
+}
+
 /* ---------- In-palette settings (gear or >SuperChrome: Settings) ---------- */
 
 function enterSettings(): void {
@@ -1710,6 +1782,7 @@ function localFuzzy(query: string, text: string): number | null {
 async function updateList(): Promise<void> {
   if (!paletteInput || !paletteList) return
   const token = ++queryToken
+  closeBrandMenu()
   renderFooter()
   updateModeStyling()
 
