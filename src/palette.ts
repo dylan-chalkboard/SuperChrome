@@ -36,7 +36,7 @@ import {
   loadFavorites,
   toggleFavorite,
 } from './ui/shared/favorites'
-import { BOOKMARK_SVG, CLOCK_SVG, CMD_ICONS, COMMAND_SVG, DOC_SVG } from './ui/shared/icons'
+import { BOOKMARK_SVG, CLOCK_SVG, CMD_ICONS, COMMAND_SVG, DOC_SVG, RIBBON_SVG } from './ui/shared/icons'
 import { MODE_PLACEHOLDERS, MODE_PREFIX, PREFIX_CHARS, mode } from './ui/shared/mode'
 import type { FavoriteEntry, PaletteAction, RemoteItem } from './ui/shared/types'
 
@@ -2383,6 +2383,12 @@ function iconFor(item: RemoteItem): HTMLElement {
       img.src = chrome.runtime.getURL('/icons/footer.png')
       img.draggable = false
       icon.appendChild(img)
+      return icon
+    }
+    if (item.icon === 'ribbon') {
+      // Self-colored glyph (like the folder): no tile behind it.
+      icon.className = 'icon plain'
+      icon.innerHTML = RIBBON_SVG
       return icon
     }
     icon.className = 'icon kind-command'

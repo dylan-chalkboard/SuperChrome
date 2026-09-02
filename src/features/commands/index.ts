@@ -68,7 +68,7 @@ export const COMMAND_META: Record<string, { icon: string; color: string }> = {
   'mode-history': { icon: 'clock', color: '#9a6ee8' },
   'mode-emoji': { icon: 'search', color: '#4caf7d' },
   'mode-snippets': { icon: 'doc', color: '#e8964a' },
-  'mode-library': { icon: 'bookmark', color: '#e8c341' },
+  'mode-library': { icon: 'ribbon', color: '' },
   'open-options': { icon: 'logo', color: '' },
   'bookmark-tab': { icon: 'bookmark', color: '#e05d5d' },
   'pick-color': { icon: 'paint', color: '#e57fb3' },
