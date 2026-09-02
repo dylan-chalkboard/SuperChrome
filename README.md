@@ -28,13 +28,16 @@ Then load it in Chrome:
 
 Open with `Cmd+P` (bookmarks), `Cmd+Shift+P` (commands), or the toolbar icon:
 
-- Plain text → fuzzy-search **bookmarks** with favicons, ranked by how often and recently you pick them (Enter opens, `Cmd+Enter` new tab)
-- `>` prefix → **commands**: bookmark/close/duplicate/pin tab, print, view source, and jump to any Chrome settings page (privacy, passwords, clear browsing data, flags, Web Store, chrome://inspect, …)
+- Plain text → fuzzy-search **bookmarks and history** with favicons, ranked by how often and recently you pick them (Enter opens, `Cmd+Enter` new tab)
+- `>` prefix → **commands**: back/forward, bookmark/close/duplicate/pin tab, print, view source, and jump to any Chrome settings page (privacy, passwords, clear browsing data, flags, Web Store, chrome://inspect, …)
 - `@` prefix → **switch to an open tab**
 - `#` prefix → **search browser history** (empty query shows recent pages)
 - `:` prefix → **emoji search** — Enter inserts into the field you were typing in (or copies)
 - **Inline calculator** — type math (`142*12`, `18% of 240`, `2^10`) and the result appears as the first row; Enter copies it
-- `Cmd+K` → **actions panel** for the selected item: open in new tab, copy URL, rename, move to folder, delete bookmark, remove from history, close tab
+- **URL navigation** — type an address (`google.com`, `localhost:3000`) and an "Open" row appears on top, address-bar style
+- **Mode colors** — prefix modes tint the header and render the typed prefix as a colored glyph (commands blue, tabs cyan, history and files purple, emoji green)
+- `Cmd+K` → **actions panel** for the selected item: open in new tab, copy URL, rename, move to folder, add to favorites, delete bookmark, remove from history, close tab
+- **Favorites bar** — Cmd+K → "Add to Favorites" pins bookmarks, pages, or commands as icon tiles above Suggested on the home view (synced across devices)
 - `Esc` or click outside to dismiss
 
 **Settings** (`>SuperChrome: Settings` or the extension's Options): glass opacity, icon tile colors, frecency decay, default mode, and per-site disable.

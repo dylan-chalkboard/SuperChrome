@@ -145,6 +145,19 @@ export function tryCalculate(raw: string): string | null {
 
 /* ---------- Small helpers ---------- */
 
+/**
+ * Turn an address-bar-like query ("google.com", "localhost:3000/x") into a
+ * navigable URL, or null when it reads as a search phrase instead.
+ */
+export function urlFromQuery(raw: string): string | null {
+  const q = raw.trim()
+  if (!q || /\s/.test(q)) return null
+  if (/^https?:\/\/\S+$/i.test(q)) return q
+  if (/^localhost(:\d+)?(\/\S*)?$/i.test(q)) return `http://${q}`
+  if (/^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}(:\d+)?(\/\S*)?$/i.test(q)) return `https://${q}`
+  return null
+}
+
 export function hostOf(url: string | undefined): string | null {
   try {
     return url ? new URL(url).hostname.toLowerCase() : null
@@ -182,6 +195,43 @@ export function fileType(filename: string): { icon: string; color: string } {
     if (pattern.test(filename)) return type
   }
   return { icon: 'doc', color: '#3aa99f' }
+}
+
+/* ---------- Hue-shift tile gradients ---------- */
+
+function hslToHex(h: number, s: number, l: number): string {
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12
+    const c = l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1))
+    return Math.round(c * 255)
+      .toString(16)
+      .padStart(2, '0')
+  }
+  return `#${f(0)}${f(8)}${f(4)}`
+}
+
+/**
+ * Turn a flat tile color into a hue-shifted diagonal gradient (Raycast-style).
+ * Grays and unparseable values pass through unchanged, so this is safe to
+ * apply to any user-configured color.
+ */
+export function tileGradient(color: string): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(color.trim())
+  if (!m) return color
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16) / 255)
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const d = max - min
+  if (d === 0) return color
+  const l = (max + min) / 2
+  const s = d / (1 - Math.abs(2 * l - 1))
+  let h = 0
+  if (max === r) h = ((g - b) / d + 6) % 6
+  else if (max === g) h = (b - r) / d + 2
+  else h = (r - g) / d + 4
+  h *= 60
+  const stop = (dh: number) => hslToHex((h + dh + 360) % 360, s, l)
+  return `linear-gradient(135deg, ${stop(-20)}, ${stop(20)})`
 }
 
 /* ---------- Bookmark tree walkers ---------- */

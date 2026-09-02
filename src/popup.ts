@@ -45,6 +45,8 @@ const FOLDER_SVG =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1.5 3.5h4.5l1.5 2h7v7h-13v-9z" stroke="currentColor" stroke-linejoin="round"/></svg>'
 
 const CMD_ICONS: Record<string, string> = {
+  'arrow-left': '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M13 8H3M7 3.5L2.5 8 7 12.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  'arrow-right': '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 3.5L13.5 8 9 12.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   tab: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5" stroke="currentColor"/><path d="M1.5 5.5h13" stroke="currentColor"/></svg>',
   switch: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 5.5h8M9.5 2.5l3 3-3 3M12 10.5H4M6.5 7.5l-3 3 3 3" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   pin: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="3" stroke="currentColor"/><path d="M8 9v5" stroke="currentColor" stroke-linecap="round"/></svg>',
@@ -144,14 +146,49 @@ let queryToken = 0
 let selectorEl: HTMLElement | null = null
 const GRID_COLS = 6
 
+/**
+ * The typed mode prefix ('>', '@', '#', ':', '~'), held outside the input so
+ * it can render as a colored glyph; the input holds only the query text.
+ */
+let modePrefix = ''
+const PREFIX_CHARS = '>@#:~'
+
 function currentMode(): string {
-  const raw = inputEl.value
-  if (raw.startsWith('>')) return 'commands'
-  if (raw.startsWith('@')) return 'tabs'
-  if (raw.startsWith('#')) return 'history'
-  if (raw.startsWith(':')) return 'emoji'
-  if (raw.startsWith('~')) return 'downloads'
+  if (modePrefix === '>') return 'commands'
+  if (modePrefix === '@') return 'tabs'
+  if (modePrefix === '#') return 'history'
+  if (modePrefix === ':') return 'emoji'
+  if (modePrefix === '~') return 'downloads'
   return 'bookmarks'
+}
+
+/** Set mode + query from a combined string like '@foo' or '#'. */
+function setModeInput(value: string): void {
+  modePrefix = value && PREFIX_CHARS.includes(value[0]) ? value[0] : ''
+  inputEl.value = modePrefix ? value.slice(1) : value
+}
+
+/** Pull a just-typed leading prefix char out of the input into modePrefix. */
+function captureModePrefix(): void {
+  if (modePrefix) return
+  const first = inputEl.value[0]
+  if (first && PREFIX_CHARS.includes(first)) {
+    modePrefix = first
+    inputEl.value = inputEl.value.slice(1)
+  }
+}
+
+/** Tint the input row, color the prefix glyph, and light up the mode's chip. */
+function updateModeStyling(): void {
+  const inputRow = document.querySelector<HTMLElement>('.input-row')
+  if (!inputRow) return
+  const mode = currentMode()
+  inputRow.className = 'input-row' + (mode === 'bookmarks' ? '' : ` mode-${mode}`)
+  const glyph = document.getElementById('modeGlyph')
+  if (glyph) glyph.textContent = modePrefix
+  inputRow.querySelectorAll<HTMLElement>('.kbd').forEach((chip) => {
+    chip.classList.toggle('active', chip.classList.contains(`chip-${mode}`))
+  })
 }
 
 let actionsEl: HTMLElement | null = null
@@ -188,6 +225,7 @@ function popFolder(): void {
 
 inputEl.addEventListener('input', () => {
   closeActions()
+  captureModePrefix()
   void updateList()
 })
 inputEl.addEventListener('keydown', (e) => {
@@ -238,6 +276,13 @@ inputEl.addEventListener('keydown', (e) => {
     if (item) void reorderItem(item, e.key === 'ArrowUp' ? -1 : 1)
     return
   }
+  if (e.key === 'Backspace' && inputEl.value === '' && modePrefix) {
+    // Deleting the last query char steps back out of the prefix mode.
+    e.preventDefault()
+    modePrefix = ''
+    void updateList()
+    return
+  }
   if (e.key === 'Backspace' && inputEl.value === '' && browseStack.length && currentMode() === 'bookmarks') {
     e.preventDefault()
     popFolder()
@@ -254,12 +299,40 @@ inputEl.addEventListener('keydown', (e) => {
     moveSelection(e.key === 'ArrowDown' ? GRID_COLS : -GRID_COLS)
     return
   }
+  // Favorites bar navigation: ↑ from the top row enters it, ←/→ move
+  // within it, ↓ (or Esc) returns to the list, ↵ opens the tile.
+  if (favIndex >= 0 && favBarItems.length) {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault()
+      const delta = e.key === 'ArrowRight' ? 1 : -1
+      setFavIndex((favIndex + delta + favBarItems.length) % favBarItems.length)
+      return
+    }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      if (e.key === 'ArrowDown') setFavIndex(-1)
+      return
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      const f = favBarItems[favIndex]
+      if (f) void executeItem(favToItem(f), e.metaKey || e.ctrlKey)
+      return
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopPropagation()
+      setFavIndex(-1)
+      return
+    }
+  }
   if (e.key === 'ArrowDown') {
     e.preventDefault()
     moveSelection(1)
   } else if (e.key === 'ArrowUp') {
     e.preventDefault()
-    moveSelection(-1)
+    if (favBarItems.length && selectedIndex === 0) setFavIndex(0)
+    else moveSelection(-1)
   } else if (e.key === 'Enter') {
     e.preventDefault()
     const item = flatItems[selectedIndex]
@@ -269,6 +342,139 @@ inputEl.addEventListener('keydown', (e) => {
 
 /* ---------- Actions panel (⌘K) ---------- */
 
+/* ---------- Favorites bar ---------- */
+
+interface FavoriteEntry {
+  kind: 'bookmark' | 'command' | 'folder'
+  label: string
+  url?: string
+  commandId?: string
+  id?: string
+  icon?: string
+  color?: string
+}
+
+let favoritesCache: FavoriteEntry[] | null = null
+/** Favorites currently rendered in the bar; empty when the bar is hidden. */
+let favBarItems: FavoriteEntry[] = []
+/** Index of the keyboard-selected favorite tile, or -1 when the list has focus. */
+let favIndex = -1
+
+async function loadFavorites(): Promise<FavoriteEntry[]> {
+  try {
+    const { favorites } = await chrome.storage.sync.get('favorites')
+    favoritesCache = Array.isArray(favorites) ? favorites : []
+  } catch {
+    favoritesCache = []
+  }
+  return favoritesCache
+}
+
+function favKey(f: FavoriteEntry): string {
+  if (f.kind === 'command') return `command:${f.commandId}`
+  if (f.kind === 'folder') return `folder:${f.id}`
+  return `url:${f.url}`
+}
+
+/** Storage key for an item, or null for kinds that can't be favorited. */
+function favoriteKeyOf(item: RemoteItem): string | null {
+  if (item.kind === 'command' && item.commandId) return `command:${item.commandId}`
+  if (item.kind === 'folder' && item.id) return `folder:${item.id}`
+  const urlKinds: RemoteItem['kind'][] = ['bookmark', 'history', 'tab', 'closed']
+  if (item.url && urlKinds.includes(item.kind)) return `url:${item.url}`
+  return null
+}
+
+function isFavorite(item: RemoteItem): boolean {
+  const key = favoriteKeyOf(item)
+  return !!key && !!favoritesCache?.some((f) => favKey(f) === key)
+}
+
+function favoriteActionFor(item: RemoteItem): PaletteAction[] {
+  if (!favoriteKeyOf(item)) return []
+  return isFavorite(item)
+    ? [{ id: 'favorite-remove', label: 'Remove from Favorites' }]
+    : [{ id: 'favorite-add', label: 'Add to Favorites' }]
+}
+
+async function toggleFavorite(item: RemoteItem): Promise<void> {
+  const key = favoriteKeyOf(item)
+  if (!key) return
+  const favorites = await loadFavorites()
+  const index = favorites.findIndex((f) => favKey(f) === key)
+  if (index >= 0) {
+    favorites.splice(index, 1)
+  } else if (item.kind === 'command') {
+    favorites.push({
+      kind: 'command',
+      label: item.label,
+      commandId: item.commandId,
+      icon: item.icon,
+      color: item.color,
+    })
+  } else if (item.kind === 'folder') {
+    favorites.push({ kind: 'folder', label: item.label, id: item.id })
+  } else {
+    favorites.push({ kind: 'bookmark', label: item.label, url: item.url })
+  }
+  favoritesCache = favorites
+  await chrome.storage.sync.set({ favorites })
+  showToast(index >= 0 ? 'Removed from Favorites' : 'Added to Favorites')
+}
+
+function favTileEl(f: FavoriteEntry): HTMLElement {
+  const el = document.createElement('div')
+  el.className = 'fav-item'
+  el.title = f.label
+  const tile = document.createElement('div')
+  tile.className = 'fav-tile'
+  if (f.kind === 'command') {
+    if (f.color) tile.style.background = f.color
+    tile.innerHTML = (f.icon && CMD_ICONS[f.icon]) || COMMAND_SVG
+  } else if (f.kind === 'folder') {
+    tile.classList.add('kind-folder')
+    tile.innerHTML = FOLDER_SVG
+  } else if (f.url) {
+    const img = document.createElement('img')
+    img.src =
+      chrome.runtime.getURL('/_favicon/') + `?pageUrl=${encodeURIComponent(f.url)}&size=32`
+    img.onerror = () => {
+      tile.innerHTML = BOOKMARK_SVG
+    }
+    tile.appendChild(img)
+  }
+  const cap = document.createElement('span')
+  cap.className = 'fav-cap'
+  cap.textContent = f.label
+  el.append(tile, cap)
+  el.addEventListener('click', (e) => {
+    void executeItem(favToItem(f), e.metaKey || e.ctrlKey)
+  })
+  return el
+}
+
+function favToItem(f: FavoriteEntry): RemoteItem {
+  if (f.kind === 'command') {
+    return { kind: 'command', label: f.label, detail: '', commandId: f.commandId, icon: f.icon, color: f.color }
+  }
+  if (f.kind === 'folder') return { kind: 'folder', label: f.label, detail: '', id: f.id }
+  return { kind: 'bookmark', label: f.label, detail: '', url: f.url }
+}
+
+/** Move keyboard focus into (index ≥ 0) or out of (-1) the favorites bar. */
+function setFavIndex(index: number): void {
+  favIndex = index
+  listEl
+    .querySelectorAll<HTMLElement>('.fav-item')
+    .forEach((el, i) => el.classList.toggle('selected', i === favIndex))
+  if (favIndex >= 0) {
+    if (selectorEl) selectorEl.style.opacity = '0'
+    listEl.querySelectorAll<HTMLElement>('.item').forEach((row) => row.classList.remove('selected'))
+  } else {
+    highlightSelection()
+  }
+}
+
 function actionsFor(item: RemoteItem): PaletteAction[] {
   switch (item.kind) {
     case 'bookmark':
@@ -277,6 +483,7 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'open-new-tab', label: 'Open in New Tab' },
         { id: 'copy-url', label: 'Copy URL' },
         { id: 'copy-md', label: 'Copy Markdown Link' },
+        ...favoriteActionFor(item),
         ...(browseStack.length && currentMode() === 'bookmarks'
           ? [
               { id: 'move-up', label: 'Move Up' },
@@ -296,6 +503,7 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'open-new-tab', label: 'Open in New Tab' },
         { id: 'copy-url', label: 'Copy URL' },
         { id: 'copy-md', label: 'Copy Markdown Link' },
+        ...favoriteActionFor(item),
         { id: 'delete-history', label: 'Remove from History', danger: true },
       ]
     case 'tab': {
@@ -307,6 +515,7 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
       actions.push(
         { id: 'copy-url', label: 'Copy URL' },
         { id: 'copy-md', label: 'Copy Markdown Link' },
+        ...favoriteActionFor(item),
         { id: 'close-tab', label: 'Close Tab', danger: true },
       )
       return actions
@@ -321,6 +530,7 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
       return [
         { id: 'browse', label: 'Browse Folder' },
         { id: 'open-all', label: 'Open All in New Tabs' },
+        ...favoriteActionFor(item),
         { id: 'folder-delete', label: 'Delete Folder', danger: true },
       ]
     case 'download':
@@ -334,7 +544,7 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
     case 'emoji':
       return [{ id: 'copy-text', label: 'Copy Emoji' }]
     default:
-      return [{ id: 'run', label: 'Run Command' }]
+      return [{ id: 'run', label: 'Run Command' }, ...favoriteActionFor(item)]
   }
 }
 
@@ -461,6 +671,10 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
     case 'close-tab':
       await chrome.runtime.sendMessage({ type: 'close-tab-id', tabId: item.tabId })
       break
+    case 'favorite-add':
+    case 'favorite-remove':
+      await toggleFavorite(item)
+      break
   }
   closeActions()
   void updateList()
@@ -503,6 +717,11 @@ function moveSelection(delta: number): void {
 }
 
 function highlightSelection(instant = false): void {
+  // Any list highlight takes focus back from the favorites bar.
+  if (favIndex >= 0) {
+    favIndex = -1
+    listEl.querySelectorAll<HTMLElement>('.fav-item').forEach((el) => el.classList.remove('selected'))
+  }
   const cells = listEl.querySelectorAll<HTMLElement>('.emoji-cell')
   if (cells.length) {
     cells.forEach((cell, i) => cell.classList.toggle('selected', i === selectedIndex))
@@ -584,7 +803,7 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     closeSelf()
     return
   } else if (item.commandId === 'switch-to-tab') {
-    inputEl.value = '@'
+    setModeInput('@')
     inputEl.focus()
     void updateList()
     return
@@ -596,8 +815,9 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
 
 async function updateList(): Promise<void> {
   const token = ++queryToken
+  updateModeStyling()
   const mode = currentMode()
-  const query = inputEl.value.replace(/^[>@#:~]/, '')
+  const query = inputEl.value
   const browsing = mode === 'bookmarks' && browseStack.length > 0
   const response = (await chrome.runtime.sendMessage({
     type: 'palette-query',
@@ -607,12 +827,19 @@ async function updateList(): Promise<void> {
   })) as { items?: RemoteItem[] }
   if (token !== queryToken) return
 
+  // Favorites bar rides above Suggested on the home view only.
+  const showFavorites = mode === 'bookmarks' && !browsing && !query.trim()
+  const favorites = showFavorites ? await loadFavorites() : []
+  if (token !== queryToken) return
+
   let items = response?.items ?? []
   if (mode === 'commands') items = items.filter((i) => !PAGE_ONLY_COMMANDS.has(i.commandId ?? ''))
 
   listEl.textContent = ''
   flatItems = items
   selectedIndex = 0
+  favBarItems = favorites
+  favIndex = -1
 
   if (mode === 'emoji' && items.length) {
     selectorEl = null
@@ -648,6 +875,13 @@ async function updateList(): Promise<void> {
   selectorEl = document.createElement('div')
   selectorEl.className = 'selector'
   listEl.appendChild(selectorEl)
+
+  if (favBarItems.length) {
+    const bar = document.createElement('div')
+    bar.className = 'fav-bar'
+    for (const f of favBarItems) bar.appendChild(favTileEl(f))
+    listEl.appendChild(bar)
+  }
 
   if (!items.length) {
     const empty = document.createElement('div')
@@ -775,6 +1009,36 @@ function iconFor(item: RemoteItem): HTMLElement {
   return icon
 }
 
+/** Mirror of lib.ts tileGradient — this file stays import-free like palette.ts. */
+function tileGradient(color: string): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(color.trim())
+  if (!m) return color
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16) / 255)
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const d = max - min
+  if (d === 0) return color
+  const l = (max + min) / 2
+  const s = d / (1 - Math.abs(2 * l - 1))
+  let h = 0
+  if (max === r) h = ((g - b) / d + 6) % 6
+  else if (max === g) h = (b - r) / d + 2
+  else h = (r - g) / d + 4
+  h *= 60
+  const hex = (hue: number) => {
+    const f = (n: number) => {
+      const k = (n + hue / 30) % 12
+      const c = l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1))
+      return Math.round(c * 255)
+        .toString(16)
+        .padStart(2, '0')
+    }
+    return `#${f(0)}${f(8)}${f(4)}`
+  }
+  const stop = (dh: number) => hex((h + dh + 360) % 360)
+  return `linear-gradient(135deg, ${stop(-20)}, ${stop(20)})`
+}
+
 function shortUrl(url: string): string {
   try {
     const u = new URL(url)
@@ -802,12 +1066,12 @@ async function applyStartupSettings(): Promise<void> {
     const colors = settings?.iconColors ?? {}
     for (const key of ['command', 'folder', 'history', 'fallback'] as const) {
       if (typeof colors[key] === 'string') {
-        document.documentElement.style.setProperty(`--sc-${key}`, colors[key])
+        document.documentElement.style.setProperty(`--sc-${key}`, tileGradient(colors[key]))
       }
     }
     if (settings?.reduceMotion === true) document.documentElement.classList.add('no-motion')
     if (!(location.hash in HASH_PREFIX) && settings?.defaultMode) {
-      inputEl.value = MODE_PREFIX[settings.defaultMode] ?? ''
+      setModeInput(MODE_PREFIX[settings.defaultMode] ?? '')
     }
   } catch {
     // Defaults baked into the CSS cover this.
@@ -819,5 +1083,7 @@ document.getElementById('gear')?.addEventListener('click', () => {
   closeSelf()
 })
 
-if (location.hash in HASH_PREFIX) inputEl.value = HASH_PREFIX[location.hash]
+if (location.hash in HASH_PREFIX) setModeInput(HASH_PREFIX[location.hash])
+// Warm the cache so ⌘K can label Add/Remove from Favorites synchronously.
+void loadFavorites()
 void applyStartupSettings().then(updateList)

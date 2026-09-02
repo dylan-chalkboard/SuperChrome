@@ -71,9 +71,38 @@ const PALETTE_CSS = `
   transform: translateX(-50%) translateY(-6px) scale(0.985);
 }
 .input-row {
-  display: flex; align-items: center;
+  display: flex; align-items: center; position: relative;
   border-bottom: 1px solid #ffffff10;
+  transition: border-bottom-color 0.25s;
 }
+.input-row > * { position: relative; }
+.input-row::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, var(--mode-tint, transparent), transparent);
+  opacity: 0; transition: opacity 0.25s;
+}
+.input-row[class*=" mode-"]::before { opacity: 1; }
+.input-row.mode-commands { --mode-tint: rgba(76, 157, 243, 0.22); border-bottom-color: rgba(76, 157, 243, 0.35); }
+.input-row.mode-tabs { --mode-tint: rgba(58, 181, 198, 0.22); border-bottom-color: rgba(58, 181, 198, 0.35); }
+.input-row.mode-history { --mode-tint: rgba(154, 110, 232, 0.22); border-bottom-color: rgba(154, 110, 232, 0.35); }
+.input-row.mode-emoji { --mode-tint: rgba(76, 175, 125, 0.22); border-bottom-color: rgba(76, 175, 125, 0.35); }
+.input-row.mode-downloads { --mode-tint: rgba(154, 110, 232, 0.22); border-bottom-color: rgba(154, 110, 232, 0.35); }
+@keyframes glyph-in {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: none; }
+}
+.mode-glyph {
+  display: none; padding-left: 16px;
+  font-size: 15px; font-weight: 700; line-height: 1;
+}
+[class*=" mode-"] > .mode-glyph { display: block; animation: glyph-in 0.18s ease-out; }
+.mode-commands .mode-glyph { color: #4c9df3; }
+.mode-tabs .mode-glyph { color: #3ab5c6; }
+.mode-history .mode-glyph { color: #9a6ee8; }
+.mode-emoji .mode-glyph { color: #4caf7d; }
+.mode-downloads .mode-glyph { color: #9a6ee8; }
+.mode-commands .input, .mode-tabs .input, .mode-history .input,
+.mode-emoji .input, .mode-downloads .input { padding-left: 7px; }
 .input {
   flex: 1; min-width: 0;
   background: transparent; border: none; outline: none;
@@ -86,6 +115,11 @@ const PALETTE_CSS = `
   background: #ffffff14; color: #cccccc99;
   border-radius: 4px; padding: 2px 7px; font-size: 11px;
 }
+.kbd.chip-commands.active { background: linear-gradient(135deg, #4cd5f3, #4c65f3); color: #ffffff; }
+.kbd.chip-tabs.active { background: linear-gradient(135deg, #3ac6a8, #3a86c6); color: #ffffff; }
+.kbd.chip-history.active { background: linear-gradient(135deg, #716ee8, #c36ee8); color: #ffffff; }
+.kbd.chip-emoji.active { background: linear-gradient(135deg, #4caf5c, #4caf9e); color: #ffffff; }
+.kbd.chip-downloads.active { background: linear-gradient(135deg, #716ee8, #c36ee8); color: #ffffff; }
 .list { height: 55vh; overflow-y: auto; padding: 8px; position: relative; }
 .selector {
   position: absolute; left: 8px; right: 8px; top: 0; height: 40px;
@@ -128,15 +162,33 @@ const PALETTE_CSS = `
   flex-shrink: 0;
 }
 .item .icon.plain { background: transparent; }
-.item .icon.kind-command { background: var(--sc-command, #4c9df3); color: #ffffff; }
-.item .icon.kind-folder { background: var(--sc-folder, #e0a63c); color: #ffffff; }
-.item .icon.kind-history { background: var(--sc-history, #9a6ee8); color: #ffffff; }
-.item .icon.kind-bookmark, .item .icon.kind-tab, .item .icon.kind-closed {
-  background: var(--sc-fallback, #e05d5d); color: #ffffff;
+.fav-bar { display: flex; gap: 6px; padding: 10px 12px 4px; overflow: hidden; }
+.fav-item {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  width: 56px; flex: none;
 }
-.item .icon.kind-download { background: #3aa99f; color: #ffffff; }
+.fav-tile {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: #ffffff10; color: #ffffff;
+  display: flex; align-items: center; justify-content: center;
+}
+.fav-tile.kind-folder { background: var(--sc-folder, linear-gradient(135deg, #e06f3c, #e0dd3c)); }
+.fav-item:hover .fav-tile, .fav-item.selected .fav-tile { outline: 2px solid rgba(255, 255, 255, 0.35); }
+.fav-tile img { width: 24px; height: 24px; border-radius: 5px; }
+.fav-tile svg { width: 20px; height: 20px; }
+.fav-cap {
+  max-width: 54px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 9px; color: #ffffff59;
+}
+.item .icon.kind-command { background: var(--sc-command, linear-gradient(135deg, #4cd5f3, #4c65f3)); color: #ffffff; }
+.item .icon.kind-folder { background: var(--sc-folder, linear-gradient(135deg, #e06f3c, #e0dd3c)); color: #ffffff; }
+.item .icon.kind-history { background: var(--sc-history, linear-gradient(135deg, #716ee8, #c36ee8)); color: #ffffff; }
+.item .icon.kind-bookmark, .item .icon.kind-tab, .item .icon.kind-closed {
+  background: var(--sc-fallback, linear-gradient(135deg, #e05d89, #e0895d)); color: #ffffff;
+}
+.item .icon.kind-download { background: linear-gradient(135deg, #3aa97a, #3a8ea9); color: #ffffff; }
 .group-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.item .icon.kind-calc { background: #4caf7d; color: #ffffff; font-weight: 700; font-size: 14px; }
+.item .icon.kind-calc { background: linear-gradient(135deg, #4caf5c, #4caf9e); color: #ffffff; font-weight: 700; font-size: 14px; }
 .item .icon.emoji-glyph { font-size: 17px; }
 .item .icon img { width: 18px; height: 18px; border-radius: 4px; }
 .item .title {
@@ -173,9 +225,7 @@ const PALETTE_CSS = `
 .actions {
   position: absolute; right: 10px; bottom: 46px;
   min-width: 230px;
-  background: rgba(30, 30, 32, 0.92);
-  backdrop-filter: blur(30px) saturate(1.6);
-  -webkit-backdrop-filter: blur(30px) saturate(1.6);
+  background: #232326;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 10px; padding: 4px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 8px 24px #00000088;
@@ -191,9 +241,12 @@ const PALETTE_CSS = `
 .list::-webkit-scrollbar { width: 10px; }
 .list::-webkit-scrollbar-thumb { background: #ffffff1a; border-radius: 5px; }
 @media (prefers-reduced-motion: reduce) {
-  .panel, .selector, .toast { transition: none !important; }
+  .panel, .selector, .toast, .input-row, .input-row::before { transition: none !important; }
+  .mode-glyph { animation: none !important; }
 }
 .panel.no-motion, .no-motion .selector { transition: none !important; }
+.no-motion .input-row, .no-motion .input-row::before { transition: none !important; }
+.no-motion .mode-glyph { animation: none !important; }
 `
 
 const BOOKMARK_SVG =
@@ -208,6 +261,8 @@ const FOLDER_SVG =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1.5 3.5h4.5l1.5 2h7v7h-13v-9z" stroke="currentColor" stroke-linejoin="round"/></svg>'
 
 const CMD_ICONS: Record<string, string> = {
+  'arrow-left': '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M13 8H3M7 3.5L2.5 8 7 12.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  'arrow-right': '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 3.5L13.5 8 9 12.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   tab: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5" stroke="currentColor"/><path d="M1.5 5.5h13" stroke="currentColor"/></svg>',
   switch: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 5.5h8M9.5 2.5l3 3-3 3M12 10.5H4M6.5 7.5l-3 3 3 3" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   pin: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="3" stroke="currentColor"/><path d="M8 9v5" stroke="currentColor" stroke-linecap="round"/></svg>',
@@ -278,6 +333,14 @@ let paletteInput: HTMLInputElement | null = null
 let paletteList: HTMLElement | null = null
 let paletteFooter: HTMLElement | null = null
 let panelEl: HTMLElement | null = null
+let inputRowEl: HTMLElement | null = null
+let modeGlyphEl: HTMLElement | null = null
+/**
+ * The typed mode prefix ('>', '@', '#', ':', '~'), held outside the input so
+ * it can render as a colored glyph; the input holds only the query text.
+ */
+let modePrefix = ''
+const PREFIX_CHARS = '>@#:~'
 let actionsEl: HTMLElement | null = null
 
 let uiState: UiState = 'list'
@@ -333,7 +396,7 @@ chrome.runtime.onMessage.addListener((message: { type?: string; mode?: string })
 
 async function togglePalette(prefix: string): Promise<void> {
   if (paletteHost && paletteInput) {
-    const currentPrefix = paletteInput.value.startsWith('>') ? '>' : ''
+    const currentPrefix = modePrefix === '>' ? '>' : ''
     if (currentPrefix === prefix && uiState === 'list') {
       closePalette()
     } else {
@@ -355,7 +418,9 @@ async function applyUserSettings(): Promise<void> {
     }
     const colors = settings.iconColors ?? {}
     for (const key of ['command', 'folder', 'history', 'fallback'] as const) {
-      if (typeof colors[key] === 'string') panelEl.style.setProperty(`--sc-${key}`, colors[key])
+      if (typeof colors[key] === 'string') {
+        panelEl.style.setProperty(`--sc-${key}`, tileGradient(colors[key]))
+      }
     }
     prefersNewTab = settings.openInNewTab === true
     reduceMotionPref = settings.reduceMotion === true
@@ -368,10 +433,22 @@ async function applyUserSettings(): Promise<void> {
 
 function setInput(value: string): void {
   if (!paletteInput) return
-  paletteInput.value = value
+  modePrefix = value && PREFIX_CHARS.includes(value[0]) ? value[0] : ''
+  const rest = modePrefix ? value.slice(1) : value
+  paletteInput.value = rest
   paletteInput.focus()
-  paletteInput.setSelectionRange(value.length, value.length)
+  paletteInput.setSelectionRange(rest.length, rest.length)
   void updateList()
+}
+
+/** Pull a just-typed leading prefix char out of the input into modePrefix. */
+function captureModePrefix(): void {
+  if (!paletteInput || modePrefix || uiState !== 'list') return
+  const first = paletteInput.value[0]
+  if (first && PREFIX_CHARS.includes(first)) {
+    modePrefix = first
+    paletteInput.value = paletteInput.value.slice(1)
+  }
 }
 
 function closePalette(): void {
@@ -416,6 +493,8 @@ function openPalette(prefix: string): void {
 
   panelEl = document.createElement('div')
   panelEl.className = 'panel'
+  // Warm the cache so ⌘K can label Add/Remove from Favorites synchronously.
+  void loadFavorites()
 
   const inputRow = document.createElement('div')
   inputRow.className = 'input-row'
@@ -424,10 +503,12 @@ function openPalette(prefix: string): void {
   paletteInput.className = 'input'
   paletteInput.placeholder = 'Search bookmarks and commands…'
   paletteInput.spellcheck = false
-  paletteInput.value = prefix
+  modePrefix = prefix && PREFIX_CHARS.includes(prefix[0]) ? prefix[0] : ''
+  paletteInput.value = modePrefix ? prefix.slice(1) : prefix
   paletteInput.addEventListener('input', () => {
     if (uiState === 'actions') closeActions()
     if (uiState === 'rename') return
+    captureModePrefix()
     void updateList()
   })
   paletteInput.addEventListener('blur', () => {
@@ -443,9 +524,23 @@ function openPalette(prefix: string): void {
 
   const hint = document.createElement('div')
   hint.className = 'hint'
-  hint.append(kbd('> Cmds'), kbd('@ Tabs'), kbd('# History'), kbd(': Emoji'), kbd('~ Files'))
+  const chipModes: Array<[string, string]> = [
+    ['> Cmds', 'commands'],
+    ['@ Tabs', 'tabs'],
+    ['# History', 'history'],
+    [': Emoji', 'emoji'],
+    ['~ Files', 'downloads'],
+  ]
+  for (const [text, chipMode] of chipModes) {
+    const chip = kbd(text)
+    chip.classList.add(`chip-${chipMode}`)
+    hint.appendChild(chip)
+  }
 
-  inputRow.append(paletteInput, hint)
+  modeGlyphEl = document.createElement('span')
+  modeGlyphEl.className = 'mode-glyph'
+  inputRow.append(modeGlyphEl, paletteInput, hint)
+  inputRowEl = inputRow
 
   paletteList = document.createElement('div')
   paletteList.className = 'list'
@@ -465,7 +560,8 @@ function openPalette(prefix: string): void {
     window.addEventListener(type, onGlobalKey, true)
   }
   paletteInput.focus()
-  paletteInput.setSelectionRange(prefix.length, prefix.length)
+  const caret = paletteInput.value.length
+  paletteInput.setSelectionRange(caret, caret)
   void applyUserSettings()
   void updateList()
 }
@@ -478,13 +574,23 @@ function kbd(text: string): HTMLElement {
 }
 
 function currentMode(): string {
-  const raw = paletteInput?.value ?? ''
-  if (raw.startsWith('>')) return 'commands'
-  if (raw.startsWith('@')) return 'tabs'
-  if (raw.startsWith('#')) return 'history'
-  if (raw.startsWith(':')) return 'emoji'
-  if (raw.startsWith('~')) return 'downloads'
+  if (modePrefix === '>') return 'commands'
+  if (modePrefix === '@') return 'tabs'
+  if (modePrefix === '#') return 'history'
+  if (modePrefix === ':') return 'emoji'
+  if (modePrefix === '~') return 'downloads'
   return 'bookmarks'
+}
+
+/** Tint the input row, color the prefix glyph, and light up the mode's chip. */
+function updateModeStyling(): void {
+  if (!inputRowEl) return
+  const mode = currentMode()
+  inputRowEl.className = 'input-row' + (mode === 'bookmarks' ? '' : ` mode-${mode}`)
+  if (modeGlyphEl) modeGlyphEl.textContent = modePrefix
+  inputRowEl.querySelectorAll<HTMLElement>('.kbd').forEach((chip) => {
+    chip.classList.toggle('active', chip.classList.contains(`chip-${mode}`))
+  })
 }
 
 function renderFooter(): void {
@@ -639,11 +745,48 @@ function onGlobalKey(e: KeyboardEvent): void {
     return
   }
 
+  // Favorites bar navigation: ↑ from the top row enters it, ←/→ move
+  // within it, ↓ (or Esc) returns to the list, ↵ opens the tile.
+  if (uiState === 'list' && favIndex >= 0 && favBarItems.length) {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault()
+      const delta = e.key === 'ArrowRight' ? 1 : -1
+      setFavIndex((favIndex + delta + favBarItems.length) % favBarItems.length)
+      return
+    }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      if (e.key === 'ArrowDown') setFavIndex(-1)
+      return
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      const f = favBarItems[favIndex]
+      if (f) void executeItem(favToItem(f), e.metaKey || e.ctrlKey)
+      return
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      setFavIndex(-1)
+      return
+    }
+  }
+
   if (e.key === 'Escape') {
     e.preventDefault()
     if (uiState === 'move' || uiState === 'group') exitSubState(false)
     else if (browseStack.length && currentMode() === 'bookmarks') popFolder()
     else closePalette()
+  } else if (
+    e.key === 'Backspace' &&
+    paletteInput?.value === '' &&
+    modePrefix &&
+    uiState === 'list'
+  ) {
+    // Deleting the last query char steps back out of the prefix mode.
+    e.preventDefault()
+    modePrefix = ''
+    void updateList()
   } else if (
     e.key === 'Backspace' &&
     paletteInput?.value === '' &&
@@ -658,7 +801,8 @@ function onGlobalKey(e: KeyboardEvent): void {
     moveSelection(1)
   } else if (e.key === 'ArrowUp') {
     e.preventDefault()
-    moveSelection(-1)
+    if (uiState === 'list' && favBarItems.length && selectedIndex === 0) setFavIndex(0)
+    else moveSelection(-1)
   } else if (e.key === 'Enter') {
     e.preventDefault()
     const item = flatItems[selectedIndex]
@@ -679,6 +823,13 @@ function moveSelection(delta: number): void {
 
 function highlightSelection(instant = false): void {
   if (!paletteList) return
+  // Any list highlight takes focus back from the favorites bar.
+  if (favIndex >= 0) {
+    favIndex = -1
+    paletteList
+      .querySelectorAll<HTMLElement>('.fav-item')
+      .forEach((el) => el.classList.remove('selected'))
+  }
   const cells = paletteList.querySelectorAll<HTMLElement>('.emoji-cell')
   if (cells.length) {
     cells.forEach((cell, i) => cell.classList.toggle('selected', i === selectedIndex))
@@ -805,6 +956,142 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
   closePalette()
 }
 
+/* ---------- Favorites bar ---------- */
+
+interface FavoriteEntry {
+  kind: 'bookmark' | 'command' | 'folder'
+  label: string
+  url?: string
+  commandId?: string
+  id?: string
+  icon?: string
+  color?: string
+}
+
+let favoritesCache: FavoriteEntry[] | null = null
+/** Favorites currently rendered in the bar; empty when the bar is hidden. */
+let favBarItems: FavoriteEntry[] = []
+/** Index of the keyboard-selected favorite tile, or -1 when the list has focus. */
+let favIndex = -1
+
+async function loadFavorites(): Promise<FavoriteEntry[]> {
+  try {
+    const { favorites } = await chrome.storage.sync.get('favorites')
+    favoritesCache = Array.isArray(favorites) ? favorites : []
+  } catch {
+    favoritesCache = []
+  }
+  return favoritesCache
+}
+
+function favKey(f: FavoriteEntry): string {
+  if (f.kind === 'command') return `command:${f.commandId}`
+  if (f.kind === 'folder') return `folder:${f.id}`
+  return `url:${f.url}`
+}
+
+/** Storage key for an item, or null for kinds that can't be favorited. */
+function favoriteKeyOf(item: RemoteItem): string | null {
+  if (item.kind === 'command' && item.commandId) return `command:${item.commandId}`
+  if (item.kind === 'folder' && item.id) return `folder:${item.id}`
+  const urlKinds: RemoteItem['kind'][] = ['bookmark', 'history', 'tab', 'closed']
+  if (item.url && urlKinds.includes(item.kind)) return `url:${item.url}`
+  return null
+}
+
+function isFavorite(item: RemoteItem): boolean {
+  const key = favoriteKeyOf(item)
+  return !!key && !!favoritesCache?.some((f) => favKey(f) === key)
+}
+
+function favoriteActionFor(item: RemoteItem): PaletteAction[] {
+  if (!favoriteKeyOf(item)) return []
+  return isFavorite(item)
+    ? [{ id: 'favorite-remove', label: 'Remove from Favorites' }]
+    : [{ id: 'favorite-add', label: 'Add to Favorites' }]
+}
+
+async function toggleFavorite(item: RemoteItem): Promise<void> {
+  const key = favoriteKeyOf(item)
+  if (!key) return
+  const favorites = await loadFavorites()
+  const index = favorites.findIndex((f) => favKey(f) === key)
+  if (index >= 0) {
+    favorites.splice(index, 1)
+  } else if (item.kind === 'command') {
+    favorites.push({
+      kind: 'command',
+      label: item.label,
+      commandId: item.commandId,
+      icon: item.icon,
+      color: item.color,
+    })
+  } else if (item.kind === 'folder') {
+    favorites.push({ kind: 'folder', label: item.label, id: item.id })
+  } else {
+    favorites.push({ kind: 'bookmark', label: item.label, url: item.url })
+  }
+  favoritesCache = favorites
+  await chrome.storage.sync.set({ favorites })
+  showToast(index >= 0 ? 'Removed from Favorites' : 'Added to Favorites')
+}
+
+function favToItem(f: FavoriteEntry): RemoteItem {
+  if (f.kind === 'command') {
+    return { kind: 'command', label: f.label, detail: '', commandId: f.commandId, icon: f.icon, color: f.color }
+  }
+  if (f.kind === 'folder') return { kind: 'folder', label: f.label, detail: '', id: f.id }
+  return { kind: 'bookmark', label: f.label, detail: '', url: f.url }
+}
+
+function favTileEl(f: FavoriteEntry): HTMLElement {
+  const el = document.createElement('div')
+  el.className = 'fav-item'
+  el.title = f.label
+  const tile = document.createElement('div')
+  tile.className = 'fav-tile'
+  if (f.kind === 'command') {
+    if (f.color) tile.style.background = f.color
+    tile.innerHTML = (f.icon && CMD_ICONS[f.icon]) || COMMAND_SVG
+  } else if (f.kind === 'folder') {
+    tile.classList.add('kind-folder')
+    tile.innerHTML = FOLDER_SVG
+  } else if (f.url) {
+    const img = document.createElement('img')
+    img.src =
+      chrome.runtime.getURL('/_favicon/') + `?pageUrl=${encodeURIComponent(f.url)}&size=32`
+    img.onerror = () => {
+      tile.innerHTML = BOOKMARK_SVG
+    }
+    tile.appendChild(img)
+  }
+  const cap = document.createElement('span')
+  cap.className = 'fav-cap'
+  cap.textContent = f.label
+  el.append(tile, cap)
+  el.addEventListener('mousedown', (e) => {
+    e.preventDefault()
+    void executeItem(favToItem(f), e.metaKey || e.ctrlKey)
+  })
+  return el
+}
+
+/** Move keyboard focus into (index ≥ 0) or out of (-1) the favorites bar. */
+function setFavIndex(index: number): void {
+  favIndex = index
+  paletteList
+    ?.querySelectorAll<HTMLElement>('.fav-item')
+    .forEach((el, i) => el.classList.toggle('selected', i === favIndex))
+  if (favIndex >= 0) {
+    if (selectorEl) selectorEl.style.opacity = '0'
+    paletteList
+      ?.querySelectorAll<HTMLElement>('.item')
+      .forEach((row) => row.classList.remove('selected'))
+  } else {
+    highlightSelection()
+  }
+}
+
 /* ---------- Actions panel (⌘K) ---------- */
 
 function actionsFor(item: RemoteItem): PaletteAction[] {
@@ -815,6 +1102,7 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'open-new-tab', label: 'Open in New Tab' },
         { id: 'copy-url', label: 'Copy URL' },
         { id: 'copy-md', label: 'Copy Markdown Link' },
+        ...favoriteActionFor(item),
         { id: 'rename', label: 'Rename…' },
         { id: 'move', label: 'Move to Folder…' },
         ...(browseStack.length && currentMode() === 'bookmarks'
@@ -836,6 +1124,7 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'open-new-tab', label: 'Open in New Tab' },
         { id: 'copy-url', label: 'Copy URL' },
         { id: 'copy-md', label: 'Copy Markdown Link' },
+        ...favoriteActionFor(item),
         { id: 'delete-history', label: 'Remove from History', danger: true },
       ]
     case 'tab': {
@@ -848,6 +1137,7 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
       actions.push(
         { id: 'copy-url', label: 'Copy URL' },
         { id: 'copy-md', label: 'Copy Markdown Link' },
+        ...favoriteActionFor(item),
         { id: 'close-tab', label: 'Close Tab', danger: true },
       )
       return actions
@@ -862,6 +1152,7 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
       return [
         { id: 'browse', label: 'Browse Folder' },
         { id: 'open-all', label: 'Open All in New Tabs' },
+        ...favoriteActionFor(item),
         { id: 'rename', label: 'Rename…' },
         ...(browseStack.length && currentMode() === 'bookmarks'
           ? [
@@ -885,7 +1176,7 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'copy-text', label: 'Copy Emoji' },
       ]
     default:
-      return [{ id: 'run', label: 'Run Command' }]
+      return [{ id: 'run', label: 'Run Command' }, ...favoriteActionFor(item)]
   }
 }
 
@@ -1031,6 +1322,10 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
       break
     case 'close-tab':
       await chrome.runtime.sendMessage({ type: 'close-tab-id', tabId: item.tabId })
+      break
+    case 'favorite-add':
+    case 'favorite-remove':
+      await toggleFavorite(item)
       break
   }
   closeActions()
@@ -1237,6 +1532,7 @@ async function updateList(): Promise<void> {
   if (!paletteInput || !paletteList) return
   const token = ++queryToken
   renderFooter()
+  updateModeStyling()
 
   if (uiState === 'rename') return
 
@@ -1269,7 +1565,7 @@ async function updateList(): Promise<void> {
   }
 
   const mode = currentMode()
-  const query = paletteInput.value.replace(/^[>@#:~]/, '')
+  const query = paletteInput.value
   const browsing = mode === 'bookmarks' && browseStack.length > 0
   const folderId = browsing ? browseStack[browseStack.length - 1].id : undefined
   const response = (await chrome.runtime.sendMessage({
@@ -1286,7 +1582,11 @@ async function updateList(): Promise<void> {
   const groupLabel = browsing
     ? browseStack[browseStack.length - 1].label
     : (GROUP_LABELS[mode] ?? 'Results')
-  renderItems(groupLabel, response?.items ?? [])
+  // Favorites bar rides above Suggested on the home view only.
+  const showFavorites = mode === 'bookmarks' && !browsing && !query.trim()
+  const favorites = showFavorites ? await loadFavorites() : []
+  if (token !== queryToken || uiState !== 'list' || !paletteList) return
+  renderItems(groupLabel, response?.items ?? [], favorites)
 }
 
 function renderEmojiGrid(items: RemoteItem[]): void {
@@ -1295,6 +1595,8 @@ function renderEmojiGrid(items: RemoteItem[]): void {
   selectorEl = null
   flatItems = items
   selectedIndex = 0
+  favBarItems = []
+  favIndex = -1
   if (!items.length) {
     const empty = document.createElement('div')
     empty.className = 'empty'
@@ -1334,7 +1636,7 @@ function renderEmojiGrid(items: RemoteItem[]): void {
   highlightSelection(true)
 }
 
-function renderItems(groupLabel: string, items: RemoteItem[]): void {
+function renderItems(groupLabel: string, items: RemoteItem[], favorites?: FavoriteEntry[]): void {
   if (!paletteList) return
   paletteList.textContent = ''
   selectorEl = document.createElement('div')
@@ -1342,6 +1644,15 @@ function renderItems(groupLabel: string, items: RemoteItem[]): void {
   paletteList.appendChild(selectorEl)
   flatItems = items
   selectedIndex = 0
+  favBarItems = favorites ?? []
+  favIndex = -1
+
+  if (favBarItems.length) {
+    const bar = document.createElement('div')
+    bar.className = 'fav-bar'
+    for (const f of favBarItems) bar.appendChild(favTileEl(f))
+    paletteList.appendChild(bar)
+  }
 
   if (!items.length) {
     const empty = document.createElement('div')
@@ -1467,6 +1778,36 @@ function iconFor(item: RemoteItem): HTMLElement {
   }
   icon.innerHTML = kind === 'folder' ? FOLDER_SVG : kind === 'history' ? CLOCK_SVG : COMMAND_SVG
   return icon
+}
+
+/** Mirror of lib.ts tileGradient — this file can't import (classic content script). */
+function tileGradient(color: string): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(color.trim())
+  if (!m) return color
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16) / 255)
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const d = max - min
+  if (d === 0) return color
+  const l = (max + min) / 2
+  const s = d / (1 - Math.abs(2 * l - 1))
+  let h = 0
+  if (max === r) h = ((g - b) / d + 6) % 6
+  else if (max === g) h = (b - r) / d + 2
+  else h = (r - g) / d + 4
+  h *= 60
+  const hex = (hue: number) => {
+    const f = (n: number) => {
+      const k = (n + hue / 30) % 12
+      const c = l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1))
+      return Math.round(c * 255)
+        .toString(16)
+        .padStart(2, '0')
+    }
+    return `#${f(0)}${f(8)}${f(4)}`
+  }
+  const stop = (dh: number) => hex((h + dh + 360) % 360)
+  return `linear-gradient(135deg, ${stop(-20)}, ${stop(20)})`
 }
 
 function shortUrl(url: string): string {

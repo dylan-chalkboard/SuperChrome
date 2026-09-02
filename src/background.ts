@@ -8,7 +8,9 @@ import {
   frecency,
   hostOf,
   rank,
+  tileGradient,
   tryCalculate,
+  urlFromQuery,
 } from './lib'
 import type { UsageMap } from './lib'
 
@@ -135,6 +137,8 @@ const PALETTE_COMMANDS = [
   { id: 'pick-color', label: 'Pick Color' },
   { id: 'copy-page-url', label: 'Copy Page URL' },
   { id: 'copy-page-md', label: 'Copy Page as Markdown Link' },
+  { id: 'go-back', label: 'Go Back' },
+  { id: 'go-forward', label: 'Go Forward' },
   { id: 'new-tab', label: 'New Tab' },
   { id: 'duplicate-tab', label: 'Duplicate Tab' },
   { id: 'toggle-pin', label: 'Pin/Unpin Tab' },
@@ -188,6 +192,8 @@ const COMMAND_META: Record<string, { icon: string; color: string }> = {
   'pick-color': { icon: 'paint', color: '#e57fb3' },
   'copy-page-url': { icon: 'link', color: '#4caf7d' },
   'copy-page-md': { icon: 'link', color: '#4caf7d' },
+  'go-back': { icon: 'arrow-left', color: '#4c9df3' },
+  'go-forward': { icon: 'arrow-right', color: '#4c9df3' },
   'new-tab': { icon: 'tab', color: '#4c9df3' },
   'duplicate-tab': { icon: 'tab', color: '#4c9df3' },
   'toggle-pin': { icon: 'pin', color: '#4c9df3' },
@@ -289,7 +295,7 @@ function commandEntries(): Array<{
       detail: '',
       commandId: c.id,
       icon: COMMAND_META[c.id]?.icon,
-      color: COMMAND_META[c.id]?.color || undefined,
+      color: COMMAND_META[c.id]?.color ? tileGradient(COMMAND_META[c.id].color) : undefined,
     },
     text: c.label.toLowerCase(),
     usageKey: `command:${c.id}`,
@@ -388,7 +394,7 @@ async function queryPalette(
               downloadId: d.id,
               text: d.filename,
               icon: type.icon,
-              color: type.color,
+              color: tileGradient(type.color),
             },
             text: basename(d.filename).toLowerCase(),
             usageKey: `download:${d.id}`,
@@ -557,8 +563,20 @@ async function queryPalette(
     ]
   }
 
+  // History rides along in the ranked list; bookmarked URLs win the dedup.
+  const bookmarkUrls = new Set(flat.map((b) => b.url))
+  const historyEntries = (
+    await chrome.history.search({ text: rawQuery.trim(), maxResults: 30, startTime: 0 })
+  )
+    .filter((r) => r.url && !bookmarkUrls.has(r.url))
+    .map((r) => ({
+      item: { kind: 'history' as const, label: r.title || r.url!, detail: '', url: r.url },
+      text: `${r.title ?? ''} ${r.url}`.toLowerCase(),
+      usageKey: `history:${r.url}`,
+    }))
+
   const results = rank<PaletteItem>(
-    [...bookmarkEntries, ...folderEntries, ...commands],
+    [...bookmarkEntries, ...folderEntries, ...commands, ...historyEntries],
     query,
     usage,
     decay,
@@ -573,6 +591,19 @@ async function queryPalette(
       group: 'Calculator',
     })
   }
+  // Address-bar behavior: a URL-shaped query gets a direct "Open" row on top.
+  const directUrl = urlFromQuery(rawQuery)
+  if (directUrl) {
+    results.unshift({
+      kind: 'search',
+      label: `Open ${rawQuery.trim()}`,
+      detail: '',
+      url: directUrl,
+      icon: 'globe',
+      color: tileGradient('#4c9df3'),
+      group: 'Navigate',
+    })
+  }
   // No query ever dead-ends: web search rides at the bottom of every result
   // set, and is the only row when nothing matches.
   const trimmed = rawQuery.trim()
@@ -582,7 +613,7 @@ async function queryPalette(
     detail: '',
     url: `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`,
     icon: 'search',
-    color: '#4c9df3',
+    color: tileGradient('#4c9df3'),
     group: 'Search',
   })
   return results
@@ -764,6 +795,12 @@ async function runCommand(
   switch (id) {
     case 'new-tab':
       await chrome.tabs.create({})
+      break
+    case 'go-back':
+      if (tab?.id) await chrome.tabs.goBack(tab.id).catch(() => {})
+      break
+    case 'go-forward':
+      if (tab?.id) await chrome.tabs.goForward(tab.id).catch(() => {})
       break
     case 'close-tab':
       if (tab?.id) await chrome.tabs.remove(tab.id)

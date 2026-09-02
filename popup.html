@@ -32,9 +32,43 @@
         color: #ccccccdd;
       }
       .input-row {
-        display: flex; align-items: center;
+        display: flex; align-items: center; position: relative;
         border-bottom: 1px solid #ffffff10;
+        transition: border-bottom-color 0.25s;
       }
+      .input-row > * { position: relative; }
+      .input-row::before {
+        content: ''; position: absolute; inset: 0; pointer-events: none;
+        background: linear-gradient(180deg, var(--mode-tint, transparent), transparent);
+        opacity: 0; transition: opacity 0.25s;
+      }
+      .input-row[class*=" mode-"]::before { opacity: 1; }
+      .input-row.mode-commands { --mode-tint: rgba(76, 157, 243, 0.22); border-bottom-color: rgba(76, 157, 243, 0.35); }
+      .input-row.mode-tabs { --mode-tint: rgba(58, 181, 198, 0.22); border-bottom-color: rgba(58, 181, 198, 0.35); }
+      .input-row.mode-history { --mode-tint: rgba(154, 110, 232, 0.22); border-bottom-color: rgba(154, 110, 232, 0.35); }
+      .input-row.mode-emoji { --mode-tint: rgba(76, 175, 125, 0.22); border-bottom-color: rgba(76, 175, 125, 0.35); }
+      .input-row.mode-downloads { --mode-tint: rgba(154, 110, 232, 0.22); border-bottom-color: rgba(154, 110, 232, 0.35); }
+      @keyframes glyph-in {
+        from { opacity: 0; transform: translateX(-4px); }
+        to { opacity: 1; transform: none; }
+      }
+      .mode-glyph {
+        display: none; padding-left: 14px;
+        font-size: 15px; font-weight: 700; line-height: 1;
+      }
+      [class*=" mode-"] > .mode-glyph { display: block; animation: glyph-in 0.18s ease-out; }
+      .mode-commands .mode-glyph { color: #4c9df3; }
+      .mode-tabs .mode-glyph { color: #3ab5c6; }
+      .mode-history .mode-glyph { color: #9a6ee8; }
+      .mode-emoji .mode-glyph { color: #4caf7d; }
+      .mode-downloads .mode-glyph { color: #9a6ee8; }
+      .mode-commands .input, .mode-tabs .input, .mode-history .input,
+      .mode-emoji .input, .mode-downloads .input { padding-left: 6px; }
+      .kbd.chip-commands.active { background: linear-gradient(135deg, #4cd5f3, #4c65f3); color: #ffffff; }
+      .kbd.chip-tabs.active { background: linear-gradient(135deg, #3ac6a8, #3a86c6); color: #ffffff; }
+      .kbd.chip-history.active { background: linear-gradient(135deg, #716ee8, #c36ee8); color: #ffffff; }
+      .kbd.chip-emoji.active { background: linear-gradient(135deg, #4caf5c, #4caf9e); color: #ffffff; }
+      .kbd.chip-downloads.active { background: linear-gradient(135deg, #716ee8, #c36ee8); color: #ffffff; }
       .input {
         flex: 1; min-width: 0;
         background: transparent; border: none; outline: none;
@@ -93,15 +127,33 @@
       }
       .item .icon img { width: 18px; height: 18px; border-radius: 4px; }
       .item .icon.plain { background: transparent; }
-      .item .icon.kind-command { background: var(--sc-command, #4c9df3); color: #ffffff; }
-      .item .icon.kind-folder { background: var(--sc-folder, #e0a63c); color: #ffffff; }
-      .item .icon.kind-history { background: var(--sc-history, #9a6ee8); color: #ffffff; }
-      .item .icon.kind-bookmark, .item .icon.kind-tab, .item .icon.kind-closed {
-        background: var(--sc-fallback, #e05d5d); color: #ffffff;
+      .fav-bar { display: flex; gap: 6px; padding: 10px 12px 4px; overflow: hidden; }
+      .fav-item {
+        display: flex; flex-direction: column; align-items: center; gap: 4px;
+        width: 56px; flex: none;
       }
-      .item .icon.kind-download { background: #3aa99f; color: #ffffff; }
+      .fav-tile {
+        width: 40px; height: 40px; border-radius: 10px;
+        background: #ffffff10; color: #ffffff;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .fav-tile.kind-folder { background: var(--sc-folder, linear-gradient(135deg, #e06f3c, #e0dd3c)); }
+      .fav-item:hover .fav-tile, .fav-item.selected .fav-tile { outline: 2px solid rgba(255, 255, 255, 0.35); }
+      .fav-tile img { width: 24px; height: 24px; border-radius: 5px; }
+      .fav-tile svg { width: 20px; height: 20px; }
+      .fav-cap {
+        max-width: 54px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        font-size: 9px; color: #ffffff59;
+      }
+      .item .icon.kind-command { background: var(--sc-command, linear-gradient(135deg, #4cd5f3, #4c65f3)); color: #ffffff; }
+      .item .icon.kind-folder { background: var(--sc-folder, linear-gradient(135deg, #e06f3c, #e0dd3c)); color: #ffffff; }
+      .item .icon.kind-history { background: var(--sc-history, linear-gradient(135deg, #716ee8, #c36ee8)); color: #ffffff; }
+      .item .icon.kind-bookmark, .item .icon.kind-tab, .item .icon.kind-closed {
+        background: var(--sc-fallback, linear-gradient(135deg, #e05d89, #e0895d)); color: #ffffff;
+      }
+      .item .icon.kind-download { background: linear-gradient(135deg, #3aa97a, #3a8ea9); color: #ffffff; }
       .group-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-      .item .icon.kind-calc { background: #4caf7d; color: #ffffff; font-weight: 700; font-size: 14px; }
+      .item .icon.kind-calc { background: linear-gradient(135deg, #4caf5c, #4caf9e); color: #ffffff; font-weight: 700; font-size: 14px; }
       .item .icon.emoji-glyph { font-size: 17px; }
       .item .title {
         overflow: hidden; text-overflow: ellipsis;
@@ -147,8 +199,8 @@
   <body>
     <div class="panel">
     <div class="input-row">
-      <input id="input" class="input" autofocus placeholder="Search bookmarks and commands…" spellcheck="false" autocomplete="off" />
-      <div class="hint"><span class="kbd">&gt; Commands</span><span class="kbd">@ Tabs</span><span class="kbd"># History</span><span class="kbd">: Emoji</span><span class="kbd">~ Files</span><button id="gear" title="SuperChrome Settings"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="currentColor"/><path d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2" stroke="currentColor" stroke-linecap="round"/></svg></button></div>
+      <span class="mode-glyph" id="modeGlyph"></span><input id="input" class="input" autofocus placeholder="Search bookmarks and commands…" spellcheck="false" autocomplete="off" />
+      <div class="hint"><span class="kbd chip-commands">&gt; Commands</span><span class="kbd chip-tabs">@ Tabs</span><span class="kbd chip-history"># History</span><span class="kbd chip-emoji">: Emoji</span><span class="kbd chip-downloads">~ Files</span><button id="gear" title="SuperChrome Settings"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="currentColor"/><path d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2" stroke="currentColor" stroke-linecap="round"/></svg></button></div>
     </div>
     <div id="list" class="list"></div>
     </div>

@@ -9,7 +9,9 @@ import {
   fuzzyMatch,
   hostOf,
   rank,
+  tileGradient,
   tryCalculate,
+  urlFromQuery,
 } from './lib'
 import type { BookmarkNodeLike, UsageMap } from './lib'
 
@@ -163,6 +165,47 @@ describe('ago', () => {
     expect(ago(NOW - 5 * 60_000)).toBe('5m ago')
     expect(ago(NOW - 3 * 3_600_000)).toBe('3h ago')
     expect(ago(NOW - 2 * DAY)).toBe('2d ago')
+  })
+})
+
+describe('urlFromQuery', () => {
+  it('turns bare domains into https URLs', () => {
+    expect(urlFromQuery('google.com')).toBe('https://google.com')
+    expect(urlFromQuery('amazon.com')).toBe('https://amazon.com')
+    expect(urlFromQuery(' news.ycombinator.com ')).toBe('https://news.ycombinator.com')
+  })
+  it('keeps explicit schemes, ports, and paths', () => {
+    expect(urlFromQuery('http://example.com/a?b=1')).toBe('http://example.com/a?b=1')
+    expect(urlFromQuery('github.com/dylan/repo')).toBe('https://github.com/dylan/repo')
+    expect(urlFromQuery('example.com:8080/health')).toBe('https://example.com:8080/health')
+  })
+  it('uses http for localhost', () => {
+    expect(urlFromQuery('localhost:3000')).toBe('http://localhost:3000')
+    expect(urlFromQuery('localhost')).toBe('http://localhost')
+  })
+  it('rejects search phrases', () => {
+    expect(urlFromQuery('best pizza near me')).toBeNull()
+    expect(urlFromQuery('google')).toBeNull()
+    expect(urlFromQuery('what is amazon.com')).toBeNull()
+    expect(urlFromQuery('')).toBeNull()
+  })
+})
+
+describe('tileGradient', () => {
+  it('turns a color into a two-stop hue-shifted gradient', () => {
+    expect(tileGradient('#4c9df3')).toBe('linear-gradient(135deg, #4cd5f3, #4c65f3)')
+  })
+  it('keeps lightness so both stops stay in the same brightness range', () => {
+    const stops = tileGradient('#e0a63c').match(/#[0-9a-f]{6}/g)!
+    expect(stops).toHaveLength(2)
+    expect(stops[0]).not.toBe(stops[1])
+  })
+  it('passes grays through unchanged (no hue to shift)', () => {
+    expect(tileGradient('#888888')).toBe('#888888')
+  })
+  it('passes unparseable values through unchanged', () => {
+    expect(tileGradient('red')).toBe('red')
+    expect(tileGradient('linear-gradient(#000, #fff)')).toBe('linear-gradient(#000, #fff)')
   })
 })
 
