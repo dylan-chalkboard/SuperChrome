@@ -36,7 +36,6 @@ const el = <T extends HTMLElement>(id: string): T => document.getElementById(id)
 const opacity = el<HTMLInputElement>('opacity')
 const opacityValue = el<HTMLSpanElement>('opacity-value')
 const colorCommand = el<HTMLInputElement>('color-command')
-const colorFolder = el<HTMLInputElement>('color-folder')
 const colorHistory = el<HTMLInputElement>('color-history')
 const colorFallback = el<HTMLInputElement>('color-fallback')
 const defaultMode = el<HTMLSelectElement>('default-mode')
@@ -52,7 +51,6 @@ function populate(s: UserSettings): void {
   opacity.value = String(s.glassOpacity)
   opacityValue.textContent = `${Math.round(s.glassOpacity * 100)}%`
   colorCommand.value = s.iconColors.command
-  colorFolder.value = s.iconColors.folder
   colorHistory.value = s.iconColors.history
   colorFallback.value = s.iconColors.fallback
   defaultMode.value = s.defaultMode
@@ -75,9 +73,11 @@ function cleanHost(line: string): string {
 function collect(): UserSettings {
   return {
     glassOpacity: Math.min(1, Math.max(0.4, Number(opacity.value) || DEFAULTS.glassOpacity)),
+    // Folder tiles no longer take a color (filled blue folder icon instead);
+    // the stored key stays for settings-shape compatibility.
     iconColors: {
       command: colorCommand.value,
-      folder: colorFolder.value,
+      folder: DEFAULTS.iconColors.folder,
       history: colorHistory.value,
       fallback: colorFallback.value,
     },
@@ -107,7 +107,7 @@ function save(): void {
   }, 200)
 }
 
-for (const input of [opacity, colorCommand, colorFolder, colorHistory, colorFallback, defaultMode, newTab, reduceMotion, decay, sites, quicklinks, snippets]) {
+for (const input of [opacity, colorCommand, colorHistory, colorFallback, defaultMode, newTab, reduceMotion, decay, sites, quicklinks, snippets]) {
   input.addEventListener('input', save)
   input.addEventListener('change', save)
 }
