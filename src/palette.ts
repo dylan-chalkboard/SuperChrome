@@ -16,6 +16,7 @@ import { parseSnippets, serializeSnippets } from './features/snippets'
 import {
   favToItem,
   favoriteActionFor,
+  isFavorite,
   loadFavorites,
   toggleFavorite,
 } from './ui/shared/favorites'
