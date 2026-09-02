@@ -37,7 +37,7 @@ Open with `Cmd+P` or the toolbar icon (type `>` for commands):
 - **Quicklinks** — keyword searches like `yt lofi beats` or `gh superchrome` (defaults: g, yt, gh, w, maps; add your own in Settings)
 - **Inline calculator** — type math (`142*12`, `18% of 240`, `2^10`) or conversions (`5km in miles`, `72f in c`, `3h in min`) and the result appears as the first row; Enter copies it
 - **URL navigation** — type an address (`google.com`, `localhost:3000`) and an "Open" row appears on top, address-bar style
-- **Mode colors** — prefix modes tint the header and render the typed prefix as a colored glyph (commands blue, tabs rose, history purple, downloads teal, emoji green, snippets orange, bookmarks gold)
+- **Mode colors** — prefix modes tint the header and render the typed prefix as a colored glyph (commands blue, tabs rose, history purple, downloads teal, emoji green, snippets orange, bookmarks red)
 - `Cmd+K` → **actions panel** for the selected item: open in new tab, copy URL, rename, move to folder, add to favorites, delete bookmark, remove from history, close tab
 - **Favorites bar** — Cmd+K → "Add to Favorites" pins bookmarks, pages, or commands as icon tiles above Suggested on the home view (synced across devices)
 - `Esc` or click outside to dismiss

@@ -96,7 +96,7 @@ const PALETTE_CSS = `
 .input-row.mode-emoji { --mode-tint: rgba(76, 175, 125, 0.22); border-bottom-color: rgba(76, 175, 125, 0.35); }
 .input-row.mode-downloads { --mode-tint: rgba(58, 169, 159, 0.22); border-bottom-color: rgba(58, 169, 159, 0.35); }
 .input-row.mode-snippets { --mode-tint: rgba(232, 150, 74, 0.22); border-bottom-color: rgba(232, 150, 74, 0.35); }
-.input-row.mode-library { --mode-tint: rgba(232, 195, 65, 0.22); border-bottom-color: rgba(232, 195, 65, 0.35); }
+.input-row.mode-library { --mode-tint: rgba(224, 93, 93, 0.22); border-bottom-color: rgba(224, 93, 93, 0.35); }
 @keyframes menu-in {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: none; }
@@ -126,7 +126,7 @@ const PALETTE_CSS = `
 .mode-emoji .mode-glyph { color: #4caf7d; }
 .mode-downloads .mode-glyph { color: #3aa99f; }
 .mode-snippets .mode-glyph { color: #e8964a; }
-.mode-library .mode-glyph { color: #e8c341; }
+.mode-library .mode-glyph { color: #e05d5d; }
 .mode-commands .input, .mode-tabs .input, .mode-history .input,
 .mode-emoji .input, .mode-downloads .input, .mode-snippets .input,
 .mode-library .input { padding-left: 7px; }
@@ -157,7 +157,7 @@ const PALETTE_CSS = `
 .chip-emoji .pfx { color: #4caf7d; }
 .chip-downloads .pfx { color: #3aa99f; }
 .chip-snippets .pfx { color: #e8964a; }
-.chip-library .pfx { color: #e8c341; }
+.chip-library .pfx { color: #e05d5d; }
 .kbd.active .pfx { color: inherit; }
 .input-row[class*=" mode-"] .hint .kbd:not(.active),
 .input-row.typing .hint .kbd:not(.active) {
@@ -169,7 +169,7 @@ const PALETTE_CSS = `
 .kbd.chip-emoji.active { background: #4caf7d; color: #ffffff; }
 .kbd.chip-downloads.active { background: #3aa99f; color: #ffffff; }
 .kbd.chip-snippets.active { background: #e8964a; color: #ffffff; }
-.kbd.chip-library.active { background: #e8c341; color: #3c3000; }
+.kbd.chip-library.active { background: #e05d5d; color: #ffffff; }
 .list { height: 55vh; overflow-y: auto; padding: 8px; position: relative; }
 .selector {
   position: absolute; left: 8px; right: 8px; top: 0; height: 40px;

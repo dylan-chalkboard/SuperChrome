@@ -32,12 +32,12 @@ export const LIBRARY_CSS = `
 .lib-pill {
   display: flex; align-items: center; gap: 6px; flex: none; cursor: pointer;
   padding: 3px 9px; border-radius: 999px;
-  background: rgba(232, 195, 65, 0.16); color: #e8c341;
+  background: rgba(224, 93, 93, 0.16); color: #e97070;
   font-size: 11.5px; font-weight: 600;
 }
-.lib-pill:hover { background: rgba(232, 195, 65, 0.28); }
+.lib-pill:hover { background: rgba(224, 93, 93, 0.28); }
 .lib-badge {
-  background: #e8c341; color: #3c3000; border-radius: 999px;
+  background: #e05d5d; color: #ffffff; border-radius: 999px;
   padding: 0 5px; font-size: 10px; font-weight: 700; line-height: 15px;
 }
 .lib-new {
@@ -52,7 +52,7 @@ export const LIBRARY_CSS = `
   background: #ffffff10; border: 1px solid #ffffff20; border-radius: 8px;
   color: #e8e8e8; font: inherit; font-size: 14px; padding: 8px 10px; outline: none;
 }
-.lib-input:focus { border-color: rgba(232, 195, 65, 0.45); }
+.lib-input:focus { border-color: rgba(224, 93, 93, 0.45); }
 .lib-input::placeholder { color: #ffffff40; }
 .lib-saved-title {
   font-size: 15px; font-weight: 600; color: #f2f2f2;
@@ -70,7 +70,7 @@ export const LIBRARY_CSS = `
   padding: 36px 26px 30px; display: flex; flex-direction: column;
   align-items: center; gap: 8px; text-align: center;
 }
-.lib-triage-count { font-size: 11px; font-weight: 700; color: #e8c341; letter-spacing: 0.4px; }
+.lib-triage-count { font-size: 11px; font-weight: 700; color: #e05d5d; letter-spacing: 0.4px; }
 .lib-triage-title {
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-size: 19px; font-weight: 600; color: #f2f2f2;
@@ -92,21 +92,21 @@ export const LIBRARY_CSS = `
 .light .lib-seg.current { color: #1c1c1e; }
 .light .lib-seg.current:hover { background: transparent; }
 .light .lib-sep { color: #00000030; }
-.light .lib-pill { background: rgba(178, 140, 16, 0.14); color: #8a6d00; }
-.light .lib-pill:hover { background: rgba(178, 140, 16, 0.24); }
-.light .lib-badge { background: #c79f13; color: #ffffff; }
+.light .lib-pill { background: rgba(200, 54, 44, 0.12); color: #b33a31; }
+.light .lib-pill:hover { background: rgba(200, 54, 44, 0.22); }
+.light .lib-badge { background: #c8362c; color: #ffffff; }
 .light .lib-new { background: #00000010; color: #00000080; }
 .light .lib-new:hover { background: #0000001c; color: #1c1c1e; }
 .light .lib-panel-title { color: #00000073; }
 .light .lib-label { color: #00000045; }
 .light .lib-input { background: #00000008; border-color: #00000020; color: #26262b; }
-.light .lib-input:focus { border-color: rgba(178, 140, 16, 0.5); }
+.light .lib-input:focus { border-color: rgba(200, 54, 44, 0.45); }
 .light .lib-input::placeholder { color: #00000040; }
 .light .lib-saved-title { color: #1c1c1e; }
 .light .lib-pick-row { color: #303036; }
 .light .lib-pick-row.selected { background: rgba(0, 0, 0, 0.08); }
 .light .lib-pick-row.danger { color: #d03d3d; }
-.light .lib-triage-count { color: #8a6d00; }
+.light .lib-triage-count { color: #b33a31; }
 .light .lib-triage-title { color: #1c1c1e; }
 .light .lib-triage-url { color: #00000059; }
 .light .lib-triage-age { color: #00000045; }
