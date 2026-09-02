@@ -25,6 +25,7 @@ import {
   resetLibrary,
 } from './features/bookmarks/view'
 import { tileGradient } from './features/gradients'
+import { GROUP_COLORS } from './features/tabs/search'
 import { cleanHost } from './features/navigation'
 import { parseQuicklinks, serializeQuicklinks } from './features/quicklinks'
 import { parseSnippets, serializeSnippets } from './features/snippets'
@@ -1269,7 +1270,14 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'add-to-group', label: 'Add to Group…' },
         { id: 'new-group', label: 'New Group from Tab' },
       ]
-      if (item.grouped) actions.push({ id: 'ungroup', label: 'Remove from Group' })
+      if (item.grouped) {
+        actions.push(
+          { id: 'ungroup', label: 'Remove from Group' },
+          { id: 'group-rename', label: 'Rename Group…' },
+          { id: 'group-color', label: 'Group Color…' },
+          { id: 'group-dissolve', label: 'Ungroup All' },
+        )
+      }
       actions.push(
         { id: 'copy-url', label: 'Copy URL' },
         { id: 'copy-md', label: 'Copy Markdown Link' },
@@ -1351,6 +1359,9 @@ const ACTION_ICONS: Record<string, string> = {
   'move-up': ARROW_UP_SVG,
   'move-down': ARROW_DOWN_SVG,
   'folder-color': CMD_ICONS.paint,
+  'group-rename': PENCIL_SVG,
+  'group-color': CMD_ICONS.paint,
+  'group-dissolve': CMD_ICONS.group,
   'add-to-group': CMD_ICONS.group,
   'new-group': CMD_ICONS.group,
   ungroup: CMD_ICONS.group,
@@ -1470,7 +1481,59 @@ function openColorPicker(item: RemoteItem): void {
   renderFooter()
 }
 
+/** Swatch submenu for a tab group's color (Chrome's nine group colors). */
+function openTabGroupColorPicker(item: RemoteItem): void {
+  if (!panelEl) return
+  actionTarget = item
+  currentActions = Object.keys(GROUP_COLORS).map((name) => ({
+    id: `tab-group-color:${name}`,
+    label: name[0].toUpperCase() + name.slice(1),
+  }))
+  actionIndex = 0
+  uiState = 'actions'
+  actionsEl?.remove()
+  actionsEl = document.createElement('div')
+  actionsEl.className = 'actions'
+  currentActions.forEach((action, index) => {
+    const row = document.createElement('div')
+    row.className = 'action-row'
+    const name = action.id.slice('tab-group-color:'.length)
+    const dot = document.createElement('span')
+    dot.className = 'menu-icon'
+    dot.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="${GROUP_COLORS[name]}"/></svg>`
+    const label = document.createElement('span')
+    label.textContent = action.label
+    const spacer = document.createElement('span')
+    spacer.className = 'spacer'
+    row.append(dot, label, spacer)
+    if (index < 9) row.appendChild(kbd(String(index + 1)))
+    row.addEventListener('mousedown', (e) => {
+      e.preventDefault()
+      void runAction(action, item)
+    })
+    row.addEventListener('mousemove', () => {
+      if (actionIndex !== index) {
+        actionIndex = index
+        highlightActions()
+      }
+    })
+    actionsEl!.appendChild(row)
+  })
+  panelEl.appendChild(actionsEl)
+  highlightActions()
+  renderFooter()
+}
+
 async function runAction(action: PaletteAction, item: RemoteItem): Promise<void> {
+  if (action.id.startsWith('tab-group-color:')) {
+    const color = action.id.slice('tab-group-color:'.length)
+    if (item.groupId !== undefined) {
+      await chrome.runtime.sendMessage({ type: 'tab-group-update', groupId: item.groupId, color })
+    }
+    closeActions()
+    void updateList()
+    return
+  }
   if (action.id.startsWith('folder-color:')) {
     const name = action.id.slice('folder-color:'.length)
     if (item.id) await setFolderColor(item.id, name === 'none' ? null : name)
@@ -1573,6 +1636,19 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
       closeActions()
       openColorPicker(item)
       return
+    case 'group-rename':
+      closeActions()
+      enterGroupRename(item)
+      return
+    case 'group-color':
+      closeActions()
+      openTabGroupColorPicker(item)
+      return
+    case 'group-dissolve':
+      if (item.groupId !== undefined) {
+        await chrome.runtime.sendMessage({ type: 'tab-group-dissolve', groupId: item.groupId })
+      }
+      break
     case 'favorite-add':
     case 'favorite-remove': {
       const toast = await toggleFavorite(item)
@@ -1694,10 +1770,37 @@ function enterRename(item: RemoteItem): void {
 
 async function commitRename(): Promise<void> {
   const title = paletteInput?.value.trim()
-  if (subStateTarget?.id && title) {
-    await chrome.runtime.sendMessage({ type: 'bookmark-rename', id: subStateTarget.id, title })
+  if (subStateTarget && title) {
+    if (subStateTarget.kind === 'tab' && subStateTarget.groupId !== undefined) {
+      await chrome.runtime.sendMessage({
+        type: 'tab-group-update',
+        groupId: subStateTarget.groupId,
+        title,
+      })
+    } else if (subStateTarget.id) {
+      await chrome.runtime.sendMessage({ type: 'bookmark-rename', id: subStateTarget.id, title })
+    }
   }
   exitSubState(true)
+}
+
+/** Rename the selected tab's group (same sub-state as bookmark rename). */
+function enterGroupRename(item: RemoteItem): void {
+  if (!paletteInput || !paletteList) return
+  uiState = 'rename'
+  subStateTarget = item
+  savedQuery = paletteInput.value
+  paletteInput.value = item.groupTitle ?? ''
+  paletteInput.placeholder = 'New group name…'
+  paletteInput.focus()
+  paletteInput.select()
+  paletteList.textContent = ''
+  flatItems = []
+  const hint = document.createElement('div')
+  hint.className = 'empty'
+  hint.textContent = `Renaming group "${item.groupTitle || 'Untitled'}" — ↵ to save, esc to cancel`
+  paletteList.appendChild(hint)
+  renderFooter()
 }
 
 async function enterMove(item: RemoteItem): Promise<void> {

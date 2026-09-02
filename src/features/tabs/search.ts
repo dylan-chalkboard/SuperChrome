@@ -44,6 +44,8 @@ export async function searchTabs(
       group: section,
       groupColor: tabGroup ? GROUP_COLORS[tabGroup.color] : undefined,
       grouped: !!tabGroup,
+      groupId: tabGroup?.id,
+      groupTitle: tabGroup?.title,
       typeText: t.active && t.windowId === currentWindowId ? 'Active' : undefined,
     }
   }

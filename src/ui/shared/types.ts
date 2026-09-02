@@ -13,6 +13,9 @@ export interface RemoteItem {
   color?: string
   groupColor?: string
   grouped?: boolean
+  /** Chrome tab-group id + title, present on grouped tab rows. */
+  groupId?: number
+  groupTitle?: string
   downloadId?: number
   group?: string
   positions?: number[]

@@ -15,6 +15,9 @@ export interface PaletteItem {
   color?: string
   groupColor?: string
   grouped?: boolean
+  /** Chrome tab-group id + title, present on grouped tab rows. */
+  groupId?: number
+  groupTitle?: string
   /** Right-column override ("Active", "3 items", "2d ago"); kind label otherwise. */
   typeText?: string
   downloadId?: number

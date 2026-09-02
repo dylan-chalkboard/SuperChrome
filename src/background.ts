@@ -216,6 +216,7 @@ interface Message {
   groupId?: number
   downloadId?: number
   delta?: number
+  color?: string
   srcTabId?: number
 }
 
@@ -369,6 +370,21 @@ async function handleMessage(
         })
       }
       return {}
+    case 'tab-group-update':
+      if (message.groupId !== undefined) {
+        await chrome.tabGroups.update(message.groupId, {
+          ...(message.title !== undefined ? { title: message.title } : {}),
+          ...(message.color ? { color: message.color as chrome.tabGroups.ColorEnum } : {}),
+        })
+      }
+      return {}
+    case 'tab-group-dissolve': {
+      if (message.groupId === undefined) return {}
+      const grouped = await chrome.tabs.query({ groupId: message.groupId })
+      const ids = grouped.map((t) => t.id).filter((x): x is number => x !== undefined)
+      if (ids.length) await chrome.tabs.ungroup(ids)
+      return {}
+    }
     case 'tab-ungroup':
       if (message.tabId !== undefined) await chrome.tabs.ungroup([message.tabId])
       return {}
