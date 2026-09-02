@@ -123,13 +123,13 @@ export function resolveInbox(otherChildren: readonly LibraryNodeLike[]): Library
 
 /* ---------- Save-state decision ---------- */
 
-export type SaveDecision = { state: 'new' } | { state: 'saved'; match: LibraryNodeLike }
+export type SaveDecision<T> = { state: 'new' } | { state: 'saved'; match: T }
 
 /** New bookmark vs already-saved, given find-by-url results for the page. */
-export function decideSaveState(
+export function decideSaveState<T extends { url?: string }>(
   url: string,
-  matches: readonly LibraryNodeLike[],
-): SaveDecision {
+  matches: readonly T[],
+): SaveDecision<T> {
   const match = matches.find((m) => m.url === url)
   return match ? { state: 'saved', match } : { state: 'new' }
 }

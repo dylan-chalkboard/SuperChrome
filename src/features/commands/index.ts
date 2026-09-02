@@ -157,11 +157,8 @@ export async function runCommand(
     case 'toggle-pin':
       if (tab?.id) await chrome.tabs.update(tab.id, { pinned: !tab.pinned })
       break
-    case 'bookmark-tab':
-      if (tab?.url) {
-        await chrome.bookmarks.create({ parentId: '1', title: tab.title ?? tab.url, url: tab.url })
-      }
-      break
+    // 'bookmark-tab' never reaches here: the palette intercepts it and opens
+    // the library save flow instead of blind-creating at the bar root.
     case 'view-source':
       if (tab?.url) await chrome.tabs.create({ url: `view-source:${tab.url}` })
       break

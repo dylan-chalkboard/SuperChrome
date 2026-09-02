@@ -3,12 +3,25 @@
  * dist/palette.js must stay a self-contained IIFE — but the source can import
  * freely: a second build pass (vite.palette.config.ts) inlines everything.
  *
- * Modes: plain text = bookmarks, '>' = commands, '@' = open tabs, '#' = history.
+ * Modes: plain text = bookmarks, '>' = commands, '@' = open tabs, '#' = history,
+ * '!' = the bookmarks section (library view with save flow and Inbox triage).
  * Cmd+K opens a Raycast-style actions panel for the selected item.
  */
 
 import { getSettings } from './core/settings'
 import type { UserSettings } from './core/settings'
+import {
+  LIBRARY_CSS,
+  initLibrary,
+  libraryDepth,
+  libraryEnterFolder,
+  libraryKey,
+  libraryOwnsInput,
+  libraryUp,
+  openLibrarySave,
+  renderLibrary,
+  resetLibrary,
+} from './features/bookmarks/view'
 import { tileGradient } from './features/gradients'
 import { cleanHost } from './features/navigation'
 import { parseQuicklinks, serializeQuicklinks } from './features/quicklinks'
@@ -87,6 +100,7 @@ const PALETTE_CSS = `
 .input-row.mode-emoji { --mode-tint: rgba(76, 175, 125, 0.22); border-bottom-color: rgba(76, 175, 125, 0.35); }
 .input-row.mode-downloads { --mode-tint: rgba(154, 110, 232, 0.22); border-bottom-color: rgba(154, 110, 232, 0.35); }
 .input-row.mode-snippets { --mode-tint: rgba(232, 150, 74, 0.22); border-bottom-color: rgba(232, 150, 74, 0.35); }
+.input-row.mode-library { --mode-tint: rgba(232, 195, 65, 0.22); border-bottom-color: rgba(232, 195, 65, 0.35); }
 @keyframes glyph-in {
   from { opacity: 0; transform: translateX(-4px); }
   to { opacity: 1; transform: none; }
@@ -111,8 +125,10 @@ const PALETTE_CSS = `
 .mode-emoji .mode-glyph { color: #4caf7d; }
 .mode-downloads .mode-glyph { color: #9a6ee8; }
 .mode-snippets .mode-glyph { color: #e8964a; }
+.mode-library .mode-glyph { color: #e8c341; }
 .mode-commands .input, .mode-tabs .input, .mode-history .input,
-.mode-emoji .input, .mode-downloads .input, .mode-snippets .input { padding-left: 7px; }
+.mode-emoji .input, .mode-downloads .input, .mode-snippets .input,
+.mode-library .input { padding-left: 7px; }
 .input {
   flex: 1; min-width: 0;
   background: transparent; border: none; outline: none;
@@ -139,6 +155,7 @@ const PALETTE_CSS = `
 .kbd.chip-emoji.active { background: #4caf7d; color: #ffffff; }
 .kbd.chip-downloads.active { background: #9a6ee8; color: #ffffff; }
 .kbd.chip-snippets.active { background: #e8964a; color: #ffffff; }
+.kbd.chip-library.active { background: #e8c341; color: #3c3000; }
 .list { height: 55vh; overflow-y: auto; padding: 8px; position: relative; }
 .selector {
   position: absolute; left: 8px; right: 8px; top: 0; height: 40px;
@@ -393,6 +410,7 @@ const GROUP_LABELS: Record<string, string> = {
   emoji: 'Emoji',
   downloads: 'Downloads',
   snippets: 'Snippets',
+  library: 'Bookmarks',
 }
 
 type UiState = 'list' | 'actions' | 'rename' | 'move' | 'group' | 'settings'
@@ -407,7 +425,7 @@ let backBtnEl: HTMLElement | null = null
 let hintEl: HTMLElement | null = null
 let modeGlyphEl: HTMLElement | null = null
 /**
- * The typed mode prefix ('>', '@', '#', ':', '~'), held outside the input so
+ * The typed mode prefix ('>', '@', '#', ':', '~', '%', '!'), held outside the input so
  * it can render as a colored glyph; the input holds only the query text.
  */
 let modePrefix = ''
@@ -546,6 +564,7 @@ function closePalette(): void {
   actionTarget = null
   subStateTarget = null
   browseStack = []
+  resetLibrary()
 }
 
 function openPalette(prefix: string): void {
@@ -555,7 +574,7 @@ function openPalette(prefix: string): void {
   const shadow = paletteHost.attachShadow({ mode: 'closed' })
 
   const style = document.createElement('style')
-  style.textContent = PALETTE_CSS
+  style.textContent = PALETTE_CSS + LIBRARY_CSS
 
   const backdrop = document.createElement('div')
   backdrop.className = 'backdrop'
@@ -588,8 +607,15 @@ function openPalette(prefix: string): void {
     // Clicks outside are handled by the backdrop, so on blur we reclaim
     // focus instead of closing.
     setTimeout(() => {
-      // Settings form controls own focus while that view is open.
-      if (paletteHost && paletteInput && uiState !== 'settings' && shadow.activeElement !== paletteInput) {
+      // Settings form controls (and the library's save/triage panels) own
+      // focus while those views are open.
+      if (
+        paletteHost &&
+        paletteInput &&
+        uiState !== 'settings' &&
+        !libraryOwnsInput() &&
+        shadow.activeElement !== paletteInput
+      ) {
         paletteInput.focus()
       }
     }, 0)
@@ -604,6 +630,7 @@ function openPalette(prefix: string): void {
     [': Emoji', 'emoji'],
     ['~ Files', 'downloads'],
     ['% Snips', 'snippets'],
+    ['! Bookmarks', 'library'],
   ]
   for (const [text, chipMode] of chipModes) {
     const chip = kbd(text)
@@ -660,11 +687,18 @@ function currentMode(): string {
   return mode(modePrefix)
 }
 
+/** Inside a real folder (bookmarks browse or the library section)? */
+function inFolderContext(): boolean {
+  const m = currentMode()
+  return (m === 'bookmarks' && browseStack.length > 0) || (m === 'library' && libraryDepth() > 0)
+}
+
 /** Tint the input row, color the prefix glyph, and light up the mode's chip. */
 function updateModeStyling(): void {
   if (!inputRowEl) return
   const mode = currentMode()
-  const browsing = mode === 'bookmarks' && browseStack.length > 0
+  const browsing =
+    (mode === 'bookmarks' && browseStack.length > 0) || (mode === 'library' && libraryDepth() > 0)
   inputRowEl.className =
     'input-row' + (mode === 'bookmarks' ? '' : ` mode-${mode}`) + (browsing ? ' browsing' : '')
   if (backBtnEl) backBtnEl.style.display = browsing ? 'flex' : 'none'
@@ -714,7 +748,7 @@ function renderFooter(): void {
   primary.append(document.createTextNode(primaryLabel), kbd(uiState === 'settings' ? 'esc' : '↵'))
   paletteFooter.appendChild(primary)
 
-  if (uiState === 'list' && (mode === 'bookmarks' || mode === 'history')) {
+  if (uiState === 'list' && (mode === 'bookmarks' || mode === 'history' || mode === 'library')) {
     const secondary = document.createElement('span')
     secondary.className = 'action'
     secondary.append(
@@ -725,7 +759,7 @@ function renderFooter(): void {
   }
 
   if (uiState === 'list') {
-    if (browseStack.length && mode === 'bookmarks') {
+    if (inFolderContext()) {
       const reorder = document.createElement('span')
       reorder.className = 'action'
       reorder.append(document.createTextNode('Reorder'), kbd('⌥↑↓'))
@@ -766,6 +800,11 @@ function onGlobalKey(e: KeyboardEvent): void {
     }
     return
   }
+
+  // Library section: save panel and triage own the keyboard (settings
+  // pattern); in plain browse the view only claims its own keys, so ⌘K,
+  // arrows, and Enter still run through the shared list machinery below.
+  if (uiState === 'list' && currentMode() === 'library' && libraryKey(e)) return
 
   if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
     e.preventDefault()
@@ -820,8 +859,7 @@ function onGlobalKey(e: KeyboardEvent): void {
     e.altKey &&
     (e.key === 'ArrowUp' || e.key === 'ArrowDown') &&
     uiState === 'list' &&
-    browseStack.length &&
-    currentMode() === 'bookmarks'
+    inFolderContext()
   ) {
     e.preventDefault()
     const item = flatItems[selectedIndex]
@@ -989,6 +1027,11 @@ function enterFolder(item: RemoteItem): void {
 }
 
 function popFolder(): void {
+  // The library section keeps its own folder stack.
+  if (currentMode() === 'library') {
+    libraryUp()
+    return
+  }
   browseStack.pop()
   if (paletteInput) paletteInput.value = ''
   void updateList()
@@ -1009,6 +1052,11 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     return
   }
   if (item.kind === 'folder') {
+    // Library rows drill with the section's own stack (search hits jump).
+    if (currentMode() === 'library' && uiState === 'list') {
+      libraryEnterFolder(item)
+      return
+    }
     enterFolder(item)
     return
   }
@@ -1051,6 +1099,14 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     return
   } else if (item.commandId === 'open-options') {
     enterSettings()
+    return
+  } else if (item.commandId === 'bookmark-tab') {
+    // Save flow instead of a blind create: open the library section's panel.
+    modePrefix = '!'
+    if (paletteInput) paletteInput.value = ''
+    updateModeStyling()
+    renderFooter()
+    openLibrarySave()
     return
   } else if (item.commandId === 'print-page') {
     closePalette()
@@ -1133,7 +1189,7 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         ...favoriteActionFor(item),
         { id: 'rename', label: 'Rename…' },
         { id: 'move', label: 'Move to Folder…' },
-        ...(browseStack.length && currentMode() === 'bookmarks'
+        ...(inFolderContext()
           ? [
               { id: 'move-up', label: 'Move Up' },
               { id: 'move-down', label: 'Move Down' },
@@ -1182,7 +1238,7 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'open-all', label: 'Open All in New Tabs' },
         ...favoriteActionFor(item),
         { id: 'rename', label: 'Rename…' },
-        ...(browseStack.length && currentMode() === 'bookmarks'
+        ...(inFolderContext()
           ? [
               { id: 'move-up', label: 'Move Up' },
               { id: 'move-down', label: 'Move Down' },
@@ -1897,6 +1953,13 @@ async function updateList(): Promise<void> {
   }
 
   const mode = currentMode()
+  // Library section: the view module owns rendering (settings-view pattern).
+  if (mode === 'library') {
+    favBarItems = []
+    favIndex = -1
+    await renderLibrary()
+    return
+  }
   const query = paletteInput.value
   const browsing = mode === 'bookmarks' && browseStack.length > 0
   const folderId = browsing ? browseStack[browseStack.length - 1].id : undefined
@@ -1968,12 +2031,18 @@ function renderEmojiGrid(items: RemoteItem[]): void {
   highlightSelection(true)
 }
 
-function renderItems(groupLabel: string, items: RemoteItem[], favorites?: FavoriteEntry[]): void {
+function renderItems(
+  groupLabel: string,
+  items: RemoteItem[],
+  favorites?: FavoriteEntry[],
+  header?: HTMLElement,
+): void {
   if (!paletteList) return
   paletteList.textContent = ''
   selectorEl = document.createElement('div')
   selectorEl.className = 'selector'
   paletteList.appendChild(selectorEl)
+  if (header) paletteList.appendChild(header)
   flatItems = items
   selectedIndex = 0
   favBarItems = favorites ?? []
@@ -2012,7 +2081,7 @@ function renderItems(groupLabel: string, items: RemoteItem[], favorites?: Favori
     detail.textContent = item.detail || (item.url ? shortUrl(item.url) : '')
     const type = document.createElement('span')
     type.className = 'type'
-    type.textContent = TYPE_LABELS[item.kind] ?? ''
+    type.textContent = item.typeText ?? TYPE_LABELS[item.kind] ?? ''
     row.append(iconFor(item), title, detail)
     if (item.groupColor) {
       const dot = document.createElement('span')
@@ -2135,4 +2204,26 @@ function shortUrl(url: string): string {
     return url
   }
 }
+
+/* ---------- Library section wiring ---------- */
+
+// The '!' section view lives in features/bookmarks/view.ts; it renders into
+// the palette's list through these hooks so rows keep the shared selection,
+// Enter, and ⌘K machinery.
+initLibrary({
+  list: () => paletteList,
+  input: () => paletteInput,
+  renderRows: (groupLabel, items, header) => renderItems(groupLabel, items, undefined, header),
+  send: (message) =>
+    chrome.runtime.sendMessage(message).catch(() => undefined) as Promise<
+      Record<string, unknown> | undefined
+    >,
+  toast: (message) => showToast(message),
+  refresh: () => void updateList(),
+  hideInputRow: (hidden) => {
+    if (inputRowEl) inputRowEl.style.display = hidden ? 'none' : ''
+  },
+  enterRename: (item) => enterRename(item),
+  kbd,
+})
 })()

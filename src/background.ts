@@ -2,7 +2,7 @@ import { getSettings } from './core/settings'
 import { getUsage, recordUsage } from './core/usage'
 import type { PaletteItem, PaletteMode } from './core/types'
 import { collectFolders } from './features/bookmarks'
-import { foldersFirst, resolveInbox } from './features/bookmarks/library'
+import { decideSaveState, foldersFirst, resolveInbox } from './features/bookmarks/library'
 import { browseBookmarkFolder, searchBookmarks, searchLibrary } from './features/bookmarks/search'
 import { commandEntries, runCommand, senderTab } from './features/commands'
 import { searchDownloads } from './features/downloads/search'
@@ -227,8 +227,9 @@ async function handleMessage(
     case 'bookmark-find-url': {
       if (!message.url) return { match: null }
       const results = await chrome.bookmarks.search({ url: message.url })
-      const match = results.find((r) => r.url === message.url)
-      if (!match) return { match: null }
+      const decision = decideSaveState(message.url, results)
+      if (decision.state === 'new') return { match: null }
+      const match = decision.match
       return {
         match: { id: match.id, title: match.title, url: match.url, parentId: match.parentId },
         folderPath: await folderPathOf(match.parentId),

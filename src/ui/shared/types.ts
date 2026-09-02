@@ -16,6 +16,8 @@ export interface RemoteItem {
   downloadId?: number
   group?: string
   positions?: number[]
+  /** Overrides the kind label in the row's right-hand column ("3 items", "2d ago"). */
+  typeText?: string
 }
 
 export interface PaletteAction {
