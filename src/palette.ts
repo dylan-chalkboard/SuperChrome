@@ -90,6 +90,15 @@ const PALETTE_CSS = `
   from { opacity: 0; transform: translateX(-4px); }
   to { opacity: 1; transform: none; }
 }
+.back-btn {
+  display: none; align-items: center; justify-content: center;
+  width: 26px; height: 26px; margin-left: 12px; border-radius: 7px;
+  background: #ffffff14; color: #ccccccbb; cursor: pointer; flex: none;
+}
+.back-btn:hover { background: #ffffff24; color: #ffffff; }
+.input-row.browsing .input { padding-left: 9px; }
+.light .back-btn { background: #00000010; color: #00000080; }
+.light .back-btn:hover { background: #0000001c; color: #1c1c1e; }
 .mode-glyph {
   display: none; padding-left: 16px;
   font-size: 15px; font-weight: 700; line-height: 1;
@@ -390,6 +399,8 @@ let paletteList: HTMLElement | null = null
 let paletteFooter: HTMLElement | null = null
 let panelEl: HTMLElement | null = null
 let inputRowEl: HTMLElement | null = null
+let backBtnEl: HTMLElement | null = null
+let hintEl: HTMLElement | null = null
 let modeGlyphEl: HTMLElement | null = null
 /**
  * The typed mode prefix ('>', '@', '#', ':', '~'), held outside the input so
@@ -598,8 +609,17 @@ function openPalette(prefix: string): void {
 
   modeGlyphEl = document.createElement('span')
   modeGlyphEl.className = 'mode-glyph'
-  inputRow.append(modeGlyphEl, paletteInput, hint)
+  backBtnEl = document.createElement('span')
+  backBtnEl.className = 'back-btn'
+  backBtnEl.title = 'Back'
+  backBtnEl.innerHTML = CMD_ICONS['arrow-left']
+  backBtnEl.addEventListener('mousedown', (e) => {
+    e.preventDefault()
+    popFolder()
+  })
+  inputRow.append(backBtnEl, modeGlyphEl, paletteInput, hint)
   inputRowEl = inputRow
+  hintEl = hint
 
   paletteList = document.createElement('div')
   paletteList.className = 'list'
@@ -640,7 +660,11 @@ function currentMode(): string {
 function updateModeStyling(): void {
   if (!inputRowEl) return
   const mode = currentMode()
-  inputRowEl.className = 'input-row' + (mode === 'bookmarks' ? '' : ` mode-${mode}`)
+  const browsing = mode === 'bookmarks' && browseStack.length > 0
+  inputRowEl.className =
+    'input-row' + (mode === 'bookmarks' ? '' : ` mode-${mode}`) + (browsing ? ' browsing' : '')
+  if (backBtnEl) backBtnEl.style.display = browsing ? 'flex' : 'none'
+  if (hintEl) hintEl.style.display = browsing ? 'none' : 'flex'
   if (modeGlyphEl) modeGlyphEl.textContent = modePrefix
   // Sub-states (rename, move, group) own the placeholder while active.
   if (paletteInput && uiState === 'list') {
