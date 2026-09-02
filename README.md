@@ -33,6 +33,7 @@ Open with `Cmd+P` or the toolbar icon (type `>` for commands):
 - `#` prefix → **search browser history** (empty query shows recent pages)
 - `:` prefix → **emoji search** — Enter inserts into the field you were typing in (or copies)
 - `%` prefix → **snippets** — reusable text blocks (defined in Settings); Enter inserts into the field you were typing in
+- `!` prefix → **bookmarks section** — a dedicated library view: breadcrumb navigation, folders first with item counts, bookmark ages, and a global bookmark-only search. `>Bookmark Current Tab` (or the section's **＋ New** button) opens a real save flow — editable title plus a fuzzy folder picker defaulting to an **Inbox** folder (created on first save); already-bookmarked pages offer Move/Rename/Remove instead of a duplicate. The Inbox pill (or `Tab`) starts triage: process saves one at a time, oldest first — `F` file to a folder, `D` delete, `Space` skip, `Enter` peek in a background tab
 - **Quicklinks** — keyword searches like `yt lofi beats` or `gh superchrome` (defaults: g, yt, gh, w, maps; add your own in Settings)
 - **Inline calculator** — type math (`142*12`, `18% of 240`, `2^10`) or conversions (`5km in miles`, `72f in c`, `3h in min`) and the result appears as the first row; Enter copies it
 - **URL navigation** — type an address (`google.com`, `localhost:3000`) and an "Open" row appears on top, address-bar style

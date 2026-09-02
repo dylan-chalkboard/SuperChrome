@@ -5,6 +5,20 @@ All notable changes to SuperChrome. Versions follow the extension's
 
 ## Unreleased
 
+- **Bookmarks section** (`!` prefix, gold): a dedicated library view with a
+  clickable breadcrumb, folders-first rows showing item counts and bookmark
+  ages, and a global bookmark-only search (results carry their folder path;
+  Enter on a folder jumps into it)
+- **Save flow**: `>Bookmark Current Tab` and the section's ＋ New button open
+  a panel with an editable title and a fuzzy folder picker (Inbox
+  preselected; `Create folder "<query>"` when nothing matches) instead of
+  blind-creating at the bar root; already-bookmarked pages show
+  Move…/Rename…/Remove/Done — never a duplicate by default
+- **Inbox + triage**: saves default to a real `Inbox` folder under Other
+  Bookmarks (created on first save); the header pill shows its count, and
+  the pill or `Tab` starts one-at-a-time triage, oldest first — `F` file,
+  `D`/Backspace delete, `Space` skip, `↵` open in a background tab, `esc`
+  exit, ending in Inbox zero
 - "Open All in New Tabs" on a bookmark folder collects the tabs into a tab
   group named after the folder
 - Single **Open palette** keyboard shortcut (`Cmd+P`) — the dedicated
