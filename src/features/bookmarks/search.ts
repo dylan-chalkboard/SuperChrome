@@ -111,14 +111,11 @@ export async function searchBookmarks(
       .sort((a, b) => b.score - a.score)
       .slice(0, 6)
     const suggestedKeys = new Set(suggested.map((x) => x.entry.usageKey))
+    // Curated definition order keeps related commands together (all the zoom
+    // ones side by side, etc.); Suggested above already covers frequent picks.
     const allCommands = commands
       .filter((entry) => !suggestedKeys.has(entry.usageKey))
-      .map((entry, index) => ({
-        entry,
-        index,
-        score: frecency(usage, entry.usageKey, decay),
-      }))
-      .sort((a, b) => b.score - a.score || a.index - b.index)
+      .map((entry) => ({ entry }))
     // Bookmarks section mirrors the bookmarks bar: its top level, folders
     // first, plus the other root folders — drill in for everything else.
     const bar = root.children?.[0]

@@ -67,7 +67,13 @@ async function queryPalette(
   if (mode === 'snippets') return searchSnippets(query, usage, decay, settings.snippets)
   if (mode === 'history') return searchHistory(rawQuery)
   if (mode === 'downloads') return searchDownloads(query, usage, decay)
-  if (mode === 'commands') return rank(commandEntries(), query, usage, decay)
+  // Browsing '>' keeps the curated order (related commands stay together);
+  // typing ranks by fuzzy match blended with usage.
+  if (mode === 'commands') {
+    return query
+      ? rank(commandEntries(), query, usage, decay)
+      : commandEntries().map((entry) => entry.item)
+  }
   if (mode === 'tabs') return searchTabs(query, usage, decay, sender)
   return searchBookmarks(rawQuery, usage, decay, settings)
 }
