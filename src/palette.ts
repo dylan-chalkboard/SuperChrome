@@ -226,8 +226,12 @@ const PALETTE_CSS = `
 .light .footer { background: #ececef; }
 .footer .spacer { flex: 1; }
 .footer .action { display: flex; align-items: center; gap: 6px; }
-.footer .brand-logo { width: 26px; height: 26px; opacity: 0.5; cursor: pointer; }
-.footer .brand-logo:hover { opacity: 0.9; }
+.footer .brand-logo {
+  width: 26px; height: 26px; opacity: 0.5; cursor: pointer;
+  box-sizing: content-box; padding: 3px; margin: -3px; border-radius: 6px;
+}
+.footer .brand-logo:hover { opacity: 0.9; background: #ffffff14; }
+.light .footer .brand-logo:hover { background: #00000010; }
 .brand-menu {
   position: absolute; left: 10px; bottom: 46px;
   min-width: 210px; z-index: 5;
