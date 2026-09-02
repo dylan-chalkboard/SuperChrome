@@ -19,14 +19,14 @@ import type { FolderOption, PickerRow } from './library'
 
 /** Appended to the palette stylesheet; every rule has a .light variant. */
 export const LIBRARY_CSS = `
-.lib-head { display: flex; align-items: center; gap: 8px; padding: 10px 10px 2px; }
+.lib-head { display: flex; align-items: center; gap: 8px; padding: 12px 10px 6px 4px; }
 .lib-crumbs {
-  display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0;
-  overflow: hidden; white-space: nowrap; font-size: 12px; color: #ffffff59;
+  display: flex; align-items: baseline; gap: 2px; flex: 1; min-width: 0;
+  overflow: hidden; white-space: nowrap; font-size: 12.5px; color: #ffffff59;
 }
-.lib-seg { cursor: pointer; padding: 2px 5px; border-radius: 5px; }
+.lib-seg { cursor: pointer; padding: 2px 6px; border-radius: 5px; }
 .lib-seg:hover { background: #ffffff14; color: #e8e8e8; }
-.lib-seg.current { color: #e8e8e8; font-weight: 600; cursor: default; }
+.lib-seg.current { color: #ffffff; font-weight: 700; font-size: 17px; cursor: default; }
 .lib-seg.current:hover { background: transparent; }
 .lib-sep { color: #ffffff30; }
 .lib-pill {
@@ -249,7 +249,8 @@ export async function renderLibrary(): Promise<void> {
             typeText: countLabel(c.count ?? 0),
           },
   )
-  kit.renderRows(stack.length ? stack[stack.length - 1].label : 'Bookmarks', items, buildHeader())
+  // No group label while browsing — the breadcrumb title already names the level.
+  kit.renderRows('', items, buildHeader())
 }
 
 function buildHeader(): HTMLElement {
@@ -297,7 +298,7 @@ function buildHeader(): HTMLElement {
   const add = document.createElement('span')
   add.className = 'lib-new'
   add.textContent = '＋ New'
-  add.title = 'Bookmark current page'
+  add.title = 'Bookmark current page (⌘D)'
   add.addEventListener('mousedown', (e) => {
     e.preventDefault()
     openLibrarySave()

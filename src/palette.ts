@@ -780,6 +780,12 @@ function renderFooter(): void {
   }
 
   if (uiState === 'list') {
+    if (mode === 'library') {
+      const newBm = document.createElement('span')
+      newBm.className = 'action'
+      newBm.append(document.createTextNode('New'), kbd('⌘D'))
+      paletteFooter.appendChild(newBm)
+    }
     if (inFolderContext()) {
       const reorder = document.createElement('span')
       reorder.className = 'action'
@@ -831,6 +837,13 @@ function onGlobalKey(e: KeyboardEvent): void {
     e.preventDefault()
     if (uiState === 'actions') closeActions()
     else if (uiState === 'list') openActions()
+    return
+  }
+
+  // ⌘D in the bookmarks section: new bookmark (Chrome's own bookmark key).
+  if (e.key === 'd' && (e.metaKey || e.ctrlKey) && uiState === 'list' && currentMode() === 'library') {
+    e.preventDefault()
+    openLibrarySave()
     return
   }
 
@@ -2160,7 +2173,7 @@ function renderItems(
   let lastGroup: string | null = null
   items.forEach((item, index) => {
     const group = item.group ?? groupLabel
-    if (group !== lastGroup) {
+    if (group && group !== lastGroup) {
       const label = document.createElement('div')
       label.className = 'group-label'
       label.textContent = group
