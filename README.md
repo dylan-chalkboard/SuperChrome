@@ -29,7 +29,7 @@ Then load it in Chrome:
 Open with `Cmd+P` (bookmarks), `Cmd+Shift+P` (commands), or the toolbar icon:
 
 - Plain text → fuzzy-search **bookmarks and history** with favicons, ranked by how often and recently you pick them (Enter opens, `Cmd+Enter` new tab)
-- `>` prefix → **commands**: back/forward, bookmark/close/duplicate/pin tab, print, view source, and Chrome pages (settings, flags, extensions, downloads, Web Store, chrome://inspect, …)
+- `>` prefix → **commands**: back/forward, bookmark/close/duplicate/pin tab, print, view source, and Chrome pages (settings, extensions, downloads, Web Store, chrome://inspect, …)
 - `@` prefix → **switch to an open tab**
 - `#` prefix → **search browser history** (empty query shows recent pages)
 - `:` prefix → **emoji search** — Enter inserts into the field you were typing in (or copies)

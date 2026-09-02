@@ -3,7 +3,6 @@ import type { PaletteItem } from '../../core/types'
 
 export const PAGE_COMMANDS: Record<string, string> = {
   'open-settings': 'chrome://settings/',
-  'open-flags': 'chrome://flags/',
   'open-version': 'chrome://version/',
   'open-inspect-devices': 'chrome://inspect/',
   'open-webstore': 'https://chromewebstore.google.com/',
@@ -26,7 +25,6 @@ export const PALETTE_COMMANDS = [
   { id: 'new-tab', label: 'New Tab' },
   { id: 'duplicate-tab', label: 'Duplicate Tab' },
   { id: 'toggle-pin', label: 'Pin/Unpin Tab' },
-  { id: 'split-tab', label: 'Split Tab Right' },
   { id: 'move-tab-new-window', label: 'Move Tab to New Window' },
   { id: 'close-tab', label: 'Close Tab' },
   { id: 'new-group-from-tab', label: 'New Tab Group from Tab' },
@@ -52,7 +50,6 @@ export const PALETTE_COMMANDS = [
   { id: 'open-downloads', label: 'Open Downloads' },
   { id: 'open-extensions', label: 'Open Extensions' },
   { id: 'open-shortcuts', label: 'Open Keyboard Shortcuts' },
-  { id: 'open-flags', label: 'Open Chrome Flags' },
   { id: 'open-version', label: 'Open Chrome Version' },
 ]
 
@@ -70,7 +67,6 @@ export const COMMAND_META: Record<string, { icon: string; color: string }> = {
   'new-tab': { icon: 'tab', color: '#4c9df3' },
   'duplicate-tab': { icon: 'tab', color: '#4c9df3' },
   'toggle-pin': { icon: 'pin', color: '#4c9df3' },
-  'split-tab': { icon: 'split', color: '#3ab5c6' },
   'move-tab-new-window': { icon: 'external', color: '#3ab5c6' },
   'close-tab': { icon: 'tab', color: '#e05d5d' },
   'new-group-from-tab': { icon: 'group', color: '#4c9df3' },
@@ -96,7 +92,6 @@ export const COMMAND_META: Record<string, { icon: string; color: string }> = {
   'open-downloads': { icon: 'download', color: '#3aa99f' },
   'open-extensions': { icon: 'puzzle', color: '#e8964a' },
   'open-shortcuts': { icon: 'keyboard', color: '#7d8a97' },
-  'open-flags': { icon: 'flag', color: '#e8964a' },
   'open-version': { icon: 'info', color: '#7d8a97' },
 }
 
@@ -170,44 +165,8 @@ export async function runCommand(
     case 'view-source':
       if (tab?.url) await chrome.tabs.create({ url: `view-source:${tab.url}` })
       break
-    case 'split-tab': {
-      // Chrome's native Split View has no creation API (extensions can only
-      // detect splits), so tile two windows across the current window's bounds.
-      if (!tab?.id || tab.windowId === undefined) break
-      const win = await chrome.windows.get(tab.windowId, { populate: true })
-      const left = win.left ?? 0
-      const top = win.top ?? 0
-      const width = win.width ?? 1200
-      const height = win.height ?? 800
-      const half = Math.floor(width / 2)
-      await chrome.windows.update(tab.windowId, {
-        state: 'normal',
-        left,
-        top,
-        width: half,
-        height,
-      })
-      if ((win.tabs?.length ?? 0) > 1) {
-        await chrome.windows.create({
-          tabId: tab.id,
-          left: left + half,
-          top,
-          width: width - half,
-          height,
-          focused: true,
-        })
-      } else {
-        // Lone tab: moving it would close the window; open a fresh one instead.
-        await chrome.windows.create({
-          left: left + half,
-          top,
-          width: width - half,
-          height,
-          focused: true,
-        })
-      }
-      break
-    }
+    // 'split-tab' was removed: Chrome has no extension API to create a native
+    // Split View (w3c/webextensions#967) — bring the command back if it ships.
     case 'move-tab-new-window':
       if (tab?.id) await chrome.windows.create({ tabId: tab.id, focused: true })
       break
