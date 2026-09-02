@@ -1,0 +1,157 @@
+# Changelog
+
+All notable changes to SuperChrome. Versions follow the extension's
+`manifest.json` version.
+
+## Unreleased
+
+- "Open All in New Tabs" on a bookmark folder collects the tabs into a tab
+  group named after the folder
+- Single **Open palette** keyboard shortcut (`Cmd+P`) — the dedicated
+  command-mode binding was removed; type `>` for commands
+
+## 0.20.0
+
+- Favorited items show a gold star badge in result rows
+- `⌘K` acts on the focused favorite tile instead of the first list row
+- Favorite selection ring animates, and keyboard focus scrolls the bar into view
+- Icons on every `⌘K` action row, matching the brand menu
+- Version bump release for the favorites polish round
+
+## 0.19.0
+
+- **In-palette settings**: the gear (now the bottom-left logo menu) swaps the
+  list for a Raycast-style settings form — appearance, opacity, colors,
+  default mode, toggles, frecency decay, and the quicklinks/snippets/disabled
+  sites editors — auto-saving and applying live
+- **Brand menu**: bottom-left logo opens Settings, Send Feedback, Keyboard
+  Shortcuts, and the version; hover box around the logo
+- **Back arrow** replaces the mode chips while browsing a bookmark folder
+- Solid footer bar (the glass stops above it); footer gear removed
+- Curated command order while browsing `>`; typed queries still rank by
+  match + usage, so related commands (all the zoom ones, etc.) stay together
+- Snippets prefix moved from `;` to `%`
+- Logo renders black in light mode
+- Fixed: `no-motion` class stuck for the session after toggling Reduce Motion
+
+## 0.18.1
+
+- **Light mode**: Appearance setting (System / Dark / Light) themes the
+  palette, toast, and options page
+- Fixed: `⌘K` menu appeared transparent — list rows painted over it (z-order)
+- Tabs mode color changed from cyan to rose so it reads apart from command blue
+- macOS-style filled blue folder icon on a transparent tile (folder color
+  setting removed)
+- Removed: the popup UI entirely — the injected palette is the only UI; the
+  toolbar icon toggles the palette, and the omnibox `b` keyword covers
+  restricted pages
+- Removed: granular Chrome settings commands (one "Open Chrome Settings"
+  remains), Split Tab Right (Chrome has no split-view API), Open Chrome Flags
+- Restructure: feature folders (`src/features/*`, `src/core/*`,
+  `src/ui/shared/*`); palette builds as a self-contained IIFE in a second
+  Vite pass; background split into per-mode search modules
+
+## 0.18.0
+
+- **Quicklinks**: keyword searches with a `{query}` placeholder
+  (`yt lofi beats`), defaults for Google/YouTube/GitHub/Wikipedia/Maps,
+  editable in Settings
+- **Snippets**: prefix mode inserting reusable text blocks, managed in
+  Settings, with frecency ranking
+- **Unit conversions** in the calculator: length, mass, temperature, time,
+  data (`5km in miles`, `72f in c`, `1.5gb in mb`)
+
+## 0.17.1
+
+- Mode chips animate their collapse so the active chip slides into place
+- Mode-specific input placeholders ("Search history…", etc.)
+- Only the active mode chip stays visible while a prefix mode is on
+- Flat colors for active mode chips
+- Hovering a favorite takes selection focus from the list
+
+## 0.17.0
+
+- **History in search**: history results rank alongside bookmarks and
+  commands in the default mode, deduped against bookmarks
+- **Favorites bar**: pin bookmarks, commands, and folders via `⌘K`; icon
+  tiles with captions above Suggested, arrow-key navigation, synced via
+  `storage.sync`
+- **Mode colors**: prefix modes tint the input row (animated), render the
+  typed prefix as a colored glyph, and light up the matching hint chip
+- **Hue-shift gradient tiles** for all non-favicon result icons
+- **URL navigation**: address-shaped queries (`google.com`,
+  `localhost:3000`) get a direct "Open" row
+- Go Back / Go Forward commands
+- Solid background for the `⌘K` actions panel
+
+## 0.15.0
+
+- "Search Google" fallback row so no query dead-ends
+- Unit tests for ranking, calculator, and helpers
+- Chrome Web Store listing kit: icon, screenshots, promo tiles, privacy
+  policy; SuperChrome Dark theme prepared for store publishing
+
+## 0.14.x
+
+- Native color picker command (`0.14.0`); always copies and toasts (`0.14.1`)
+- Copy toasts in the popup/tab palette (`0.14.2`)
+
+## 0.13.x
+
+- UI polish pass and copy-page commands (`0.13.0`)
+- `prefers-reduced-motion` support and Reduce Motion setting (`0.13.1`)
+- Full emoji set with names under each glyph (`0.13.2`)
+
+## 0.12.x
+
+- Sectioned home view: Suggested, then Bookmarks with folders first
+  (`0.12.0`); Commands section on the home view (`0.12.1`)
+- Download results get file-type icons and colors (`0.12.2`)
+
+## 0.11.x
+
+- Reorder bookmarks with `Alt+↑/↓` while browsing a folder (`0.11.0`)
+- "Open results in a new tab" setting (`0.11.1`)
+- Palette opens as a tab on restricted pages, with source-tab command
+  routing and reliability fixes (`0.11.2`–`0.11.6`)
+
+## 0.10.x
+
+- Tab groups, downloads mode, generic menu-click bridge (`0.10.0`)
+- Per-command icons and colors in the `>` list (`0.10.1`)
+
+## 0.9.x
+
+- Inline calculator and emoji search (`0.9.0`)
+- Settings gear in the footer; copy toasts; history favicons
+
+## 0.8.0
+
+- Options page
+
+## 0.7.x
+
+- Renamed to **SuperChrome**: folder navigation, colored icons, numbered
+  actions; logo across toolbar, footer, and README
+
+## 0.6.0
+
+- Recently closed tabs, all-window tab search
+
+## 0.5.0
+
+- Match highlighting, `⌘1–9` quick open, markdown links, popup actions
+
+## 0.4.0
+
+- Frecency ranking, history search mode, `⌘K` actions panel
+
+## 0.3.x
+
+- Popup palette for `chrome://` pages; keyboard shortcuts open it on
+  restricted pages
+
+## 0.1.0
+
+- Initial release: Raycast-style bookmark command palette for Chrome, with
+  the native messaging bridge for opening real DevTools on macOS
