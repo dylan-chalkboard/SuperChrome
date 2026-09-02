@@ -46,6 +46,7 @@ export async function searchTabs(
             group: 'Open Tabs',
             groupColor: tabGroup ? GROUP_COLORS[tabGroup.color] : undefined,
             grouped: !!tabGroup,
+            typeText: t.active && t.windowId === currentWindowId ? 'Active' : undefined,
           },
           text: `${t.title} ${t.url} ${tabGroup?.title ?? ''}`.toLowerCase(),
           usageKey: `tab:${t.url}`,

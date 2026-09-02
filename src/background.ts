@@ -361,8 +361,12 @@ async function handleMessage(
       }
     }
     case 'tab-group-add':
-      if (message.tabId !== undefined && message.groupId !== undefined) {
-        await chrome.tabs.group({ tabIds: [message.tabId], groupId: message.groupId })
+      // Without a groupId, chrome.tabs.group creates a new group.
+      if (message.tabId !== undefined) {
+        await chrome.tabs.group({
+          tabIds: [message.tabId],
+          ...(message.groupId !== undefined ? { groupId: message.groupId } : {}),
+        })
       }
       return {}
     case 'tab-ungroup':
