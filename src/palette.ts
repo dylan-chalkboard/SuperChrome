@@ -146,7 +146,20 @@ const PALETTE_CSS = `
   transition: max-width 0.25s ease, opacity 0.2s, padding 0.25s ease, margin-right 0.25s ease;
 }
 .hint .kbd:last-child { margin-right: 0; }
-.input-row[class*=" mode-"] .hint .kbd:not(.active) {
+/* Glyph-first chips: just the colored prefix char until hovered or active. */
+.kbd .lbl { display: none; }
+.kbd.active .lbl, .hint .kbd:hover .lbl { display: inline; }
+.kbd .pfx { font-weight: 700; }
+.chip-commands .pfx { color: #4c9df3; }
+.chip-tabs .pfx { color: #e0619e; }
+.chip-history .pfx { color: #9a6ee8; }
+.chip-emoji .pfx { color: #4caf7d; }
+.chip-downloads .pfx { color: #9a6ee8; }
+.chip-snippets .pfx { color: #e8964a; }
+.chip-library .pfx { color: #e8c341; }
+.kbd.active .pfx { color: inherit; }
+.input-row[class*=" mode-"] .hint .kbd:not(.active),
+.input-row.typing .hint .kbd:not(.active) {
   max-width: 0; opacity: 0; padding-left: 0; padding-right: 0; margin-right: 0;
 }
 .kbd.chip-commands.active { background: #4c9df3; color: #ffffff; }
@@ -633,8 +646,17 @@ function openPalette(prefix: string): void {
     ['! Bookmarks', 'library'],
   ]
   for (const [text, chipMode] of chipModes) {
-    const chip = kbd(text)
-    chip.classList.add(`chip-${chipMode}`)
+    const [pfx, ...rest] = text.split(' ')
+    const chip = document.createElement('span')
+    chip.className = `kbd chip-${chipMode}`
+    chip.title = rest.join(' ')
+    const glyph = document.createElement('b')
+    glyph.className = 'pfx'
+    glyph.textContent = pfx
+    const label = document.createElement('span')
+    label.className = 'lbl'
+    label.textContent = ` ${rest.join(' ')}`
+    chip.append(glyph, label)
     hint.appendChild(chip)
   }
 
@@ -700,7 +722,10 @@ function updateModeStyling(): void {
   const browsing =
     (mode === 'bookmarks' && browseStack.length > 0) || (mode === 'library' && libraryDepth() > 0)
   inputRowEl.className =
-    'input-row' + (mode === 'bookmarks' ? '' : ` mode-${mode}`) + (browsing ? ' browsing' : '')
+    'input-row' +
+    (mode === 'bookmarks' ? '' : ` mode-${mode}`) +
+    (browsing ? ' browsing' : '') +
+    (paletteInput?.value ? ' typing' : '')
   if (backBtnEl) backBtnEl.style.display = browsing ? 'flex' : 'none'
   if (hintEl) hintEl.style.display = browsing ? 'none' : 'flex'
   if (modeGlyphEl) modeGlyphEl.textContent = modePrefix
