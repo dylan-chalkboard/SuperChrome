@@ -637,7 +637,7 @@ function openPalette(prefix: string): void {
     ['@ Tabs', 'tabs'],
     ['# History', 'history'],
     [': Emoji', 'emoji'],
-    ['~ Files', 'downloads'],
+    ['~ Downloads', 'downloads'],
     ['% Snips', 'snippets'],
     ['! Bookmarks', 'library'],
   ]
@@ -1120,14 +1120,14 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
   } else if (item.commandId === 'switch-to-tab') {
     setInput('@')
     return
-  } else if (item.commandId?.startsWith('mode-')) {
+  } else if (item.commandId?.startsWith('mode-') || item.commandId === 'open-downloads') {
     const prefixes: Record<string, string> = {
       'mode-commands': '>',
       'mode-history': '#',
       'mode-emoji': ':',
-      'mode-files': '~',
       'mode-snippets': '%',
       'mode-library': '!',
+      'open-downloads': '~',
     }
     setInput(prefixes[item.commandId] ?? '')
     return

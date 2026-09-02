@@ -18,7 +18,7 @@ export const MODE_PLACEHOLDERS: Record<string, string> = {
   tabs: 'Search open tabs…',
   history: 'Search history…',
   emoji: 'Search emoji…',
-  downloads: 'Search files…',
+  downloads: 'Search downloads…',
   snippets: 'Search snippets…',
   library: 'Search bookmarks…',
 }
