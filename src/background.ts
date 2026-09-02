@@ -12,13 +12,6 @@ import { rank } from './features/ranking'
 import { searchSnippets } from './features/snippets/search'
 import { GROUP_COLORS, searchTabs } from './features/tabs/search'
 
-const MODE_HASH: Record<PaletteMode, string> = {
-  bookmarks: '',
-  commands: '#commands',
-  tabs: '#tabs',
-  history: '#history',
-}
-
 async function togglePaletteIn(
   tab: chrome.tabs.Tab | undefined,
   mode: PaletteMode,
@@ -29,29 +22,25 @@ async function togglePaletteIn(
   const disabled =
     host !== null && settings.disabledSites.some((d) => host === d || host.endsWith(`.${d}`))
 
-  if (!disabled) {
-    try {
-      await chrome.tabs.sendMessage(tab.id, { type: 'toggle-palette', mode })
-      return
-    } catch {
-      // Content script isn't there — inject on demand and retry.
-    }
-    try {
-      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['palette.js'] })
-      await chrome.tabs.sendMessage(tab.id, { type: 'toggle-palette', mode })
-      return
-    } catch {
-      // Restricted page (chrome://, Web Store, PDF viewer) — fall through.
-    }
+  if (disabled) return
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: 'toggle-palette', mode })
+    return
+  } catch {
+    // Content script isn't there — inject on demand and retry.
   }
-
-  // Restricted page (chrome://, Web Store) or disabled site: open the palette
-  // as a full extension page in a new tab — picking a result navigates it.
-  await chrome.tabs.create({
-    url: chrome.runtime.getURL(`popup.html?tab=1&src=${tab.id}${MODE_HASH[mode]}`),
-    index: tab.index + 1,
-  })
+  try {
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['palette.js'] })
+    await chrome.tabs.sendMessage(tab.id, { type: 'toggle-palette', mode })
+  } catch {
+    // Restricted page (chrome://, Web Store, PDF viewer) — the palette can't
+    // run here; the omnibox "b" keyword still covers bookmark search.
+  }
 }
+
+chrome.action.onClicked.addListener((tab) => {
+  void getSettings().then((settings) => togglePaletteIn(tab, settings.defaultMode))
+})
 
 chrome.commands.onCommand.addListener(async (command) => {
   if (command !== 'open-palette' && command !== 'quick-open') return
@@ -179,9 +168,6 @@ async function handleMessage(
       return {}
     case 'close-tab-id':
       if (message.tabId !== undefined) await chrome.tabs.remove(message.tabId)
-      return {}
-    case 'close-me':
-      if (sender.tab?.id) await chrome.tabs.remove(sender.tab.id).catch(() => {})
       return {}
     case 'activate-tab':
       if (message.tabId !== undefined) {

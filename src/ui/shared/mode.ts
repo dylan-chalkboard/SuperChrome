@@ -28,10 +28,3 @@ export const MODE_PREFIX: Record<string, string> = {
   history: '#',
   snippets: ';',
 }
-
-export const HASH_PREFIX: Record<string, string> = {
-  '#commands': '>',
-  '#tabs': '@',
-  '#history': '#',
-  '#snippets': ';',
-}

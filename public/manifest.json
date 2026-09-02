@@ -37,7 +37,6 @@
   },
   "action": {
     "default_title": "Open SuperChrome palette",
-    "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",
@@ -61,7 +60,7 @@
   },
   "commands": {
     "_execute_action": {
-      "description": "Open palette popup (works on chrome:// pages)"
+      "description": "Open palette (toolbar icon shortcut)"
     },
     "open-palette": {
       "description": "Open command palette",
