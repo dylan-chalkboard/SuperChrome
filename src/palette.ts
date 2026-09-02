@@ -93,7 +93,7 @@ const PALETTE_CSS = `
 .input-row.mode-tabs { --mode-tint: rgba(224, 97, 158, 0.22); border-bottom-color: rgba(224, 97, 158, 0.35); }
 .input-row.mode-history { --mode-tint: rgba(154, 110, 232, 0.22); border-bottom-color: rgba(154, 110, 232, 0.35); }
 .input-row.mode-emoji { --mode-tint: rgba(76, 175, 125, 0.22); border-bottom-color: rgba(76, 175, 125, 0.35); }
-.input-row.mode-downloads { --mode-tint: rgba(154, 110, 232, 0.22); border-bottom-color: rgba(154, 110, 232, 0.35); }
+.input-row.mode-downloads { --mode-tint: rgba(58, 169, 159, 0.22); border-bottom-color: rgba(58, 169, 159, 0.35); }
 .input-row.mode-snippets { --mode-tint: rgba(232, 150, 74, 0.22); border-bottom-color: rgba(232, 150, 74, 0.35); }
 .input-row.mode-library { --mode-tint: rgba(232, 195, 65, 0.22); border-bottom-color: rgba(232, 195, 65, 0.35); }
 @keyframes glyph-in {
@@ -118,7 +118,7 @@ const PALETTE_CSS = `
 .mode-tabs .mode-glyph { color: #e0619e; }
 .mode-history .mode-glyph { color: #9a6ee8; }
 .mode-emoji .mode-glyph { color: #4caf7d; }
-.mode-downloads .mode-glyph { color: #9a6ee8; }
+.mode-downloads .mode-glyph { color: #3aa99f; }
 .mode-snippets .mode-glyph { color: #e8964a; }
 .mode-library .mode-glyph { color: #e8c341; }
 .mode-commands .input, .mode-tabs .input, .mode-history .input,
@@ -149,7 +149,7 @@ const PALETTE_CSS = `
 .chip-tabs .pfx { color: #e0619e; }
 .chip-history .pfx { color: #9a6ee8; }
 .chip-emoji .pfx { color: #4caf7d; }
-.chip-downloads .pfx { color: #9a6ee8; }
+.chip-downloads .pfx { color: #3aa99f; }
 .chip-snippets .pfx { color: #e8964a; }
 .chip-library .pfx { color: #e8c341; }
 .kbd.active .pfx { color: inherit; }
@@ -161,7 +161,7 @@ const PALETTE_CSS = `
 .kbd.chip-tabs.active { background: #e0619e; color: #ffffff; }
 .kbd.chip-history.active { background: #9a6ee8; color: #ffffff; }
 .kbd.chip-emoji.active { background: #4caf7d; color: #ffffff; }
-.kbd.chip-downloads.active { background: #9a6ee8; color: #ffffff; }
+.kbd.chip-downloads.active { background: #3aa99f; color: #ffffff; }
 .kbd.chip-snippets.active { background: #e8964a; color: #ffffff; }
 .kbd.chip-library.active { background: #e8c341; color: #3c3000; }
 .list { height: 55vh; overflow-y: auto; padding: 8px; position: relative; }

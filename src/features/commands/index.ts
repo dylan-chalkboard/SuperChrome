@@ -100,7 +100,7 @@ export const COMMAND_META: Record<string, { icon: string; color: string }> = {
   'open-webstore': { icon: 'bag', color: '#4caf7d' },
   'open-bookmarks-manager': { icon: 'bookmark', color: '#e05d5d' },
   'open-history': { icon: 'clock', color: '#9a6ee8' },
-  'open-downloads': { icon: 'download', color: '#9a6ee8' },
+  'open-downloads': { icon: 'download', color: '#3aa99f' },
   'open-extensions': { icon: 'puzzle', color: '#e8964a' },
   'open-shortcuts': { icon: 'keyboard', color: '#7d8a97' },
   'open-version': { icon: 'info', color: '#7d8a97' },
