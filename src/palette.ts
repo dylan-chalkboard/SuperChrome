@@ -7,7 +7,12 @@
  * Cmd+K opens a Raycast-style actions panel for the selected item.
  */
 
+import { getSettings } from './core/settings'
+import type { UserSettings } from './core/settings'
 import { tileGradient } from './features/gradients'
+import { cleanHost } from './features/navigation'
+import { parseQuicklinks, serializeQuicklinks } from './features/quicklinks'
+import { parseSnippets, serializeSnippets } from './features/snippets'
 import {
   favToItem,
   favoriteActionFor,
@@ -214,8 +219,11 @@ const PALETTE_CSS = `
   display: flex; align-items: center; gap: 14px;
   height: 38px; padding: 0 14px;
   border-top: 1px solid #ffffff10;
+  /* Solid at all times — the glass treatment stops above this bar. */
+  background: #1b1b1e;
   color: #cccccc80; font-size: 12px;
 }
+.light .footer { background: #ececef; }
 .footer .spacer { flex: 1; }
 .footer .action { display: flex; align-items: center; gap: 6px; }
 .footer .brand-logo { width: 26px; height: 26px; opacity: 0.5; }
@@ -246,6 +254,50 @@ const PALETTE_CSS = `
 .action-row.danger { color: #ff8f8f; }
 .list::-webkit-scrollbar { width: 10px; }
 .list::-webkit-scrollbar-thumb { background: #ffffff1a; border-radius: 5px; }
+/* ---------- In-palette settings view (Raycast-style two-column form) ---------- */
+.settings { padding: 20px 24px 22px; display: flex; flex-direction: column; gap: 13px; }
+.set-row { display: grid; grid-template-columns: 150px 1fr; gap: 16px; align-items: center; }
+.set-row.top { align-items: start; }
+.set-row > label { text-align: right; color: #ffffff8c; font-size: 13px; padding-top: 1px; }
+.set-hint { display: block; font-size: 11px; color: #ffffff40; margin-top: 3px; }
+.set-div { height: 1px; background: #ffffff10; margin: 8px -24px; }
+.seg { display: inline-flex; gap: 4px; }
+.seg button {
+  background: none; border: none; color: #cccccc99; font: inherit; font-size: 12.5px;
+  padding: 4px 13px; border-radius: 999px; cursor: pointer;
+}
+.seg button.on { background: #ffffff1f; color: #ffffff; }
+.check { display: flex; align-items: center; gap: 8px; color: #e0e0e0; font-size: 13px; cursor: pointer; }
+.settings input[type='range'] { width: 200px; accent-color: #4c9df3; }
+.settings select, .settings input[type='number'] {
+  background: #ffffff10; border: 1px solid #ffffff20; border-radius: 6px;
+  color: #e8e8e8; font: inherit; padding: 4px 8px; outline: none;
+}
+.settings input[type='number'] { width: 70px; }
+.settings input[type='color'] {
+  width: 38px; height: 26px; padding: 2px; cursor: pointer;
+  background: #ffffff10; border: 1px solid #ffffff20; border-radius: 6px;
+}
+.settings input[type='checkbox'] { width: 15px; height: 15px; accent-color: #4c9df3; margin: 0; }
+.settings textarea {
+  width: 100%; min-height: 72px; resize: vertical;
+  background: #ffffff10; border: 1px solid #ffffff20; border-radius: 6px;
+  color: #e8e8e8; font: 12px ui-monospace, Menlo, monospace; padding: 8px; outline: none;
+}
+.set-swatches { display: flex; gap: 12px; align-items: center; }
+.set-swatches span { font-size: 11px; color: #ffffff59; }
+.light .set-row > label { color: #00000073; }
+.light .set-hint { color: #00000045; }
+.light .set-div { background: #00000010; }
+.light .seg button { color: #00000073; }
+.light .seg button.on { background: #00000014; color: #1c1c1e; }
+.light .check { color: #303036; }
+.light .set-swatches span { color: #00000059; }
+.light .settings select, .light .settings input[type='number'],
+.light .settings input[type='color'], .light .settings textarea {
+  background: #00000008; border-color: #00000020; color: #26262b;
+}
+
 /* ---------- Light mode (appearance setting or system preference) ---------- */
 .panel.light {
   background: rgba(244, 244, 246, var(--sc-op, 0.8));
@@ -314,7 +366,7 @@ const GROUP_LABELS: Record<string, string> = {
   snippets: 'Snippets',
 }
 
-type UiState = 'list' | 'actions' | 'rename' | 'move' | 'group'
+type UiState = 'list' | 'actions' | 'rename' | 'move' | 'group' | 'settings'
 
 let paletteHost: HTMLDivElement | null = null
 let paletteInput: HTMLInputElement | null = null
@@ -503,7 +555,8 @@ function openPalette(prefix: string): void {
     // Clicks outside are handled by the backdrop, so on blur we reclaim
     // focus instead of closing.
     setTimeout(() => {
-      if (paletteHost && paletteInput && shadow.activeElement !== paletteInput) {
+      // Settings form controls own focus while that view is open.
+      if (paletteHost && paletteInput && uiState !== 'settings' && shadow.activeElement !== paletteInput) {
         paletteInput.focus()
       }
     }, 0)
@@ -597,16 +650,18 @@ function renderFooter(): void {
   const primary = document.createElement('span')
   primary.className = 'action'
   const primaryLabel =
-    uiState === 'move'
-      ? 'Move Here'
-      : mode === 'commands'
-        ? 'Run'
-        : mode === 'tabs'
-          ? 'Switch'
-          : mode === 'emoji' || mode === 'snippets'
-            ? 'Insert'
-            : 'Open'
-  primary.append(document.createTextNode(primaryLabel), kbd('↵'))
+    uiState === 'settings'
+      ? 'Done'
+      : uiState === 'move'
+        ? 'Move Here'
+        : mode === 'commands'
+          ? 'Run'
+          : mode === 'tabs'
+            ? 'Switch'
+            : mode === 'emoji' || mode === 'snippets'
+              ? 'Insert'
+              : 'Open'
+  primary.append(document.createTextNode(primaryLabel), kbd(uiState === 'settings' ? 'esc' : '↵'))
   paletteFooter.appendChild(primary)
 
   if (uiState === 'list' && (mode === 'bookmarks' || mode === 'history')) {
@@ -639,8 +694,8 @@ function renderFooter(): void {
     '<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="currentColor"/><path d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2" stroke="currentColor" stroke-linecap="round"/></svg>'
   gear.addEventListener('mousedown', (e) => {
     e.preventDefault()
-    void chrome.runtime.sendMessage({ type: 'run-command', id: 'open-options' })
-    closePalette()
+    if (uiState === 'settings') exitSettings()
+    else enterSettings()
   })
   paletteFooter.appendChild(gear)
 }
@@ -657,6 +712,15 @@ function onGlobalKey(e: KeyboardEvent): void {
   if (!paletteHost) return
   e.stopPropagation()
   if (e.type !== 'keydown') return
+
+  // Settings view owns the keyboard: form controls get everything but Esc.
+  if (uiState === 'settings') {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      exitSettings()
+    }
+    return
+  }
 
   if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
     e.preventDefault()
@@ -939,6 +1003,9 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     return
   } else if (item.commandId === 'switch-to-tab') {
     setInput('@')
+    return
+  } else if (item.commandId === 'open-options') {
+    enterSettings()
     return
   } else if (item.commandId === 'print-page') {
     closePalette()
@@ -1438,6 +1505,189 @@ function exitSubState(_commit: boolean): void {
   void updateList()
 }
 
+/* ---------- In-palette settings (gear or >SuperChrome: Settings) ---------- */
+
+function enterSettings(): void {
+  if (!paletteInput || !paletteList || uiState === 'settings') return
+  if (uiState === 'actions') closeActions()
+  uiState = 'settings'
+  savedQuery = modePrefix + paletteInput.value
+  if (inputRowEl) inputRowEl.style.display = 'none'
+  void renderSettings()
+  renderFooter()
+}
+
+function exitSettings(): void {
+  if (!paletteInput) return
+  uiState = 'list'
+  if (inputRowEl) inputRowEl.style.display = ''
+  modePrefix = savedQuery && PREFIX_CHARS.includes(savedQuery[0]) ? savedQuery[0] : ''
+  paletteInput.value = modePrefix ? savedQuery.slice(1) : savedQuery
+  paletteInput.focus()
+  void updateList()
+}
+
+async function renderSettings(): Promise<void> {
+  if (!paletteList) return
+  const s = await getSettings()
+  paletteList.textContent = ''
+  selectorEl = null
+  flatItems = []
+  favBarItems = []
+  favIndex = -1
+
+  const form = document.createElement('div')
+  form.className = 'settings'
+
+  let saveTimer: ReturnType<typeof setTimeout> | undefined
+  const save = (): void => {
+    clearTimeout(saveTimer)
+    saveTimer = setTimeout(() => {
+      void chrome.storage.sync.set({ settings: collect() }).then(() => applyUserSettings())
+    }, 250)
+  }
+
+  const row = (label: string, control: HTMLElement, top = false): HTMLElement => {
+    const el = document.createElement('div')
+    el.className = 'set-row' + (top ? ' top' : '')
+    const lab = document.createElement('label')
+    lab.textContent = label
+    el.append(lab, control)
+    form.appendChild(el)
+    return el
+  }
+  const divider = (): void => {
+    const el = document.createElement('div')
+    el.className = 'set-div'
+    form.appendChild(el)
+  }
+  const wire = <T extends HTMLElement>(el: T): T => {
+    el.addEventListener('input', save)
+    el.addEventListener('change', save)
+    return el
+  }
+
+  // Appearance: Raycast-style segmented pills.
+  let appearanceValue = s.appearance
+  const seg = document.createElement('div')
+  seg.className = 'seg'
+  const segButtons = (['light', 'dark', 'system'] as const).map((value) => {
+    const b = document.createElement('button')
+    b.textContent = value[0].toUpperCase() + value.slice(1)
+    b.classList.toggle('on', appearanceValue === value)
+    b.addEventListener('mousedown', (e) => {
+      e.preventDefault()
+      appearanceValue = value
+      segButtons.forEach((sb, i) => sb.classList.toggle('on', (['light', 'dark', 'system'] as const)[i] === value))
+      save()
+    })
+    seg.appendChild(b)
+    return b
+  })
+  row('Appearance', seg)
+
+  const opacity = wire(document.createElement('input'))
+  opacity.type = 'range'
+  opacity.min = '0.4'
+  opacity.max = '1'
+  opacity.step = '0.05'
+  opacity.value = String(s.glassOpacity)
+  row('Glass opacity', opacity)
+
+  const swatches = document.createElement('div')
+  swatches.className = 'set-swatches'
+  const colorInput = (value: string, label: string): HTMLInputElement => {
+    const input = wire(document.createElement('input'))
+    input.type = 'color'
+    input.value = value
+    const tag = document.createElement('span')
+    tag.textContent = label
+    swatches.append(input, tag)
+    return input
+  }
+  const colorCommand = colorInput(s.iconColors.command, 'Command')
+  const colorHistory = colorInput(s.iconColors.history, 'History')
+  const colorFallback = colorInput(s.iconColors.fallback, 'Fallback')
+  row('Icon colors', swatches)
+  divider()
+
+  const defaultModeSel = wire(document.createElement('select'))
+  for (const [value, label] of [
+    ['bookmarks', 'Bookmarks'],
+    ['commands', 'Commands'],
+    ['tabs', 'Tabs'],
+    ['history', 'History'],
+  ]) {
+    const opt = document.createElement('option')
+    opt.value = value
+    opt.textContent = label
+    defaultModeSel.appendChild(opt)
+  }
+  defaultModeSel.value = s.defaultMode
+  row('Default mode', defaultModeSel)
+
+  const check = (label: string, checked: boolean): HTMLInputElement => {
+    const wrap = document.createElement('label')
+    wrap.className = 'check'
+    const box = wire(document.createElement('input'))
+    box.type = 'checkbox'
+    box.checked = checked
+    const text = document.createElement('span')
+    text.textContent = label
+    wrap.append(box, text)
+    row('', wrap)
+    return box
+  }
+  const newTab = check('Open results in a new tab', s.openInNewTab)
+  const reduceMotionBox = check('Reduce motion', s.reduceMotion)
+
+  const decay = wire(document.createElement('input'))
+  decay.type = 'number'
+  decay.min = '1'
+  decay.max = '90'
+  decay.value = String(s.frecencyDecayDays)
+  row('Frecency decay', decay)
+  divider()
+
+  const area = (value: string, placeholder: string): HTMLTextAreaElement => {
+    const el = wire(document.createElement('textarea'))
+    el.spellcheck = false
+    el.value = value
+    el.placeholder = placeholder
+    return el
+  }
+  const quicklinksArea = area(
+    serializeQuicklinks(s.quicklinks),
+    'yt | YouTube | https://www.youtube.com/results?search_query={query}',
+  )
+  row('Quicklinks', quicklinksArea, true)
+  const snippetsArea = area(serializeSnippets(s.snippets), 'sig\nBest,\nDylan\n---\n…')
+  row('Snippets', snippetsArea, true)
+  const sitesArea = area(s.disabledSites.join('\n'), 'figma.com\ndocs.google.com')
+  row('Disabled sites', sitesArea, true)
+
+  const collect = (): UserSettings => ({
+    ...s,
+    appearance: appearanceValue,
+    glassOpacity: Math.min(1, Math.max(0.4, Number(opacity.value) || s.glassOpacity)),
+    iconColors: {
+      command: colorCommand.value,
+      folder: s.iconColors.folder,
+      history: colorHistory.value,
+      fallback: colorFallback.value,
+    },
+    defaultMode: defaultModeSel.value as UserSettings['defaultMode'],
+    openInNewTab: newTab.checked,
+    reduceMotion: reduceMotionBox.checked,
+    frecencyDecayDays: Math.min(90, Math.max(1, Number(decay.value) || s.frecencyDecayDays)),
+    quicklinks: parseQuicklinks(quicklinksArea.value),
+    snippets: parseSnippets(snippetsArea.value),
+    disabledSites: sitesArea.value.split('\n').map(cleanHost).filter(Boolean),
+  })
+
+  paletteList.appendChild(form)
+}
+
 /* ---------- List rendering ---------- */
 
 function localFuzzy(query: string, text: string): number | null {
@@ -1463,7 +1713,7 @@ async function updateList(): Promise<void> {
   renderFooter()
   updateModeStyling()
 
-  if (uiState === 'rename') return
+  if (uiState === 'rename' || uiState === 'settings') return
 
   if (uiState === 'group') {
     const query = paletteInput.value.trim().toLowerCase()

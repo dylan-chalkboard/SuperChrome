@@ -14,6 +14,15 @@ export function urlFromQuery(raw: string): string | null {
   return null
 }
 
+/** Normalize a user-typed host line: strip scheme, path, and case. */
+export function cleanHost(line: string): string {
+  return line
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/\/.*$/, '')
+}
+
 export function hostOf(url: string | undefined): string | null {
   try {
     return url ? new URL(url).hostname.toLowerCase() : null

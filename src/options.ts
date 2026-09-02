@@ -1,5 +1,6 @@
 import {
   DEFAULT_QUICKLINKS,
+  cleanHost,
   parseQuicklinks,
   parseSnippets,
   serializeQuicklinks,
@@ -72,14 +73,6 @@ function populate(s: UserSettings): void {
   sites.value = s.disabledSites.join('\n')
   quicklinks.value = serializeQuicklinks(s.quicklinks)
   snippets.value = serializeSnippets(s.snippets)
-}
-
-function cleanHost(line: string): string {
-  return line
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\//, '')
-    .replace(/\/.*$/, '')
 }
 
 function collect(): UserSettings {
