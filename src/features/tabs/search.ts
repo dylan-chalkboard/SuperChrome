@@ -70,9 +70,16 @@ export async function searchTabs(
     // each tab group as its own labeled section.
     const ungrouped = openTabs.filter((t) => !groupsById.has(t.groupId ?? -1))
     open = ungrouped.map((t) => tabItem(t, 'Open Tabs'))
+    // Sections key off the title, so duplicates (two untitled groups, or two
+    // groups given the same name) get a counter to stay distinct.
+    const usedTitles = new Map<string, number>()
     for (const g of tabGroups) {
+      const base = g.title || 'Untitled group'
+      const n = (usedTitles.get(base) ?? 0) + 1
+      usedTitles.set(base, n)
+      const section = n > 1 ? `${base} ${n}` : base
       const members = openTabs.filter((t) => t.groupId === g.id)
-      open.push(...members.map((t) => tabItem(t, g.title || 'Untitled group')))
+      open.push(...members.map((t) => tabItem(t, section)))
     }
   }
   const sessions = await chrome.sessions.getRecentlyClosed({ maxResults: 10 })
