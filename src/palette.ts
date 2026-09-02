@@ -1009,7 +1009,9 @@ function highlightSelection(instant = false): void {
   const cells = paletteList.querySelectorAll<HTMLElement>('.emoji-cell')
   if (cells.length) {
     cells.forEach((cell, i) => cell.classList.toggle('selected', i === selectedIndex))
-    cells[selectedIndex]?.scrollIntoView({ block: 'nearest' })
+    // The first item scrolls to the very top so headers and labels show.
+    if (selectedIndex === 0) paletteList.scrollTop = 0
+    else cells[selectedIndex]?.scrollIntoView({ block: 'nearest' })
     return
   }
   const rows = paletteList.querySelectorAll<HTMLElement>('.item')
@@ -1027,7 +1029,10 @@ function highlightSelection(instant = false): void {
   } else if (selectorEl) {
     selectorEl.style.opacity = '0'
   }
-  row?.scrollIntoView({ block: 'nearest' })
+  // The first item scrolls to the very top so the header, favorites bar, and
+  // group label above it stay visible; elsewhere, nearest-edge scrolling.
+  if (selectedIndex === 0) paletteList.scrollTop = 0
+  else row?.scrollIntoView({ block: 'nearest' })
 }
 
 /* ---------- Executing items ---------- */
