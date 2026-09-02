@@ -6,8 +6,9 @@ export const CLOCK_SVG =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor"/><path d="M8 5v3.2l2.2 1.6" stroke="currentColor" stroke-linecap="round"/></svg>'
 export const DOC_SVG =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 1.5h5.5L12.5 5v9.5h-8.5v-13z" stroke="currentColor" stroke-linejoin="round"/><path d="M9.5 1.5V5H12.5" stroke="currentColor" stroke-linejoin="round"/></svg>'
+// macOS-style filled two-tone folder; rendered on a transparent tile.
 export const FOLDER_SVG =
-  '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1.5 3.5h4.5l1.5 2h7v7h-13v-9z" stroke="currentColor" stroke-linejoin="round"/></svg>'
+  '<svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M1.5 4.2C1.5 3.26 2.26 2.5 3.2 2.5h2.9c.45 0 .88.18 1.2.5l.9.9h4.6c.94 0 1.7.76 1.7 1.7v6.2c0 .94-.76 1.7-1.7 1.7H3.2c-.94 0-1.7-.76-1.7-1.7V4.2z" fill="#3f97ee"/><path d="M1.5 6.2c0-.94.76-1.7 1.7-1.7h9.6c.94 0 1.7.76 1.7 1.7v5.6c0 .94-.76 1.7-1.7 1.7H3.2c-.94 0-1.7-.76-1.7-1.7V6.2z" fill="#7ab8f5"/></svg>'
 
 export const CMD_ICONS: Record<string, string> = {
   'arrow-left': '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M13 8H3M7 3.5L2.5 8 7 12.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',

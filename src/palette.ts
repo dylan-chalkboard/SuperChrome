@@ -176,7 +176,6 @@ const PALETTE_CSS = `
   background: #ffffff10; color: #ffffff;
   display: flex; align-items: center; justify-content: center;
 }
-.fav-tile.kind-folder { background: var(--sc-folder, linear-gradient(135deg, #e06f3c, #e0dd3c)); }
 .fav-item:hover .fav-tile, .fav-item.selected .fav-tile { outline: 2px solid rgba(255, 255, 255, 0.35); }
 .fav-tile img { width: 24px; height: 24px; border-radius: 5px; }
 .fav-tile svg { width: 20px; height: 20px; }
@@ -185,7 +184,7 @@ const PALETTE_CSS = `
   font-size: 9px; color: #ffffff59;
 }
 .item .icon.kind-command { background: var(--sc-command, linear-gradient(135deg, #4cd5f3, #4c65f3)); color: #ffffff; }
-.item .icon.kind-folder { background: var(--sc-folder, linear-gradient(135deg, #e06f3c, #e0dd3c)); color: #ffffff; }
+.item .icon.kind-folder { background: transparent; }
 .item .icon.kind-history { background: var(--sc-history, linear-gradient(135deg, #716ee8, #c36ee8)); color: #ffffff; }
 .item .icon.kind-bookmark, .item .icon.kind-tab, .item .icon.kind-closed {
   background: var(--sc-fallback, linear-gradient(135deg, #e05d89, #e0895d)); color: #ffffff;
