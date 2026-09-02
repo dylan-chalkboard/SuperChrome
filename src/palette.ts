@@ -115,6 +115,7 @@ const PALETTE_CSS = `
   background: #ffffff14; color: #cccccc99;
   border-radius: 4px; padding: 2px 7px; font-size: 11px;
 }
+.input-row[class*=" mode-"] .hint .kbd:not(.active) { display: none; }
 .kbd.chip-commands.active { background: linear-gradient(135deg, #4cd5f3, #4c65f3); color: #ffffff; }
 .kbd.chip-tabs.active { background: linear-gradient(135deg, #3ac6a8, #3a86c6); color: #ffffff; }
 .kbd.chip-history.active { background: linear-gradient(135deg, #716ee8, #c36ee8); color: #ffffff; }
