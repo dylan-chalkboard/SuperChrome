@@ -33,7 +33,7 @@ Open with `Cmd+P` (bookmarks), `Cmd+Shift+P` (commands), or the toolbar icon:
 - `@` prefix → **switch to an open tab**
 - `#` prefix → **search browser history** (empty query shows recent pages)
 - `:` prefix → **emoji search** — Enter inserts into the field you were typing in (or copies)
-- `;` prefix → **snippets** — reusable text blocks (defined in Settings); Enter inserts into the field you were typing in
+- `%` prefix → **snippets** — reusable text blocks (defined in Settings); Enter inserts into the field you were typing in
 - **Quicklinks** — keyword searches like `yt lofi beats` or `gh superchrome` (defaults: g, yt, gh, w, maps; add your own in Settings)
 - **Inline calculator** — type math (`142*12`, `18% of 240`, `2^10`) or conversions (`5km in miles`, `72f in c`, `3h in min`) and the result appears as the first row; Enter copies it
 - **URL navigation** — type an address (`google.com`, `localhost:3000`) and an "Open" row appears on top, address-bar style

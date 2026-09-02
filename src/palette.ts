@@ -278,7 +278,9 @@ const PALETTE_CSS = `
 .light .footer .gear:hover { background: #00000010; color: #303036; }
 .light .empty { color: #00000059; }
 .light .list::-webkit-scrollbar-thumb { background: #00000022; }
-.light .brand-logo { filter: invert(1) opacity(0.65); }
+/* The logo asset is white; invert to black anywhere it shows in light mode. */
+.light .brand-logo { filter: invert(1); opacity: 0.75; }
+.light .logo-img { filter: invert(1); }
 @media (prefers-reduced-motion: reduce) {
   .panel, .selector, .toast, .input-row, .input-row::before, .hint .kbd { transition: none !important; }
   .mode-glyph { animation: none !important; }
@@ -515,7 +517,7 @@ function openPalette(prefix: string): void {
     ['# History', 'history'],
     [': Emoji', 'emoji'],
     ['~ Files', 'downloads'],
-    ['; Snips', 'snippets'],
+    ['% Snips', 'snippets'],
   ]
   for (const [text, chipMode] of chipModes) {
     const chip = kbd(text)
@@ -1678,6 +1680,7 @@ function iconFor(item: RemoteItem): HTMLElement {
     if (item.icon === 'logo') {
       icon.className = 'icon plain'
       const img = document.createElement('img')
+      img.className = 'logo-img'
       img.src = chrome.runtime.getURL('/icons/footer.png')
       img.draggable = false
       icon.appendChild(img)
