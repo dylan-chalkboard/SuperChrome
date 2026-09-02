@@ -55,6 +55,54 @@ export async function browseBookmarkFolder(
 }
 
 /**
+ * Library ('!') mode typing: a global bookmark-only search — bookmarks and
+ * folders across the whole tree, no commands/history/calculator. Rows carry
+ * their folder path so results read in context.
+ */
+export async function searchLibrary(
+  rawQuery: string,
+  usage: UsageMap,
+  decay: number,
+): Promise<PaletteItem[]> {
+  const query = rawQuery.trim().toLowerCase()
+  const [root] = await chrome.bookmarks.getTree()
+  const flat: Array<{ id: string; title: string; url: string; path: string }> = []
+  const folders: Array<{ id: string; path: string }> = []
+  for (const child of root.children ?? []) {
+    collectBookmarks(child, [], flat)
+    collectFolders(child, [], folders)
+  }
+  const entries = [
+    ...folders.map((f) => {
+      const segments = f.path.split(' / ')
+      const parent = segments.slice(0, -1).join(' / ')
+      return {
+        item: {
+          kind: 'folder' as const,
+          label: segments[segments.length - 1],
+          detail: parent ? `in ${parent}` : '',
+          id: f.id,
+        },
+        text: segments[segments.length - 1].toLowerCase(),
+        usageKey: `folder:${f.id}`,
+      }
+    }),
+    ...flat.map((b) => ({
+      item: {
+        kind: 'bookmark' as const,
+        label: b.title,
+        detail: b.path ? `in ${b.path}` : '',
+        url: b.url,
+        id: b.id,
+      },
+      text: `${b.title} ${b.url}`.toLowerCase(),
+      usageKey: `bookmark:${b.url}`,
+    })),
+  ]
+  return rank<PaletteItem>(entries, query, usage, decay).slice(0, 50)
+}
+
+/**
  * Default mode: the Raycast-style home view when the query is empty, else the
  * blended search across bookmarks, folders, commands, history, calculator,
  * quicklinks, direct URLs, and Google search.

@@ -2,7 +2,8 @@ import { getSettings } from './core/settings'
 import { getUsage, recordUsage } from './core/usage'
 import type { PaletteItem, PaletteMode } from './core/types'
 import { collectFolders } from './features/bookmarks'
-import { browseBookmarkFolder, searchBookmarks } from './features/bookmarks/search'
+import { foldersFirst, resolveInbox } from './features/bookmarks/library'
+import { browseBookmarkFolder, searchBookmarks, searchLibrary } from './features/bookmarks/search'
 import { commandEntries, runCommand, senderTab } from './features/commands'
 import { searchDownloads } from './features/downloads/search'
 import { searchEmoji } from './features/emoji/search'
@@ -74,7 +75,77 @@ async function queryPalette(
       : commandEntries().map((entry) => entry.item)
   }
   if (mode === 'tabs') return searchTabs(query, usage, decay, sender)
+  if (mode === 'library') return searchLibrary(rawQuery, usage, decay)
   return searchBookmarks(rawQuery, usage, decay, settings)
+}
+
+/* ---------- Library (bookmarks section) helpers ---------- */
+
+interface LibraryChild {
+  id: string
+  title: string
+  url?: string
+  dateAdded?: number
+  /** Direct child count, folders only. */
+  count?: number
+}
+
+function libraryChild(node: chrome.bookmarks.BookmarkTreeNode): LibraryChild {
+  return {
+    id: node.id,
+    title: node.title || node.url || '',
+    url: node.url,
+    dateAdded: node.dateAdded,
+    count: node.url ? undefined : (node.children?.length ?? 0),
+  }
+}
+
+/**
+ * One level of the library view. The root merges the children of every
+ * top-level root (Bookmarks Bar, Other Bookmarks, …) into one list, folders
+ * first; a folder id returns its children plus the breadcrumb path down to
+ * it (top-level roots excluded — the merged root stands in for them).
+ */
+async function libraryList(
+  folderId?: string,
+): Promise<{ items: LibraryChild[]; path: Array<{ id: string; label: string }> }> {
+  if (!folderId) {
+    const [root] = await chrome.bookmarks.getTree()
+    const merged: LibraryChild[] = []
+    for (const top of root.children ?? []) {
+      for (const child of top.children ?? []) merged.push(libraryChild(child))
+    }
+    return { items: foldersFirst(merged), path: [] }
+  }
+  const [folder] = await chrome.bookmarks.getSubTree(folderId)
+  const items = foldersFirst((folder.children ?? []).map(libraryChild))
+  const path: Array<{ id: string; label: string }> = []
+  let node: chrome.bookmarks.BookmarkTreeNode | undefined = folder
+  while (node?.parentId && node.parentId !== '0') {
+    path.unshift({ id: node.id, label: node.title })
+    ;[node] = await chrome.bookmarks.get(node.parentId)
+  }
+  return { items, path }
+}
+
+/** The "Other Bookmarks" root: id '2' in Chrome, second root as a fallback. */
+async function otherBookmarksNode(): Promise<chrome.bookmarks.BookmarkTreeNode | undefined> {
+  const [root] = await chrome.bookmarks.getTree()
+  const children = root.children ?? []
+  return children.find((c) => c.id === '2') ?? children[1] ?? children[0]
+}
+
+/** Folder path of a node's ancestors, top-level roots included, for display. */
+async function folderPathOf(parentId: string | undefined): Promise<string> {
+  const titles: string[] = []
+  let id = parentId
+  while (id && id !== '0') {
+    const [node] = await chrome.bookmarks.get(id)
+    if (!node) break
+    if (node.title) titles.unshift(node.title)
+    id = node.parentId
+  }
+  return titles.join(' / ')
 }
 
 /* ---------- Message handling ---------- */
@@ -134,6 +205,46 @@ async function handleMessage(
       }
       return { folders }
     }
+    case 'library-list':
+      return libraryList(message.folderId)
+    case 'bookmark-create': {
+      if (!message.url) return {}
+      const node = await chrome.bookmarks.create({
+        parentId: message.parentId,
+        title: message.title || message.url,
+        url: message.url,
+      })
+      return { id: node.id }
+    }
+    case 'folder-create': {
+      if (!message.title) return {}
+      // Folders created from the save flow (Inbox, "Create folder …") land
+      // under Other Bookmarks unless a parent is given.
+      const parentId = message.parentId ?? (await otherBookmarksNode())?.id
+      const node = await chrome.bookmarks.create({ parentId, title: message.title })
+      return { id: node.id }
+    }
+    case 'bookmark-find-url': {
+      if (!message.url) return { match: null }
+      const results = await chrome.bookmarks.search({ url: message.url })
+      const match = results.find((r) => r.url === message.url)
+      if (!match) return { match: null }
+      return {
+        match: { id: match.id, title: match.title, url: match.url, parentId: match.parentId },
+        folderPath: await folderPathOf(match.parentId),
+      }
+    }
+    case 'inbox-info': {
+      const other = await otherBookmarksNode()
+      const children = other ? await chrome.bookmarks.getChildren(other.id) : []
+      const inbox = resolveInbox(children)
+      if (!inbox) return { folderId: null, count: 0 }
+      const items = await chrome.bookmarks.getChildren(inbox.id)
+      return { folderId: inbox.id, count: items.length }
+    }
+    case 'open-url-background':
+      if (message.url) await chrome.tabs.create({ url: message.url, active: false })
+      return {}
     case 'bookmark-rename':
       if (message.id && message.title) await chrome.bookmarks.update(message.id, { title: message.title })
       return {}
