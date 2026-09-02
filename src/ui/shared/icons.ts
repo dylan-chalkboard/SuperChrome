@@ -6,10 +6,9 @@ export const CLOCK_SVG =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor"/><path d="M8 5v3.2l2.2 1.6" stroke="currentColor" stroke-linecap="round"/></svg>'
 export const DOC_SVG =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 1.5h5.5L12.5 5v9.5h-8.5v-13z" stroke="currentColor" stroke-linejoin="round"/><path d="M9.5 1.5V5H12.5" stroke="currentColor" stroke-linejoin="round"/></svg>'
-// Filled gold ribbon bookmark with a folded corner; transparent tile.
-// (Matches the library mode's #e8c341.)
+// Filled red ribbon bookmark with a folded corner; transparent tile.
 export const RIBBON_SVG =
-  '<svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M11.6 1.5H5.1c-.9 0-1.6.7-1.6 1.6v10.6c0 .6.7.95 1.2.6l2.8-2.1 2.8 2.1c.5.35 1.2 0 1.2-.6V1.5z" fill="#e8c341"/><path d="M11.6 1.5h.9c.9 0 1.6.72 1.6 1.6v.9c0 .88-.7 1.6-1.6 1.6h-.9V1.5z" fill="#bf9a15"/></svg>'
+  '<svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M11.6 1.5H5.1c-.9 0-1.6.7-1.6 1.6v10.6c0 .6.7.95 1.2.6l2.8-2.1 2.8 2.1c.5.35 1.2 0 1.2-.6V1.5z" fill="#f04438"/><path d="M11.6 1.5h.9c.9 0 1.6.72 1.6 1.6v.9c0 .88-.7 1.6-1.6 1.6h-.9V1.5z" fill="#c8362c"/></svg>'
 
 // macOS-style filled two-tone folder; rendered on a transparent tile.
 export const FOLDER_SVG =
