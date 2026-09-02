@@ -20,13 +20,12 @@ Then load it in Chrome:
 
 1. Open `chrome://extensions`, turn on **Developer mode**
 2. **Load unpacked** → pick this project's `dist/` folder
-3. Bind shortcuts at `chrome://extensions/shortcuts` (suggested keys don't auto-bind after install):
-   - **Quick open bookmarks** → `Cmd+P` (must be set manually to take over Print)
-   - **Open command palette** → `Cmd+Shift+P`
+3. Bind the shortcut at `chrome://extensions/shortcuts` (suggested keys don't auto-bind after install):
+   - **Open palette** → `Cmd+P` (must be set manually to take over Print)
 
 ## Usage
 
-Open with `Cmd+P` (bookmarks), `Cmd+Shift+P` (commands), or the toolbar icon:
+Open with `Cmd+P` or the toolbar icon (type `>` for commands):
 
 - Plain text → fuzzy-search **bookmarks and history** with favicons, ranked by how often and recently you pick them (Enter opens, `Cmd+Enter` new tab)
 - `>` prefix → **commands**: back/forward, bookmark/close/duplicate/pin tab, print, view source, and Chrome pages (settings, extensions, downloads, Web Store, chrome://inspect, …)

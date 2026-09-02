@@ -43,10 +43,9 @@ chrome.action.onClicked.addListener((tab) => {
 })
 
 chrome.commands.onCommand.addListener(async (command) => {
-  if (command !== 'open-palette' && command !== 'quick-open') return
+  if (command !== 'quick-open') return
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-  const mode = command === 'open-palette' ? 'commands' : (await getSettings()).defaultMode
-  void togglePaletteIn(tab, mode)
+  void togglePaletteIn(tab, (await getSettings()).defaultMode)
 })
 
 /* ---------- Palette queries: thin dispatcher over per-mode searches ---------- */
