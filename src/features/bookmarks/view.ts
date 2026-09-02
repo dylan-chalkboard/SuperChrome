@@ -135,6 +135,7 @@ interface LibraryChild {
   url?: string
   dateAdded?: number
   count?: number
+  group?: string
 }
 
 type LibState = 'browse' | 'save' | 'saved' | 'save-move' | 'triage' | 'triage-file' | 'zero'
@@ -240,6 +241,7 @@ export async function renderLibrary(): Promise<void> {
             url: c.url,
             id: c.id,
             typeText: c.dateAdded ? ago(c.dateAdded) : '',
+            group: c.group,
           }
         : {
             kind: 'folder',
@@ -247,6 +249,7 @@ export async function renderLibrary(): Promise<void> {
             detail: '',
             id: c.id,
             typeText: countLabel(c.count ?? 0),
+            group: c.group,
           },
   )
   // No group label while browsing — the breadcrumb title already names the level.

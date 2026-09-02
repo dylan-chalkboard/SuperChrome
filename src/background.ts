@@ -88,6 +88,8 @@ interface LibraryChild {
   dateAdded?: number
   /** Direct child count, folders only. */
   count?: number
+  /** Source root's name at the library root (Bookmarks Bar, Other Bookmarks). */
+  group?: string
 }
 
 function libraryChild(node: chrome.bookmarks.BookmarkTreeNode): LibraryChild {
@@ -110,12 +112,18 @@ async function libraryList(
   folderId?: string,
 ): Promise<{ items: LibraryChild[]; path: Array<{ id: string; label: string }> }> {
   if (!folderId) {
+    // Root: each top-level root becomes its own labeled section, folders
+    // first within each, with the Bookmarks Bar always on top.
     const [root] = await chrome.bookmarks.getTree()
-    const merged: LibraryChild[] = []
-    for (const top of root.children ?? []) {
-      for (const child of top.children ?? []) merged.push(libraryChild(child))
+    const roots = [...(root.children ?? [])].sort((a, b) =>
+      a.id === '1' ? -1 : b.id === '1' ? 1 : 0,
+    )
+    const items: LibraryChild[] = []
+    for (const top of roots) {
+      const kids = foldersFirst((top.children ?? []).map(libraryChild))
+      for (const child of kids) items.push({ ...child, group: top.title })
     }
-    return { items: foldersFirst(merged), path: [] }
+    return { items, path: [] }
   }
   const [folder] = await chrome.bookmarks.getSubTree(folderId)
   const items = foldersFirst((folder.children ?? []).map(libraryChild))
