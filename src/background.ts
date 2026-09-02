@@ -162,9 +162,18 @@ async function handleMessage(
       return {}
     case 'open-folder-tabs': {
       if (!message.id) return {}
+      const [folder] = await chrome.bookmarks.get(message.id)
       const children = await chrome.bookmarks.getChildren(message.id)
+      const tabIds: number[] = []
       for (const child of children) {
-        if (child.url) await chrome.tabs.create({ url: child.url, active: false })
+        if (!child.url) continue
+        const tab = await chrome.tabs.create({ url: child.url, active: false })
+        if (tab.id !== undefined) tabIds.push(tab.id)
+      }
+      // The batch lands as a tab group named after the folder.
+      if (tabIds.length) {
+        const groupId = await chrome.tabs.group({ tabIds })
+        await chrome.tabGroups.update(groupId, { title: folder?.title || 'Folder' })
       }
       return {}
     }
