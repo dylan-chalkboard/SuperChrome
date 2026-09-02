@@ -123,11 +123,11 @@ const PALETTE_CSS = `
 .input-row[class*=" mode-"] .hint .kbd:not(.active) {
   max-width: 0; opacity: 0; padding-left: 0; padding-right: 0; margin-right: 0;
 }
-.kbd.chip-commands.active { background: linear-gradient(135deg, #4cd5f3, #4c65f3); color: #ffffff; }
-.kbd.chip-tabs.active { background: linear-gradient(135deg, #3ac6a8, #3a86c6); color: #ffffff; }
-.kbd.chip-history.active { background: linear-gradient(135deg, #716ee8, #c36ee8); color: #ffffff; }
-.kbd.chip-emoji.active { background: linear-gradient(135deg, #4caf5c, #4caf9e); color: #ffffff; }
-.kbd.chip-downloads.active { background: linear-gradient(135deg, #716ee8, #c36ee8); color: #ffffff; }
+.kbd.chip-commands.active { background: #4c9df3; color: #ffffff; }
+.kbd.chip-tabs.active { background: #3ab5c6; color: #ffffff; }
+.kbd.chip-history.active { background: #9a6ee8; color: #ffffff; }
+.kbd.chip-emoji.active { background: #4caf7d; color: #ffffff; }
+.kbd.chip-downloads.active { background: #9a6ee8; color: #ffffff; }
 .list { height: 55vh; overflow-y: auto; padding: 8px; position: relative; }
 .selector {
   position: absolute; left: 8px; right: 8px; top: 0; height: 40px;
