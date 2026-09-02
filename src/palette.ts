@@ -1120,6 +1120,17 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
   } else if (item.commandId === 'switch-to-tab') {
     setInput('@')
     return
+  } else if (item.commandId?.startsWith('mode-')) {
+    const prefixes: Record<string, string> = {
+      'mode-commands': '>',
+      'mode-history': '#',
+      'mode-emoji': ':',
+      'mode-files': '~',
+      'mode-snippets': '%',
+      'mode-library': '!',
+    }
+    setInput(prefixes[item.commandId] ?? '')
+    return
   } else if (item.commandId === 'open-options') {
     enterSettings()
     return

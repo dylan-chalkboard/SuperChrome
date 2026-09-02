@@ -15,6 +15,14 @@ export const PAGE_COMMANDS: Record<string, string> = {
 
 export const PALETTE_COMMANDS = [
   { id: 'switch-to-tab', label: 'Switch to Tab…' },
+  // Mode launchers: searchable from the home view; the palette intercepts
+  // these and sets the mode prefix instead of running anything.
+  { id: 'mode-commands', label: 'Search Commands' },
+  { id: 'mode-history', label: 'Search History' },
+  { id: 'mode-emoji', label: 'Search Emoji' },
+  { id: 'mode-files', label: 'Search Files' },
+  { id: 'mode-snippets', label: 'Search Snippets' },
+  { id: 'mode-library', label: 'Browse Bookmarks' },
   { id: 'open-options', label: 'SuperChrome: Settings' },
   { id: 'bookmark-tab', label: 'Bookmark Current Tab' },
   { id: 'pick-color', label: 'Pick Color' },
@@ -56,7 +64,13 @@ export const PALETTE_COMMANDS = [
 
 /** Per-command icon + tile color shown in the '>' list. */
 export const COMMAND_META: Record<string, { icon: string; color: string }> = {
-  'switch-to-tab': { icon: 'switch', color: '#4c9df3' },
+  'switch-to-tab': { icon: 'switch', color: '#e0619e' },
+  'mode-commands': { icon: 'search', color: '#4c9df3' },
+  'mode-history': { icon: 'clock', color: '#9a6ee8' },
+  'mode-emoji': { icon: 'search', color: '#4caf7d' },
+  'mode-files': { icon: 'download', color: '#9a6ee8' },
+  'mode-snippets': { icon: 'doc', color: '#e8964a' },
+  'mode-library': { icon: 'bookmark', color: '#e8c341' },
   'open-options': { icon: 'logo', color: '' },
   'bookmark-tab': { icon: 'bookmark', color: '#e05d5d' },
   'pick-color': { icon: 'paint', color: '#e57fb3' },
