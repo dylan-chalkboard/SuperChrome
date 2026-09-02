@@ -8,6 +8,7 @@ export interface UserSettings {
   iconColors: { command: string; folder: string; history: string; fallback: string }
   frecencyDecayDays: number
   defaultMode: PaletteMode
+  appearance: 'system' | 'dark' | 'light'
   openInNewTab: boolean
   reduceMotion: boolean
   disabledSites: string[]
@@ -20,6 +21,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   iconColors: { command: '#4c9df3', folder: '#e0a63c', history: '#9a6ee8', fallback: '#e05d5d' },
   frecencyDecayDays: 14,
   defaultMode: 'bookmarks',
+  appearance: 'system',
   openInNewTab: false,
   reduceMotion: false,
   disabledSites: [],

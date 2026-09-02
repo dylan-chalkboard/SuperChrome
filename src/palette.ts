@@ -229,6 +229,8 @@ const PALETTE_CSS = `
 .actions {
   position: absolute; right: 10px; bottom: 46px;
   min-width: 230px;
+  /* Above .item rows (z-index 1) — without this their text paints over the menu. */
+  z-index: 5;
   background: #232326;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 10px; padding: 4px;
@@ -244,6 +246,39 @@ const PALETTE_CSS = `
 .action-row.danger { color: #ff8f8f; }
 .list::-webkit-scrollbar { width: 10px; }
 .list::-webkit-scrollbar-thumb { background: #ffffff1a; border-radius: 5px; }
+/* ---------- Light mode (appearance setting or system preference) ---------- */
+.panel.light {
+  background: rgba(244, 244, 246, var(--sc-op, 0.8));
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 16px 48px rgba(0, 0, 0, 0.25);
+  color: #333338;
+}
+.light .input { color: #1c1c1e; }
+.light .input::placeholder { color: #00000040; }
+.light .input-row { border-bottom-color: #00000012; }
+.light .kbd { background: #00000010; color: #00000073; }
+.light .selector { background: rgba(0, 0, 0, 0.07); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4); }
+.light .group-label { color: #00000059; }
+.light .item .title { color: #26262b; }
+.light .item .title b { color: #000000; }
+.light .item .detail, .light .item .type { color: #00000045; }
+.light .item .icon { background: #00000010; }
+.light .item .icon.plain, .light .item .icon.kind-folder { background: transparent; }
+.light .fav-tile { background: #0000000d; }
+.light .fav-item:hover .fav-tile, .light .fav-item.selected .fav-tile { outline-color: rgba(0, 0, 0, 0.25); }
+.light .fav-cap { color: #00000059; }
+.light .emoji-cell.selected, .light .emoji-cell:hover { background: rgba(0, 0, 0, 0.08); }
+.light .emoji-cell .emoji-name { color: #00000059; }
+.light .actions { background: #ffffff; border-color: rgba(0, 0, 0, 0.12); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25); }
+.light .action-row { color: #303036; }
+.light .action-row.selected { background: rgba(0, 0, 0, 0.08); }
+.light .action-row.danger { color: #d03d3d; }
+.light .footer { border-top-color: #00000010; color: #00000066; }
+.light .footer .gear { color: #00000066; }
+.light .footer .gear:hover { background: #00000010; color: #303036; }
+.light .empty { color: #00000059; }
+.light .list::-webkit-scrollbar-thumb { background: #00000022; }
+.light .brand-logo { filter: invert(1) opacity(0.65); }
 @media (prefers-reduced-motion: reduce) {
   .panel, .selector, .toast, .input-row, .input-row::before, .hint .kbd { transition: none !important; }
   .mode-glyph { animation: none !important; }
@@ -310,6 +345,7 @@ let prefersNewTab = false
 let selectorEl: HTMLElement | null = null
 const GRID_COLS = 8
 let reduceMotionPref = false
+let lightMode = false
 
 function reducedMotion(): boolean {
   return reduceMotionPref || window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -355,7 +391,13 @@ async function togglePalette(prefix: string): Promise<void> {
 async function applyUserSettings(): Promise<void> {
   try {
     const { settings } = await chrome.storage.sync.get('settings')
-    if (!panelEl || !settings) return
+    if (!panelEl) return
+    const appearance = settings?.appearance ?? 'system'
+    lightMode =
+      appearance === 'light' ||
+      (appearance !== 'dark' && window.matchMedia('(prefers-color-scheme: light)').matches)
+    panelEl.classList.toggle('light', lightMode)
+    if (!settings) return
     if (typeof settings.glassOpacity === 'number') {
       panelEl.style.setProperty('--sc-op', String(settings.glassOpacity))
     }
@@ -1270,11 +1312,17 @@ function showToast(message: string, swatch?: string): void {
       opacity: 0;
       transition: opacity 0.15s ease;
     }
+    .toast.light {
+      background: rgba(248, 248, 250, 0.95);
+      border-color: rgba(0, 0, 0, 0.14);
+      color: #26262b;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 8px 24px rgba(0, 0, 0, 0.25);
+    }
     .toast.show { opacity: 1; }
     @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
   `
   const pill = document.createElement('div')
-  pill.className = 'toast'
+  pill.className = 'toast' + (lightMode ? ' light' : '')
   if (swatch) {
     const chip = document.createElement('span')
     chip.style.cssText = `width:14px;height:14px;border-radius:4px;border:1px solid #ffffff33;background:${swatch};`

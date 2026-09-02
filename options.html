@@ -37,6 +37,18 @@
       .row + .row { margin-top: 10px; }
       .row label { color: #e0e0e0; }
       .row .hint { display: block; font-size: 12px; color: #cccccc66; margin-top: 2px; }
+      body.light { background: #f2f2f5; color: #333338; }
+      body.light .header h1 { color: #1a1a1a; }
+      body.light .card { background: #ffffff; border-color: #00000014; }
+      body.light .card h2 { color: #00000066; }
+      body.light .row label { color: #303036; }
+      body.light .row .hint { color: #00000059; }
+      body.light input[type='number'], body.light select, body.light textarea {
+        background: #00000008; border-color: #00000020; color: #26262b;
+      }
+      body.light input[type='color'] { background: #00000008; border-color: #00000020; }
+      body.light button { border-color: #00000026; color: #303036; }
+      body.light .value { color: #00000066; }
       input[type='range'] { width: 200px; accent-color: #4c9df3; }
       input[type='color'] {
         width: 44px; height: 28px; padding: 2px;
@@ -102,6 +114,14 @@
             <option value="commands">Commands</option>
             <option value="tabs">Tabs</option>
             <option value="history">History</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Appearance<span class="hint">Palette theme — System follows your OS setting</span></label>
+          <select id="appearance">
+            <option value="system">System</option>
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
           </select>
         </div>
         <div class="row">

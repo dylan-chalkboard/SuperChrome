@@ -12,6 +12,7 @@ interface UserSettings {
   iconColors: { command: string; folder: string; history: string; fallback: string }
   frecencyDecayDays: number
   defaultMode: 'bookmarks' | 'commands' | 'tabs' | 'history'
+  appearance: 'system' | 'dark' | 'light'
   openInNewTab: boolean
   reduceMotion: boolean
   disabledSites: string[]
@@ -24,6 +25,7 @@ const DEFAULTS: UserSettings = {
   iconColors: { command: '#4c9df3', folder: '#e0a63c', history: '#9a6ee8', fallback: '#e05d5d' },
   frecencyDecayDays: 14,
   defaultMode: 'bookmarks',
+  appearance: 'system',
   openInNewTab: false,
   reduceMotion: false,
   disabledSites: [],
@@ -39,6 +41,7 @@ const colorCommand = el<HTMLInputElement>('color-command')
 const colorHistory = el<HTMLInputElement>('color-history')
 const colorFallback = el<HTMLInputElement>('color-fallback')
 const defaultMode = el<HTMLSelectElement>('default-mode')
+const appearance = el<HTMLSelectElement>('appearance')
 const newTab = el<HTMLInputElement>('new-tab')
 const reduceMotion = el<HTMLInputElement>('reduce-motion')
 const decay = el<HTMLInputElement>('decay')
@@ -47,6 +50,13 @@ const quicklinks = el<HTMLTextAreaElement>('quicklinks')
 const snippets = el<HTMLTextAreaElement>('snippets')
 const status = el<HTMLSpanElement>('status')
 
+function applyAppearance(mode: UserSettings['appearance']): void {
+  const light =
+    mode === 'light' ||
+    (mode !== 'dark' && window.matchMedia('(prefers-color-scheme: light)').matches)
+  document.body.classList.toggle('light', light)
+}
+
 function populate(s: UserSettings): void {
   opacity.value = String(s.glassOpacity)
   opacityValue.textContent = `${Math.round(s.glassOpacity * 100)}%`
@@ -54,6 +64,8 @@ function populate(s: UserSettings): void {
   colorHistory.value = s.iconColors.history
   colorFallback.value = s.iconColors.fallback
   defaultMode.value = s.defaultMode
+  appearance.value = s.appearance
+  applyAppearance(s.appearance)
   newTab.checked = s.openInNewTab
   reduceMotion.checked = s.reduceMotion
   decay.value = String(s.frecencyDecayDays)
@@ -83,6 +95,7 @@ function collect(): UserSettings {
     },
     frecencyDecayDays: Math.min(90, Math.max(1, Number(decay.value) || DEFAULTS.frecencyDecayDays)),
     defaultMode: (defaultMode.value as UserSettings['defaultMode']) || 'bookmarks',
+    appearance: (appearance.value as UserSettings['appearance']) || 'system',
     openInNewTab: newTab.checked,
     reduceMotion: reduceMotion.checked,
     disabledSites: sites.value.split('\n').map(cleanHost).filter(Boolean),
@@ -99,6 +112,7 @@ function save(): void {
   saveTimer = setTimeout(() => {
     const settings = collect()
     opacityValue.textContent = `${Math.round(settings.glassOpacity * 100)}%`
+    applyAppearance(settings.appearance)
     void chrome.storage.sync.set({ settings }).then(() => {
       status.classList.add('show')
       clearTimeout(statusTimer)
@@ -107,7 +121,7 @@ function save(): void {
   }, 200)
 }
 
-for (const input of [opacity, colorCommand, colorHistory, colorFallback, defaultMode, newTab, reduceMotion, decay, sites, quicklinks, snippets]) {
+for (const input of [opacity, colorCommand, colorHistory, colorFallback, defaultMode, appearance, newTab, reduceMotion, decay, sites, quicklinks, snippets]) {
   input.addEventListener('input', save)
   input.addEventListener('change', save)
 }
