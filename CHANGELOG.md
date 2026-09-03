@@ -3,6 +3,10 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.25.9
+
+- Search Emoji's icon is an actual 😀
+
 ## 0.25.8
 
 - Terminal-window glyph for Search Commands, tile-free like the ribbon

@@ -1324,6 +1324,11 @@ function buildFavTile(f: FavoriteEntry): HTMLElement {
       img.src = chrome.runtime.getURL('/icons/footer.png')
       img.draggable = false
       tile.appendChild(img)
+    } else if (f.icon === 'emoji-glyph') {
+      const glyph = document.createElement('span')
+      glyph.className = 'fav-emoji'
+      glyph.textContent = '😀'
+      tile.appendChild(glyph)
     } else if (f.icon === 'ribbon' || f.icon === 'floppy' || f.icon === 'terminal-app') {
       tile.innerHTML =
         f.icon === 'ribbon' ? RIBBON_SVG : f.icon === 'floppy' ? FLOPPY_SVG : TERMINAL_APP_SVG
@@ -3022,6 +3027,11 @@ function iconFor(item: RemoteItem): HTMLElement {
       img.src = chrome.runtime.getURL('/icons/footer.png')
       img.draggable = false
       icon.appendChild(img)
+      return icon
+    }
+    if (item.icon === 'emoji-glyph') {
+      icon.className = 'icon plain emoji-glyph'
+      icon.textContent = '😀'
       return icon
     }
     if (item.icon === 'ribbon' || item.icon === 'floppy' || item.icon === 'terminal-app') {
