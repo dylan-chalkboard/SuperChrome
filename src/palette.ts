@@ -11,6 +11,14 @@
 import { getSettings } from './core/settings'
 import { FOLDER_COLORS, folderSvg } from './features/bookmarks/colors'
 import { folderColorOf, loadFolderColors, setFolderColor } from './ui/shared/folder-colors'
+import { ONBOARD_STEPS, onboardProgress, onboardVisible } from './features/onboarding'
+import {
+  dismissOnboarding,
+  loadOnboarding,
+  markOnboard,
+  onboardingState,
+  reviveOnboarding,
+} from './ui/shared/onboarding'
 import type { UserSettings } from './core/settings'
 import {
   LIBRARY_CSS,
@@ -20,6 +28,7 @@ import {
   libraryKey,
   libraryOwnsInput,
   libraryUp,
+  libraryCurrentFolderId,
   openLibrarySave,
   renderLibrary,
   resetLibrary,
@@ -36,7 +45,7 @@ import {
   loadFavorites,
   toggleFavorite,
 } from './ui/shared/favorites'
-import { BOOKMARK_SVG, CLOCK_SVG, CMD_ICONS, COMMAND_SVG, DOC_SVG, RIBBON_SVG } from './ui/shared/icons'
+import { BOOKMARK_SVG, CLOCK_SVG, CMD_ICONS, COMMAND_SVG, DOC_SVG, ONBOARD_DONE_SVG, ONBOARD_TODO_SVG, RIBBON_SVG } from './ui/shared/icons'
 import { MODE_PLACEHOLDERS, MODE_PREFIX, PREFIX_CHARS, mode } from './ui/shared/mode'
 import type { FavoriteEntry, PaletteAction, RemoteItem } from './ui/shared/types'
 
@@ -427,7 +436,7 @@ const GROUP_LABELS: Record<string, string> = {
   library: 'Bookmarks',
 }
 
-type UiState = 'list' | 'actions' | 'rename' | 'move' | 'group' | 'settings'
+type UiState = 'list' | 'actions' | 'rename' | 'move' | 'group' | 'settings' | 'links'
 
 let paletteHost: HTMLDivElement | null = null
 let paletteInput: HTMLInputElement | null = null
@@ -445,6 +454,9 @@ let modeGlyphEl: HTMLElement | null = null
 let modePrefix = ''
 let actionsEl: HTMLElement | null = null
 let brandMenuEl: HTMLElement | null = null
+let pageLinks: RemoteItem[] = []
+let creatingFolder = false
+let newFolderParentId: string | undefined
 
 let uiState: UiState = 'list'
 let flatItems: RemoteItem[] = []
@@ -601,6 +613,7 @@ function openPalette(prefix: string): void {
   // Warm the cache so ⌘K can label Add/Remove from Favorites synchronously.
   void loadFavorites()
   void loadFolderColors()
+  void loadOnboarding()
 
   const inputRow = document.createElement('div')
   inputRow.className = 'input-row'
@@ -948,7 +961,7 @@ function onGlobalKey(e: KeyboardEvent): void {
 
   if (e.key === 'Escape') {
     e.preventDefault()
-    if (uiState === 'move' || uiState === 'group') exitSubState(false)
+    if (uiState === 'move' || uiState === 'group' || uiState === 'links') exitSubState(false)
     else if (browseStack.length && currentMode() === 'bookmarks') popFolder()
     // Inside a prefix mode, Esc steps back to home; only home Esc closes.
     else if (modePrefix) setInput('')
@@ -1126,6 +1139,7 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
   if (item.kind === 'bookmark' || item.kind === 'history' || item.kind === 'search') {
     void chrome.runtime.sendMessage({ type: 'open-url', url: item.url, newTab: altAction })
   } else if (item.kind === 'tab') {
+    void markOnboard('tab')
     void chrome.runtime.sendMessage({ type: 'activate-tab', tabId: item.tabId })
   } else if (item.kind === 'closed') {
     void chrome.runtime.sendMessage({ type: 'restore-session', sessionId: item.sessionId })
@@ -1143,6 +1157,33 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     return
   } else if (item.commandId === 'switch-to-tab') {
     setInput('@')
+    return
+  } else if (item.commandId === 'show-onboarding') {
+    void reviveOnboarding().then(() => setInput(''))
+    return
+  } else if (item.commandId === 'page-links') {
+    enterLinks()
+    return
+  } else if (item.commandId === 'new-folder') {
+    enterNewFolder()
+    return
+  } else if (item.commandId?.startsWith('onboard:')) {
+    const key = item.commandId.slice('onboard:'.length)
+    void markOnboard(key)
+    if (key === 'hotkey') {
+      void chrome.runtime.sendMessage({ type: 'run-command', id: 'open-shortcuts' })
+      closePalette()
+    } else if (key === 'command') setInput('>')
+    else if (key === 'tab') setInput('@')
+    else if (key === 'library') setInput('*')
+    else if (key === 'save') openLibrarySave()
+    else if (key === 'actions') {
+      showToast('Select any row and press ⌘K')
+      void updateList()
+    } else if (key === 'favorite') {
+      showToast('⌘K on any row → Add to Favorites')
+      void updateList()
+    }
     return
   } else if (item.commandId?.startsWith('mode-') || item.commandId === 'open-downloads') {
     const prefixes: Record<string, string> = {
@@ -1171,6 +1212,7 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     window.print()
     return
   } else {
+    void markOnboard('command')
     void chrome.runtime.sendMessage({ type: 'run-command', id: item.commandId })
   }
   closePalette()
@@ -1331,6 +1373,12 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'copy-text', label: 'Copy Snippet' },
       ]
     default:
+      if (item.commandId?.startsWith('onboard:')) {
+        return [
+          { id: 'run', label: 'Do It' },
+          { id: 'onboard-hide', label: 'Hide Getting Started' },
+        ]
+      }
       return [{ id: 'run', label: 'Run Command' }, ...favoriteActionFor(item)]
   }
 }
@@ -1364,6 +1412,7 @@ const ACTION_ICONS: Record<string, string> = {
   'move-up': ARROW_UP_SVG,
   'move-down': ARROW_DOWN_SVG,
   'folder-color': CMD_ICONS.paint,
+  'onboard-hide': CMD_ICONS.reset,
   'group-rename': PENCIL_SVG,
   'group-color': CMD_ICONS.paint,
   'group-dissolve': CMD_ICONS.group,
@@ -1388,6 +1437,7 @@ function openActions(): void {
       : flatItems[selectedIndex]
   if (!item || !panelEl) return
   closeBrandMenu()
+  void markOnboard('actions')
   actionTarget = item
   currentActions = actionsFor(item)
   actionIndex = 0
@@ -1641,6 +1691,9 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
       closeActions()
       openColorPicker(item)
       return
+    case 'onboard-hide':
+      await dismissOnboarding()
+      break
     case 'group-rename':
       closeActions()
       enterGroupRename(item)
@@ -1656,6 +1709,7 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
       break
     case 'favorite-add':
     case 'favorite-remove': {
+      if (action.id === 'favorite-add') void markOnboard('favorite')
       const toast = await toggleFavorite(item)
       if (toast) showToast(toast)
       break
@@ -1775,6 +1829,18 @@ function enterRename(item: RemoteItem): void {
 
 async function commitRename(): Promise<void> {
   const title = paletteInput?.value.trim()
+  if (creatingFolder) {
+    if (title) {
+      await chrome.runtime.sendMessage({
+        type: 'folder-create',
+        title,
+        parentId: newFolderParentId,
+      })
+      showToast(`Folder "${title}" created`)
+    }
+    exitSubState(true)
+    return
+  }
   if (subStateTarget && title) {
     if (subStateTarget.kind === 'tab' && subStateTarget.groupId !== undefined) {
       await chrome.runtime.sendMessage({
@@ -1865,6 +1931,7 @@ async function commitGroup(groupItem: RemoteItem): Promise<void> {
 }
 
 function exitSubState(_commit: boolean): void {
+  creatingFolder = false
   if (uiState === 'actions') closeActions()
   if (!paletteInput) return
   uiState = 'list'
@@ -1931,6 +1998,55 @@ function toggleBrandMenu(): void {
   brandMenuEl.appendChild(version)
 
   panelEl.appendChild(brandMenuEl)
+}
+
+/* ---------- Page links (>Grab Page Links) ---------- */
+
+function enterLinks(): void {
+  if (!paletteInput || !paletteList) return
+  const seen = new Set<string>()
+  pageLinks = []
+  document.querySelectorAll<HTMLAnchorElement>('a[href]').forEach((a) => {
+    const href = a.href
+    if (!/^https?:/i.test(href) || seen.has(href)) return
+    seen.add(href)
+    const label =
+      (a.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 80) || a.title || href
+    pageLinks.push({
+      kind: 'search',
+      label,
+      detail: '',
+      url: href,
+      icon: 'link',
+      color: tileGradient('#4caf7d'),
+    })
+  })
+  uiState = 'links'
+  savedQuery = paletteInput.value
+  paletteInput.value = ''
+  paletteInput.placeholder = `Filter ${pageLinks.length} links…`
+  paletteInput.focus()
+  void updateList()
+}
+
+/** Create a bookmark folder — inside the current library folder, else Other Bookmarks. */
+function enterNewFolder(): void {
+  if (!paletteInput || !paletteList) return
+  creatingFolder = true
+  newFolderParentId = currentMode() === 'library' ? libraryCurrentFolderId() : undefined
+  uiState = 'rename'
+  subStateTarget = null
+  savedQuery = paletteInput.value
+  paletteInput.value = ''
+  paletteInput.placeholder = 'New folder name…'
+  paletteInput.focus()
+  paletteList.textContent = ''
+  flatItems = []
+  const hint = document.createElement('div')
+  hint.className = 'empty'
+  hint.textContent = `New folder ${newFolderParentId ? 'in this folder' : 'in Other Bookmarks'} — ↵ to create, esc to cancel`
+  paletteList.appendChild(hint)
+  renderFooter()
 }
 
 /* ---------- In-palette settings (gear or >SuperChrome: Settings) ---------- */
@@ -2172,6 +2288,17 @@ async function updateList(): Promise<void> {
     return
   }
 
+  if (uiState === 'links') {
+    const q = paletteInput.value.trim().toLowerCase()
+    const rows = pageLinks
+      .map((l) => ({ l, s: localFuzzy(q, `${l.label} ${l.url}`.toLowerCase()) }))
+      .filter((x) => x.s !== null)
+      .sort((a, b) => b.s! - a.s!)
+      .map((x) => x.l)
+    renderItems(`Page Links (${pageLinks.length})`, rows)
+    return
+  }
+
   const mode = currentMode()
   // Library section: the view module owns rendering (settings-view pattern).
   if (mode === 'library') {
@@ -2197,11 +2324,34 @@ async function updateList(): Promise<void> {
   const groupLabel = browsing
     ? browseStack[browseStack.length - 1].label
     : (GROUP_LABELS[mode] ?? 'Results')
-  // Favorites bar rides above Suggested on the home view only.
+  // Favorites bar + Getting Started ride above Suggested on the home view.
   const showFavorites = mode === 'bookmarks' && !browsing && !query.trim()
   const favorites = showFavorites ? await loadFavorites() : []
+  let onboardRows: RemoteItem[] = []
+  if (showFavorites) {
+    const ob = await loadOnboarding()
+    if (onboardVisible(ob)) {
+      if (!ob.done.hotkey) {
+        const info = (await chrome.runtime
+          .sendMessage({ type: 'hotkey-info' })
+          .catch(() => null)) as { shortcut?: string } | null
+        if (info?.shortcut) await markOnboard('hotkey')
+      }
+      const state = onboardingState() ?? ob
+      const header = `Getting Started · ${onboardProgress(state)}/${ONBOARD_STEPS.length}`
+      onboardRows = ONBOARD_STEPS.map((step) => ({
+        kind: 'command' as const,
+        label: step.label,
+        detail: '',
+        commandId: `onboard:${step.key}`,
+        icon: state.done[step.key] ? 'onboard-done' : 'onboard-todo',
+        group: header,
+        typeText: state.done[step.key] ? 'Done' : 'To Do',
+      }))
+    }
+  }
   if (token !== queryToken || uiState !== 'list' || !paletteList) return
-  renderItems(groupLabel, response?.items ?? [], favorites)
+  renderItems(groupLabel, [...onboardRows, ...(response?.items ?? [])], favorites)
 }
 
 function renderEmojiGrid(items: RemoteItem[]): void {
@@ -2391,6 +2541,11 @@ function iconFor(item: RemoteItem): HTMLElement {
       icon.innerHTML = RIBBON_SVG
       return icon
     }
+    if (item.icon === 'onboard-done' || item.icon === 'onboard-todo') {
+      icon.className = 'icon plain'
+      icon.innerHTML = item.icon === 'onboard-done' ? ONBOARD_DONE_SVG : ONBOARD_TODO_SVG
+      return icon
+    }
     icon.className = 'icon kind-command'
     if (item.color) icon.style.background = item.color
     icon.innerHTML = (item.icon && CMD_ICONS[item.icon]) || COMMAND_SVG
@@ -2440,10 +2595,12 @@ initLibrary({
   list: () => paletteList,
   input: () => paletteInput,
   renderRows: (groupLabel, items, header) => renderItems(groupLabel, items, undefined, header),
-  send: (message) =>
-    chrome.runtime.sendMessage(message).catch(() => undefined) as Promise<
+  send: (message) => {
+    if ((message as { type?: string }).type === 'bookmark-create') void markOnboard('save')
+    return chrome.runtime.sendMessage(message).catch(() => undefined) as Promise<
       Record<string, unknown> | undefined
-    >,
+    >
+  },
   toast: (message) => showToast(message),
   refresh: () => void updateList(),
   hideInputRow: (hidden) => {

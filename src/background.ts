@@ -285,6 +285,10 @@ async function handleMessage(
         folderPath: await folderPathOf(match.parentId),
       }
     }
+    case 'hotkey-info': {
+      const cmds = await chrome.commands.getAll()
+      return { shortcut: cmds.find((c) => c.name === 'quick-open')?.shortcut ?? '' }
+    }
     case 'inbox-info': {
       const other = await otherBookmarksNode()
       const children = other ? await chrome.bookmarks.getChildren(other.id) : []

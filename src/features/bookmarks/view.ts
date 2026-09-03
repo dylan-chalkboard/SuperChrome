@@ -174,6 +174,10 @@ export function libraryDepth(): number {
   return stack.length
 }
 
+export function libraryCurrentFolderId(): string | undefined {
+  return stack.length ? stack[stack.length - 1].id : undefined
+}
+
 /** True while a save panel or triage owns the keyboard and hides the input row. */
 export function libraryOwnsInput(): boolean {
   return state !== 'browse'

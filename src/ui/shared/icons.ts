@@ -6,6 +6,12 @@ export const CLOCK_SVG =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor"/><path d="M8 5v3.2l2.2 1.6" stroke="currentColor" stroke-linecap="round"/></svg>'
 export const DOC_SVG =
   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 1.5h5.5L12.5 5v9.5h-8.5v-13z" stroke="currentColor" stroke-linejoin="round"/><path d="M9.5 1.5V5H12.5" stroke="currentColor" stroke-linejoin="round"/></svg>'
+// Getting Started checkboxes: hollow circle (to do) and green check (done).
+export const ONBOARD_TODO_SVG =
+  '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.2" stroke="#8a8a8e" stroke-width="1.4"/></svg>'
+export const ONBOARD_DONE_SVG =
+  '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.8" fill="#4caf7d"/><path d="M5.2 8.2l1.9 1.9 3.7-4" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+
 // Filled red ribbon bookmark with a folded corner; transparent tile.
 export const RIBBON_SVG =
   '<svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M11.6 1.5H5.1c-.9 0-1.6.7-1.6 1.6v10.6c0 .6.7.95 1.2.6l2.8-2.1 2.8 2.1c.5.35 1.2 0 1.2-.6V1.5z" fill="#f04438"/><path d="M11.6 1.5h.9c.9 0 1.6.72 1.6 1.6v.9c0 .88-.7 1.6-1.6 1.6h-.9V1.5z" fill="#c8362c"/></svg>'
@@ -15,6 +21,7 @@ export const FOLDER_SVG =
   '<svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M1.5 4.2C1.5 3.26 2.26 2.5 3.2 2.5h2.9c.45 0 .88.18 1.2.5l.9.9h4.6c.94 0 1.7.76 1.7 1.7v6.2c0 .94-.76 1.7-1.7 1.7H3.2c-.94 0-1.7-.76-1.7-1.7V4.2z" fill="#3f97ee"/><path d="M1.5 6.2c0-.94.76-1.7 1.7-1.7h9.6c.94 0 1.7.76 1.7 1.7v5.6c0 .94-.76 1.7-1.7 1.7H3.2c-.94 0-1.7-.76-1.7-1.7V6.2z" fill="#7ab8f5"/></svg>'
 
 export const CMD_ICONS: Record<string, string> = {
+  folder: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1.5 3.5h4.5l1.5 2h7v7h-13v-9z" stroke="currentColor" stroke-linejoin="round"/></svg>',
   'arrow-left': '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M13 8H3M7 3.5L2.5 8 7 12.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   'arrow-right': '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 3.5L13.5 8 9 12.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   tab: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5" stroke="currentColor"/><path d="M1.5 5.5h13" stroke="currentColor"/></svg>',

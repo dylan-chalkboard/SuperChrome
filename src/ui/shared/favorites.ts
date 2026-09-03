@@ -24,7 +24,9 @@ export function favKey(f: FavoriteEntry): string {
 
 /** Storage key for an item, or null for kinds that can't be favorited. */
 export function favoriteKeyOf(item: RemoteItem): string | null {
-  if (item.kind === 'command' && item.commandId) return `command:${item.commandId}`
+  if (item.kind === 'command' && item.commandId && !item.commandId.startsWith('onboard:')) {
+    return `command:${item.commandId}`
+  }
   if (item.kind === 'folder' && item.id) return `folder:${item.id}`
   const urlKinds: RemoteItem['kind'][] = ['bookmark', 'history', 'tab', 'closed']
   if (item.url && urlKinds.includes(item.kind)) return `url:${item.url}`
