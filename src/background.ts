@@ -396,21 +396,21 @@ async function handleMessage(
       let target = await chrome.tabs.get(message.tabId).catch(() => undefined)
       if (!target || anchor?.windowId === undefined) return {}
       if (target.id === anchor.id) return {}
-      // Native split view first: pull the tab into this window, then let the
-      // native host click Chrome's real split-view context-menu item. When
-      // the host is missing or the menu hunt fails, tile windows instead.
-      if (target.windowId !== anchor.windowId && target.id !== undefined) {
-        await chrome.tabs.move(target.id, { windowId: anchor.windowId, index: -1 }).catch(() => {})
+      // Native split view first: park the target right after the anchor tab,
+      // then press Chrome's own split-view shortcut (⌘⌥N) via the native
+      // host. Window tiling remains the fallback when the host is absent.
+      if (target.id !== undefined && anchor.id !== undefined && anchor.index !== undefined) {
+        await chrome.tabs
+          .move(target.id, { windowId: anchor.windowId, index: anchor.index + 1 })
+          .catch(() => {})
         target = (await chrome.tabs.get(target.id).catch(() => undefined)) ?? target
+        await chrome.tabs.update(anchor.id, { active: true }).catch(() => {})
       }
       const native = (await chrome.runtime
-        .sendNativeMessage('com.superchrome.host', {
-          action: 'split-tab',
-          title: (target.title ?? '').slice(0, 40),
-        })
+        .sendNativeMessage('com.superchrome.host', { action: 'keystroke', name: 'split-view' })
         .catch(() => null)) as { ok?: boolean; error?: string } | null
       if (native?.ok) return { native: true }
-      if (native?.error) console.warn('split-tab fallback:', native.error)
+      if (native?.error) console.warn('split-view fallback:', native.error)
       await tileBeside(anchor.windowId, target)
       return { native: false }
     }

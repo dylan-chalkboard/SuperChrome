@@ -36,6 +36,7 @@ export const PALETTE_COMMANDS = [
   { id: 'reopen-tab', label: 'Reopen Closed Tab' },
   { id: 'duplicate-tab', label: 'Duplicate Tab' },
   { id: 'toggle-pin', label: 'Pin/Unpin Tab' },
+  { id: 'split-view', label: 'New Split View' },
   { id: 'tile-left', label: 'Tile Tab Left' },
   { id: 'tile-right', label: 'Tile Tab Right' },
   { id: 'move-tab-new-window', label: 'Move Tab to New Window' },
@@ -89,6 +90,7 @@ export const COMMAND_META: Record<string, { icon: string; color: string }> = {
   'reopen-tab': { icon: 'reset', color: '#e0619e' },
   'duplicate-tab': { icon: 'tab', color: '#4c9df3' },
   'toggle-pin': { icon: 'pin', color: '#4c9df3' },
+  'split-view': { icon: 'split', color: '#3ab5c6' },
   'tile-left': { icon: 'split', color: '#3ab5c6' },
   'tile-right': { icon: 'split', color: '#3ab5c6' },
   'move-tab-new-window': { icon: 'external', color: '#3ab5c6' },
@@ -245,6 +247,7 @@ export async function runCommand(
       }
       break
     }
+    case 'split-view':
     case 'toggle-bookmarks-bar':
     case 'save-page':
     case 'find-in-page':

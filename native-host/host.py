@@ -23,6 +23,7 @@ KEYSTROKES = {
     "save-page": ("s", ["command down"]),
     "find-in-page": ("f", ["command down"]),
     "new-incognito": ("n", ["command down", "shift down"]),
+    "split-view": ("n", ["command down", "option down"]),
 }
 
 MENU_ITEM_RE = re.compile(r"^[A-Za-z0-9 '&,./…-]{1,40}$")
@@ -41,54 +42,6 @@ def run_keystroke(name: str) -> subprocess.CompletedProcess:
     return osascript(
         f'tell application "System Events" to keystroke "{key}" using {{{mods}}}'
     )
-
-
-def run_split_tab(title) -> subprocess.CompletedProcess:
-    """Right-click the tab whose name contains `title` and click Chrome's
-    native split-view context-menu item. Best-effort UI scripting: the
-    extension falls back to window tiling when this reports failure."""
-    if not isinstance(title, str) or not title.strip():
-        raise ValueError("invalid title")
-    safe = title.replace("\\", "").replace('"', "")[:40]
-    script = f'''
-tell application "System Events" to tell process "Google Chrome"
-    set frontmost to true
-    set theTab to missing value
-    try
-        set theTab to first radio button of tab group 1 of window 1 whose name contains "{safe}"
-    end try
-    if theTab is missing value then
-        try
-            set theTab to first UI element of tab group 1 of window 1 whose name contains "{safe}"
-        end try
-    end if
-    if theTab is missing value then error "tab element not found"
-    perform action "AXShowMenu" of theTab
-    delay 0.3
-    set theMenu to missing value
-    try
-        set theMenu to menu 1 of theTab
-    end try
-    if theMenu is missing value then
-        key code 53
-        error "context menu not found"
-    end if
-    set clicked to false
-    repeat with mi in menu items of theMenu
-        try
-            if name of mi contains "plit" then
-                click mi
-                set clicked to true
-                exit repeat
-            end if
-        end try
-    end repeat
-    if not clicked then
-        key code 53
-        error "split menu item not found"
-    end if
-end tell'''
-    return osascript(script)
 
 
 def run_click_menu(path: list) -> subprocess.CompletedProcess:
@@ -130,8 +83,6 @@ def main() -> None:
             result = run_keystroke(message["name"])
         elif action == "click-menu":
             result = run_click_menu(message.get("path"))
-        elif action == "split-tab":
-            result = run_split_tab(message.get("title"))
         else:
             result = None
             error = "unknown action"

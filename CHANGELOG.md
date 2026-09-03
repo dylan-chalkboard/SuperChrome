@@ -3,6 +3,13 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.25.2
+
+- Split view now uses Chrome's own ⌘⌥N shortcut through the native host
+  (no fragile menu scripting): "Split With Current Tab" parks the chosen
+  tab next to yours and presses it; `>New Split View` presses it directly;
+  window tiling stays the fallback without the host
+
 ## 0.25.1
 
 - **Native split view via the macOS host**: ⌘K → "Split With Current Tab"
