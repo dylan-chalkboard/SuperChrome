@@ -48,7 +48,8 @@ import {
   toggleFavorite,
   updateFavorite,
 } from './ui/shared/favorites'
-import { ALL_ICONS, BOOKMARK_SVG, CLOCK_SVG, CMD_ICONS, COMMAND_SVG, DOC_SVG, FLOPPY_SVG, ONBOARD_DONE_SVG, ONBOARD_TODO_SVG, RIBBON_SVG } from './ui/shared/icons'
+import { ALL_ICONS, BOOKMARK_SVG, CLOCK_SVG, CMD_ICONS, COMMAND_SVG, DOC_SVG, FLOPPY_SVG,
+  TERMINAL_APP_SVG, ONBOARD_DONE_SVG, ONBOARD_TODO_SVG, RIBBON_SVG } from './ui/shared/icons'
 import { MODE_PLACEHOLDERS, MODE_PREFIX, PREFIX_CHARS, mode } from './ui/shared/mode'
 import type { FavoriteEntry, PaletteAction, RemoteItem } from './ui/shared/types'
 
@@ -1323,8 +1324,9 @@ function buildFavTile(f: FavoriteEntry): HTMLElement {
       img.src = chrome.runtime.getURL('/icons/footer.png')
       img.draggable = false
       tile.appendChild(img)
-    } else if (f.icon === 'ribbon' || f.icon === 'floppy') {
-      tile.innerHTML = f.icon === 'ribbon' ? RIBBON_SVG : FLOPPY_SVG
+    } else if (f.icon === 'ribbon' || f.icon === 'floppy' || f.icon === 'terminal-app') {
+      tile.innerHTML =
+        f.icon === 'ribbon' ? RIBBON_SVG : f.icon === 'floppy' ? FLOPPY_SVG : TERMINAL_APP_SVG
     } else {
       if (!f.tileColor && f.color) tile.style.background = f.color
       tile.innerHTML = (f.icon && CMD_ICONS[f.icon]) || COMMAND_SVG
@@ -3022,10 +3024,11 @@ function iconFor(item: RemoteItem): HTMLElement {
       icon.appendChild(img)
       return icon
     }
-    if (item.icon === 'ribbon' || item.icon === 'floppy') {
+    if (item.icon === 'ribbon' || item.icon === 'floppy' || item.icon === 'terminal-app') {
       // Self-colored glyphs (like the folder): no tile behind them.
       icon.className = 'icon plain'
-      icon.innerHTML = item.icon === 'ribbon' ? RIBBON_SVG : FLOPPY_SVG
+      icon.innerHTML =
+        item.icon === 'ribbon' ? RIBBON_SVG : item.icon === 'floppy' ? FLOPPY_SVG : TERMINAL_APP_SVG
       return icon
     }
     if (item.icon === 'onboard-done' || item.icon === 'onboard-todo') {

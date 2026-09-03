@@ -70,7 +70,7 @@ export const PALETTE_COMMANDS = [
 /** Per-command icon + tile color shown in the '>' list. */
 export const COMMAND_META: Record<string, { icon: string; color: string }> = {
   'switch-to-tab': { icon: 'switch', color: '#e0619e' },
-  'mode-commands': { icon: 'search', color: '#4c9df3' },
+  'mode-commands': { icon: 'terminal-app', color: '' },
   'mode-history': { icon: 'clock', color: '#9a6ee8' },
   'mode-emoji': { icon: 'search', color: '#4caf7d' },
   'mode-snippets': { icon: 'doc', color: '#e8964a' },

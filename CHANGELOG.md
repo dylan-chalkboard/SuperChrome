@@ -3,6 +3,11 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.25.8
+
+- Terminal-window glyph for Search Commands, tile-free like the ribbon
+  and floppy
+
 ## 0.25.7
 
 - `>DVD Screensaver` 📀 — the logo bounces around a dimmed screen,
