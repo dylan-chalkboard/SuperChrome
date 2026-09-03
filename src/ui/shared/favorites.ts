@@ -41,7 +41,7 @@ export function isFavorite(item: RemoteItem): boolean {
 export function favoriteActionFor(item: RemoteItem): PaletteAction[] {
   if (!favoriteKeyOf(item)) return []
   return isFavorite(item)
-    ? [{ id: 'favorite-remove', label: 'Remove from Favorites' }]
+    ? [{ id: 'favorite-remove', label: 'Remove from Favorites', danger: true }]
     : [{ id: 'favorite-add', label: 'Add to Favorites' }]
 }
 

@@ -3,6 +3,10 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.23.1
+
+- "Remove from Favorites" renders as a destructive (red) action
+
 ## 0.23.0
 
 - **Customize Favorite…** replaces the separate color/emoji actions: one
