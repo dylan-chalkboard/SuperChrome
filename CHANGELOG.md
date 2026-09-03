@@ -3,6 +3,11 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.24.4
+
+- "Switch to Tab" indicator is more prominent: a boxed right-arrow tile
+  next to the label, Raycast-style
+
 ## 0.24.3
 
 - Fixed: right-column labels rendered near-invisible in dark mode (a

@@ -266,8 +266,12 @@ const PALETTE_CSS = `
   flex: 1; overflow: hidden; text-overflow: ellipsis;
   color: #ffffff4d; font-size: 13px;
 }
-.open-tab-arrow { display: flex; flex-shrink: 0; color: #ffffff59; margin-left: 6px; }
-.light .open-tab-arrow { color: #00000045; }
+.open-tab-arrow {
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 24px; height: 24px; margin-left: 8px; border-radius: 7px;
+  background: #ffffff14; color: #e8e8e8;
+}
+.light .open-tab-arrow { background: #00000010; color: #303036; }
 .item .type {
   flex-shrink: 0; margin-left: auto;
   color: #ffffff4d; font-size: 12px;
@@ -2775,8 +2779,7 @@ function renderItems(
     if (item.openTab) {
       const arrow = document.createElement('span')
       arrow.className = 'open-tab-arrow'
-      arrow.innerHTML =
-        '<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="3" stroke="currentColor"/><path d="M6 10l4-4M7 6h3v3" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      arrow.innerHTML = CMD_ICONS['arrow-right']
       row.appendChild(arrow)
     }
     row.addEventListener('mousedown', (e) => {
