@@ -150,6 +150,21 @@ async function libraryList(
   return { items, path }
 }
 
+/** URL equality for switch-instead-of-reopen: ignores hash and trailing slash. */
+function sameUrl(a: string | undefined, b: string | undefined): boolean {
+  if (!a || !b) return false
+  const norm = (u: string): string => {
+    try {
+      const url = new URL(u)
+      url.hash = ''
+      return url.href.replace(/\/$/, '')
+    } catch {
+      return u
+    }
+  }
+  return norm(a) === norm(b)
+}
+
 /** folderType shipped in Chrome 134; older trees just report undefined. */
 function folderTypeOf(node: chrome.bookmarks.BookmarkTreeNode): string | undefined {
   return (node as { folderType?: string }).folderType
@@ -411,6 +426,20 @@ async function handleMessage(
       const tab = await senderTab(sender)
       // The setting inverts Enter vs Cmd+Enter: XOR keeps both reachable.
       const newTab = (message.newTab ?? false) !== (await getSettings()).openInNewTab
+      // Plain open switches to an already-open tab instead of duplicating it;
+      // the Cmd+Enter variant stays an escape hatch that really opens anew.
+      if (!newTab && message.url) {
+        const existing = (await chrome.tabs.query({})).find(
+          (t) => t.id !== undefined && t.id !== tab?.id && sameUrl(t.url, message.url),
+        )
+        if (existing?.id !== undefined) {
+          await chrome.tabs.update(existing.id, { active: true })
+          if (existing.windowId !== undefined) {
+            await chrome.windows.update(existing.windowId, { focused: true })
+          }
+          return { newTab: false, switched: true }
+        }
+      }
       if (newTab || !tab?.id) await chrome.tabs.create({ url: message.url })
       else await chrome.tabs.update(tab.id, { url: message.url })
       // Tab-mode palette needs to know whether its own tab is now navigating.

@@ -3,6 +3,12 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.24.1
+
+- Opening a bookmark/history/search result whose URL is already open
+  switches to that tab (hash and trailing slash ignored); `⌘↵` still
+  forces a fresh tab
+
 ## 0.24.0
 
 - **Customize Favorite** grew: 18 colors + hue-shift gradients + 8
