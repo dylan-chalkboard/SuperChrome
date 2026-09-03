@@ -51,6 +51,7 @@ import {
 } from './ui/shared/favorites'
 import { ALL_ICONS, BOOKMARK_SVG, CLOCK_SVG, CMD_ICONS, COMMAND_SVG, DOC_SVG, CLOCK_APP_SVG,
   FLOPPY_SVG,
+  SNIPPET_APP_SVG,
   TABS_APP_SVG,
   TERMINAL_APP_SVG, ONBOARD_DONE_SVG, ONBOARD_TODO_SVG, RIBBON_SVG } from './ui/shared/icons'
 import { MODE_PLACEHOLDERS, MODE_PREFIX, PREFIX_CHARS, mode } from './ui/shared/mode'
@@ -1535,6 +1536,7 @@ const APP_GLYPHS: Record<string, string> = {
   'terminal-app': TERMINAL_APP_SVG,
   'clock-app': CLOCK_APP_SVG,
   'tabs-app': TABS_APP_SVG,
+  'snippet-app': SNIPPET_APP_SVG,
 }
 
 const STAR_SLASH_SVG =

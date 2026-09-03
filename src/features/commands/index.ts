@@ -77,7 +77,7 @@ export const COMMAND_META: Record<string, { icon: string; color: string }> = {
   'mode-commands': { icon: 'terminal-app', color: '' },
   'mode-history': { icon: 'clock-app', color: '' },
   'mode-emoji': { icon: 'emoji-glyph', color: '' },
-  'mode-snippets': { icon: 'doc', color: '#e8964a' },
+  'mode-snippets': { icon: 'snippet-app', color: '' },
   'mode-library': { icon: 'ribbon', color: '' },
   'open-options': { icon: 'logo', color: '' },
   'show-onboarding': { icon: 'info', color: '#4c9df3' },

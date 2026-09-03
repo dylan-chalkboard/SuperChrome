@@ -3,6 +3,10 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.26.3
+
+- Notepad glyph for Snippets — the launcher icon family is complete
+
 ## 0.26.2
 
 - Mode launchers renamed to bare nouns — Commands, Tabs, History, Emoji,
