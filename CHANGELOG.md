@@ -3,6 +3,10 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.27.2
+
+- Screenshot flashes the screen on capture, macOS-style
+
 ## 0.27.1
 
 - Zap Ads detection substantially widened: AdSense aswift frames, GPT

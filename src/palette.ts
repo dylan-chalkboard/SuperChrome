@@ -2275,10 +2275,23 @@ async function screenshotPage(): Promise<void> {
   try {
     const blob = await (await fetch(resp.dataUrl)).blob()
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+    screenshotFlash()
     showToast('Screenshot copied')
   } catch {
     showToast("Couldn't take screenshot")
   }
+}
+
+/** macOS-style capture flash — after the capture, so it's not in the shot. */
+function screenshotFlash(): void {
+  if (reducedMotion()) return
+  const flash = document.createElement('div')
+  flash.style.cssText =
+    'position:fixed;inset:0;background:#ffffff;pointer-events:none;z-index:2147483647;'
+  document.documentElement.appendChild(flash)
+  flash
+    .animate([{ opacity: 0.9 }, { opacity: 0 }], { duration: 380, easing: 'ease-out' })
+    .addEventListener('finish', () => flash.remove())
 }
 
 const AD_IFRAME_HOSTS = [
