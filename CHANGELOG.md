@@ -3,6 +3,23 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.22.0
+
+- **Getting Started checklist** (Raycast-style walkthrough): seven checkbox
+  rows on the home view — bind the ⌘P hotkey, `>`, `@`, `⌘K`, `⌘D` save,
+  favorite, `*` — ticking automatically as features get used or when
+  tapped; hidden once complete; `⌘K` → Hide, back via
+  `>SuperChrome: Getting Started`
+- **Grab Page Links** command: every anchor on the page as a filterable
+  list — Enter opens, deduped, http(s) only
+- **New Bookmark Folder…** command: inline naming; creates inside the
+  current library folder, else Other Bookmarks
+- **Right-click context menu**: rows and favorite tiles open the ⌘K panel
+  at the cursor
+- **Favorites bar**: wraps instead of clipping overflow, larger tiles,
+  per-favorite Tile Color… and Emoji Icon… customization, and command
+  tiles render the logo/ribbon icons correctly
+
 ## 0.21.0
 
 - **Bookmarks section** (`*` prefix, red): a dedicated library view with a
