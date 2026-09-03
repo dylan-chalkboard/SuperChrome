@@ -1219,6 +1219,10 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     closePalette()
     launchConfetti()
     return
+  } else if (item.commandId === 'dvd') {
+    closePalette()
+    launchDvd()
+    return
   } else if (item.commandId === 'new-folder') {
     enterNewFolder()
     return
@@ -2232,6 +2236,72 @@ function launchConfetti(): void {
     else canvas.remove()
   }
   requestAnimationFrame(tick)
+}
+
+/* ---------- DVD screensaver (>DVD) ---------- */
+
+function launchDvd(): void {
+  if (reducedMotion()) {
+    showToast('📀')
+    return
+  }
+  const colors = ['#4c9df3', '#e0619e', '#9a6ee8', '#4caf7d', '#e8964a', '#e8c341', '#3aa99f', '#e05d5d']
+  const host = document.createElement('div')
+  host.style.cssText =
+    'position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,0.78);cursor:default;'
+  const logo = document.createElement('div')
+  logo.style.cssText = 'position:absolute;width:110px;height:46px;will-change:transform;'
+  logo.innerHTML =
+    '<svg width="110" height="46" viewBox="0 0 110 46">' +
+    '<text x="55" y="27" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="27" font-style="italic" font-weight="900" fill="currentColor">DVD</text>' +
+    '<ellipse cx="55" cy="37" rx="34" ry="5.5" fill="currentColor"/>' +
+    '<ellipse cx="55" cy="37" rx="10" ry="2" fill="rgba(0,0,0,0.85)"/>' +
+    '</svg>'
+  host.appendChild(logo)
+  document.documentElement.appendChild(host)
+
+  let colorIndex = Math.floor(Math.random() * colors.length)
+  logo.style.color = colors[colorIndex]
+  const W = 110
+  const H = 46
+  let x = Math.random() * (window.innerWidth - W)
+  let y = Math.random() * (window.innerHeight - H)
+  let vx = 2.4 * (Math.random() < 0.5 ? 1 : -1)
+  let vy = 2.1 * (Math.random() < 0.5 ? 1 : -1)
+  let raf = 0
+
+  const nextColor = (): void => {
+    colorIndex = (colorIndex + 1 + Math.floor(Math.random() * (colors.length - 1))) % colors.length
+    logo.style.color = colors[colorIndex]
+  }
+  const stop = (): void => {
+    cancelAnimationFrame(raf)
+    window.removeEventListener('keydown', stop, true)
+    host.remove()
+  }
+  const tick = (): void => {
+    x += vx
+    y += vy
+    let hitX = false
+    let hitY = false
+    if (x <= 0 || x >= window.innerWidth - W) {
+      vx = -vx
+      x = Math.max(0, Math.min(x, window.innerWidth - W))
+      hitX = true
+    }
+    if (y <= 0 || y >= window.innerHeight - H) {
+      vy = -vy
+      y = Math.max(0, Math.min(y, window.innerHeight - H))
+      hitY = true
+    }
+    if (hitX || hitY) nextColor()
+    if (hitX && hitY) launchConfetti() // The corner. It finally happened.
+    logo.style.transform = `translate3d(${x}px, ${y}px, 0)`
+    raf = requestAnimationFrame(tick)
+  }
+  window.addEventListener('keydown', stop, true)
+  host.addEventListener('mousedown', stop)
+  raf = requestAnimationFrame(tick)
 }
 
 /* ---------- Page links (>Grab Page Links) ---------- */
