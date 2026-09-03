@@ -473,6 +473,26 @@ async function handleMessage(
       // Tab-mode palette needs to know whether its own tab is now navigating.
       return { newTab: newTab || !tab?.id }
     }
+    case 'fetch-image': {
+      if (!message.url) return { ok: false }
+      try {
+        const response = await fetch(message.url)
+        const buffer = await response.arrayBuffer()
+        if (buffer.byteLength > 25 * 1024 * 1024) return { ok: false }
+        const view = new Uint8Array(buffer)
+        let binary = ''
+        for (let i = 0; i < view.length; i += 0x8000) {
+          binary += String.fromCharCode(...view.subarray(i, i + 0x8000))
+        }
+        return {
+          ok: true,
+          mime: response.headers.get('content-type')?.split(';')[0] || 'image/png',
+          base64: btoa(binary),
+        }
+      } catch {
+        return { ok: false }
+      }
+    }
     case 'run-command':
       if (message.id) await runCommand(message.id, sender)
       return {}

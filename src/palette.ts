@@ -1443,6 +1443,15 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'delete', label: 'Delete Bookmark', danger: true },
       ]
     case 'search':
+      if (item.iconUrl && item.url) {
+        // Image rows from Grab Page Images / Page Info.
+        return [
+          { id: 'open', label: 'Open Image' },
+          { id: 'open-new-tab', label: 'Open in New Tab' },
+          { id: 'copy-image', label: 'Copy Image' },
+          { id: 'copy-url', label: 'Copy Image URL' },
+        ]
+      }
       return [
         { id: 'open', label: 'Search' },
         { id: 'open-new-tab', label: 'Search in New Tab' },
@@ -1561,6 +1570,7 @@ const ACTION_ICONS: Record<string, string> = {
   browse: FOLDER_OUTLINE_SVG,
   'open-all': CMD_ICONS.tab,
   'copy-url': CMD_ICONS.link,
+  'copy-image': CMD_ICONS.image,
   'copy-md': CMD_ICONS.link,
   'copy-text': CMD_ICONS.doc,
   'favorite-add': STAR_SVG,
@@ -1798,6 +1808,37 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
       })
       closePalette()
       return
+    case 'copy-image': {
+      const resp = (await chrome.runtime.sendMessage({ type: 'fetch-image', url: item.url })) as
+        | { ok?: boolean; mime?: string; base64?: string }
+        | undefined
+      if (!resp?.ok || !resp.base64) {
+        showToast("Couldn't copy image")
+        closeActions()
+        return
+      }
+      try {
+        const bytes = Uint8Array.from(atob(resp.base64), (c) => c.charCodeAt(0))
+        let blob = new Blob([bytes], { type: resp.mime })
+        if (resp.mime !== 'image/png') {
+          // The async clipboard only accepts PNG for images — transcode.
+          const bitmap = await createImageBitmap(blob)
+          const canvas = document.createElement('canvas')
+          canvas.width = bitmap.width
+          canvas.height = bitmap.height
+          canvas.getContext('2d')!.drawImage(bitmap, 0, 0)
+          blob = await new Promise<Blob>((resolve, reject) =>
+            canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('encode'))), 'image/png'),
+          )
+        }
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+        showToast('Image copied')
+      } catch {
+        showToast("Couldn't copy image")
+      }
+      closePalette()
+      return
+    }
     case 'copy-url':
       copyText(item.url ?? '')
       closePalette()

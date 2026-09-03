@@ -3,6 +3,12 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.26.4
+
+- ⌘K on image rows (Grab Page Images, Page Info) gains **Copy Image** —
+  the actual image lands on your clipboard (fetched cross-origin by the
+  background, transcoded to PNG when needed)
+
 ## 0.26.3
 
 - Notepad glyph for Snippets — the launcher icon family is complete
