@@ -3,6 +3,13 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.23.0
+
+- **Customize Favorite…** replaces the separate color/emoji actions: one
+  panel with a live preview, flat color and gradient background swatches,
+  and a glyph choice of Default (favicon/command icon), a picker over the
+  built-in icon library, or a text monogram (up to 3 characters)
+
 ## 0.22.0
 
 - **Getting Started checklist** (Raycast-style walkthrough): seven checkbox

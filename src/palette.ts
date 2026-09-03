@@ -39,6 +39,7 @@ import { cleanHost } from './features/navigation'
 import { parseQuicklinks, serializeQuicklinks } from './features/quicklinks'
 import { parseSnippets, serializeSnippets } from './features/snippets'
 import {
+  favKey,
   favToItem,
   favoriteActionFor,
   favoriteKeyOf,
@@ -328,6 +329,39 @@ const PALETTE_CSS = `
 .action-row.danger { color: #ff8f8f; }
 .list::-webkit-scrollbar { width: 10px; }
 .list::-webkit-scrollbar-thumb { background: #ffffff1a; border-radius: 5px; }
+/* ---------- Customize Favorite panel ---------- */
+.fav-preview { display: flex; justify-content: center; padding: 4px 0 2px; }
+.swatch-strip { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.swatch-dot {
+  width: 24px; height: 24px; border-radius: 50%; cursor: pointer;
+  border: 1px solid #ffffff20; box-sizing: border-box;
+}
+.swatch-dot.none {
+  background:
+    linear-gradient(to top left, transparent 46%, #e05d5d 47%, #e05d5d 53%, transparent 54%),
+    #ffffff10;
+}
+.swatch-dot.on { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7); }
+.icon-grid { display: flex; flex-wrap: wrap; gap: 6px; max-height: 160px; overflow-y: auto; }
+.icon-cell {
+  width: 30px; height: 30px; border-radius: 7px; cursor: pointer;
+  background: #ffffff10; color: #ccccccbb;
+  display: flex; align-items: center; justify-content: center; flex: none;
+}
+.icon-cell:hover { background: #ffffff20; color: #ffffff; }
+.icon-cell.on { background: #4c9df3; color: #ffffff; }
+.fav-tile .fav-text {
+  font-size: 15px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase;
+}
+.light .swatch-dot { border-color: #00000020; }
+.light .swatch-dot.none { background:
+    linear-gradient(to top left, transparent 46%, #d03d3d 47%, #d03d3d 53%, transparent 54%),
+    #00000008; }
+.light .swatch-dot.on { box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.45); }
+.light .icon-cell { background: #00000008; color: #00000073; }
+.light .icon-cell:hover { background: #00000014; color: #1c1c1e; }
+.light .icon-cell.on { background: #4c9df3; color: #ffffff; }
+
 /* ---------- In-palette settings view (Raycast-style two-column form) ---------- */
 .settings { padding: 20px 24px 22px; display: flex; flex-direction: column; gap: 13px; }
 .set-row { display: grid; grid-template-columns: 150px 1fr; gap: 16px; align-items: center; }
@@ -439,7 +473,7 @@ const GROUP_LABELS: Record<string, string> = {
   library: 'Bookmarks',
 }
 
-type UiState = 'list' | 'actions' | 'rename' | 'move' | 'group' | 'settings' | 'links'
+type UiState = 'list' | 'actions' | 'rename' | 'move' | 'group' | 'settings' | 'links' | 'fav-custom'
 
 let paletteHost: HTMLDivElement | null = null
 let paletteInput: HTMLInputElement | null = null
@@ -460,7 +494,8 @@ let brandMenuEl: HTMLElement | null = null
 let pageLinks: RemoteItem[] = []
 let creatingFolder = false
 let newFolderParentId: string | undefined
-let favEmojiKey: string | null = null
+let favCustomKey: string | null = null
+let favGlyphTab: 'default' | 'icon' | 'text' | null = null
 
 let uiState: UiState = 'list'
 let flatItems: RemoteItem[] = []
@@ -778,7 +813,7 @@ function renderFooter(): void {
   const primary = document.createElement('span')
   primary.className = 'action'
   const primaryLabel =
-    uiState === 'settings'
+    uiState === 'settings' || uiState === 'fav-custom'
       ? 'Done'
       : uiState === 'move'
         ? 'Move Here'
@@ -789,7 +824,7 @@ function renderFooter(): void {
             : mode === 'emoji' || mode === 'snippets'
               ? 'Insert'
               : 'Open'
-  primary.append(document.createTextNode(primaryLabel), kbd(uiState === 'settings' ? 'esc' : '↵'))
+  primary.append(document.createTextNode(primaryLabel), kbd(uiState === 'settings' || uiState === 'fav-custom' ? 'esc' : '↵'))
   paletteFooter.appendChild(primary)
 
   if (uiState === 'list' && (mode === 'bookmarks' || mode === 'history' || mode === 'library')) {
@@ -842,11 +877,12 @@ function onGlobalKey(e: KeyboardEvent): void {
     return
   }
 
-  // Settings view owns the keyboard: form controls get everything but Esc.
-  if (uiState === 'settings') {
+  // Settings/customize views own the keyboard: controls get everything but Esc.
+  if (uiState === 'settings' || uiState === 'fav-custom') {
     if (e.key === 'Escape') {
       e.preventDefault()
-      exitSettings()
+      if (uiState === 'settings') exitSettings()
+      else exitFavCustomize()
     }
     return
   }
@@ -1233,24 +1269,33 @@ let favBarItems: FavoriteEntry[] = []
 /** Index of the keyboard-selected favorite tile, or -1 when the list has focus. */
 let favIndex = -1
 
-function favTileEl(f: FavoriteEntry, index: number): HTMLElement {
-  const el = document.createElement('div')
-  el.className = 'fav-item'
-  el.title = f.label
-  el.addEventListener('mousemove', () => {
-    if (favIndex !== index) setFavIndex(index)
-  })
+/** The visual tile for a favorite — shared by the bar and the customize preview. */
+function buildFavTile(f: FavoriteEntry): HTMLElement {
   const tile = document.createElement('div')
   tile.className = 'fav-tile'
   if (f.tileColor && FOLDER_COLORS[f.tileColor]) {
-    tile.style.background = FOLDER_COLORS[f.tileColor][0]
+    const hex = FOLDER_COLORS[f.tileColor][0]
+    tile.style.background = f.tileStyle === 'gradient' ? tileGradient(hex) : hex
   }
   if (f.emojiIcon) {
     const glyph = document.createElement('span')
     glyph.className = 'fav-emoji'
     glyph.textContent = f.emojiIcon
     tile.appendChild(glyph)
-  } else if (f.kind === 'command') {
+    return tile
+  }
+  if (f.iconName && CMD_ICONS[f.iconName]) {
+    tile.innerHTML = CMD_ICONS[f.iconName]
+    return tile
+  }
+  if (f.textIcon) {
+    const glyph = document.createElement('span')
+    glyph.className = 'fav-text'
+    glyph.textContent = f.textIcon
+    tile.appendChild(glyph)
+    return tile
+  }
+  if (f.kind === 'command') {
     // Mirror iconFor's special cases so command tiles always show something.
     if (f.icon === 'logo') {
       const img = document.createElement('img')
@@ -1276,6 +1321,17 @@ function favTileEl(f: FavoriteEntry, index: number): HTMLElement {
     }
     tile.appendChild(img)
   }
+  return tile
+}
+
+function favTileEl(f: FavoriteEntry, index: number): HTMLElement {
+  const el = document.createElement('div')
+  el.className = 'fav-item'
+  el.title = f.label
+  el.addEventListener('mousemove', () => {
+    if (favIndex !== index) setFavIndex(index)
+  })
+  const tile = buildFavTile(f)
   const cap = document.createElement('span')
   cap.className = 'fav-cap'
   cap.textContent = f.label
@@ -1447,8 +1503,7 @@ const ACTION_ICONS: Record<string, string> = {
   'move-down': ARROW_DOWN_SVG,
   'folder-color': CMD_ICONS.paint,
   'onboard-hide': CMD_ICONS.reset,
-  'fav-color': CMD_ICONS.paint,
-  'fav-emoji': STAR_SVG,
+  'fav-custom': CMD_ICONS.paint,
   'group-rename': PENCIL_SVG,
   'group-color': CMD_ICONS.paint,
   'group-dissolve': CMD_ICONS.group,
@@ -1480,11 +1535,7 @@ function openActions(at?: { x: number; y: number }): void {
   favMenuContext = favIndex >= 0
   actionTarget = item
   currentActions = favMenuContext
-    ? [
-        ...actionsFor(item),
-        { id: 'fav-color', label: 'Tile Color…' },
-        { id: 'fav-emoji', label: 'Emoji Icon…' },
-      ]
+    ? [...actionsFor(item), { id: 'fav-custom', label: 'Customize Favorite…' }]
     : actionsFor(item)
   actionIndex = 0
   uiState = 'actions'
@@ -1645,87 +1696,7 @@ function openTabGroupColorPicker(item: RemoteItem): void {
   renderFooter()
 }
 
-/** Swatch submenu for a favorite tile's background color. */
-function openFavColorPicker(item: RemoteItem): void {
-  if (!panelEl) return
-  actionTarget = item
-  currentActions = [
-    { id: 'fav-color:none', label: 'Default' },
-    ...Object.keys(FOLDER_COLORS).map((name) => ({
-      id: `fav-color:${name}`,
-      label: name[0].toUpperCase() + name.slice(1),
-    })),
-  ]
-  actionIndex = 0
-  uiState = 'actions'
-  actionsEl?.remove()
-  actionsEl = document.createElement('div')
-  actionsEl.className = 'actions'
-  currentActions.forEach((action, index) => {
-    const row = document.createElement('div')
-    row.className = 'action-row'
-    const name = action.id.slice('fav-color:'.length)
-    const pair = FOLDER_COLORS[name]
-    const dot = document.createElement('span')
-    dot.className = 'menu-icon'
-    dot.innerHTML = pair
-      ? `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="${pair[0]}"/></svg>`
-      : `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="none" stroke="#8a8a8e"/></svg>`
-    const label = document.createElement('span')
-    label.textContent = action.label
-    const spacer = document.createElement('span')
-    spacer.className = 'spacer'
-    row.append(dot, label, spacer)
-    if (index < 9) row.appendChild(kbd(String(index + 1)))
-    row.addEventListener('mousedown', (e) => {
-      e.preventDefault()
-      void runAction(action, item)
-    })
-    row.addEventListener('mousemove', () => {
-      if (actionIndex !== index) {
-        actionIndex = index
-        highlightActions()
-      }
-    })
-    actionsEl!.appendChild(row)
-  })
-  panelEl.appendChild(actionsEl)
-  highlightActions()
-  renderFooter()
-}
-
-/** Emoji-icon input for a favorite tile (empty entry clears it). */
-function enterFavEmoji(item: RemoteItem): void {
-  if (!paletteInput || !paletteList) return
-  favEmojiKey = favoriteKeyOf(item)
-  if (!favEmojiKey) return
-  uiState = 'rename'
-  subStateTarget = null
-  savedQuery = paletteInput.value
-  paletteInput.value = ''
-  paletteInput.placeholder = 'Emoji for this favorite (leave empty to clear)…'
-  paletteInput.focus()
-  paletteList.textContent = ''
-  flatItems = []
-  const hint = document.createElement('div')
-  hint.className = 'empty'
-  hint.textContent = `Emoji icon for "${item.label}" — ↵ to save, esc to cancel`
-  paletteList.appendChild(hint)
-  renderFooter()
-}
-
 async function runAction(action: PaletteAction, item: RemoteItem): Promise<void> {
-  if (action.id.startsWith('fav-color:')) {
-    const name = action.id.slice('fav-color:'.length)
-    const key = favoriteKeyOf(item)
-    if (key) {
-      await updateFavorite(key, { tileColor: name === 'none' ? undefined : name })
-      await loadFavorites()
-    }
-    closeActions()
-    void updateList()
-    return
-  }
   if (action.id.startsWith('tab-group-color:')) {
     const color = action.id.slice('tab-group-color:'.length)
     if (item.groupId !== undefined) {
@@ -1840,13 +1811,9 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
     case 'onboard-hide':
       await dismissOnboarding()
       break
-    case 'fav-color':
+    case 'fav-custom':
       closeActions()
-      openFavColorPicker(item)
-      return
-    case 'fav-emoji':
-      closeActions()
-      enterFavEmoji(item)
+      enterFavCustomize(item)
       return
     case 'group-rename':
       closeActions()
@@ -1983,14 +1950,6 @@ function enterRename(item: RemoteItem): void {
 
 async function commitRename(): Promise<void> {
   const title = paletteInput?.value.trim()
-  if (favEmojiKey) {
-    const glyph = (title ?? '').slice(0, 8)
-    await updateFavorite(favEmojiKey, { emojiIcon: glyph || undefined })
-    await loadFavorites()
-    favEmojiKey = null
-    exitSubState(true)
-    return
-  }
   if (creatingFolder) {
     if (title) {
       await chrome.runtime.sendMessage({
@@ -2094,7 +2053,6 @@ async function commitGroup(groupItem: RemoteItem): Promise<void> {
 
 function exitSubState(_commit: boolean): void {
   creatingFolder = false
-  favEmojiKey = null
   if (uiState === 'actions') closeActions()
   if (!paletteInput) return
   uiState = 'list'
@@ -2210,6 +2168,170 @@ function enterNewFolder(): void {
   hint.textContent = `New folder ${newFolderParentId ? 'in this folder' : 'in Other Bookmarks'} — ↵ to create, esc to cancel`
   paletteList.appendChild(hint)
   renderFooter()
+}
+
+/* ---------- Customize Favorite (right-click/⌘K on a tile) ---------- */
+
+function enterFavCustomize(item: RemoteItem): void {
+  const key = favoriteKeyOf(item)
+  if (!key || !paletteInput || !paletteList) return
+  favCustomKey = key
+  favGlyphTab = null
+  uiState = 'fav-custom'
+  savedQuery = modePrefix + paletteInput.value
+  if (inputRowEl) inputRowEl.style.display = 'none'
+  void renderFavCustomize()
+  renderFooter()
+}
+
+function exitFavCustomize(): void {
+  if (!paletteInput) return
+  favCustomKey = null
+  uiState = 'list'
+  if (inputRowEl) inputRowEl.style.display = ''
+  modePrefix = savedQuery && PREFIX_CHARS.includes(savedQuery[0]) ? savedQuery[0] : ''
+  paletteInput.value = modePrefix ? savedQuery.slice(1) : savedQuery
+  paletteInput.focus()
+  void updateList()
+}
+
+async function renderFavCustomize(): Promise<void> {
+  if (!paletteList || !favCustomKey) return
+  const favorites = await loadFavorites()
+  const fav = favorites.find((x) => favKey(x) === favCustomKey)
+  if (!fav) {
+    exitFavCustomize()
+    return
+  }
+  paletteList.textContent = ''
+  selectorEl = null
+  flatItems = []
+  favBarItems = []
+  favIndex = -1
+
+  const form = document.createElement('div')
+  form.className = 'settings'
+
+  const preview = document.createElement('div')
+  preview.className = 'fav-preview'
+  const pv = document.createElement('div')
+  pv.className = 'fav-item'
+  pv.appendChild(buildFavTile(fav))
+  const cap = document.createElement('span')
+  cap.className = 'fav-cap'
+  cap.textContent = fav.label
+  pv.appendChild(cap)
+  preview.appendChild(pv)
+  form.appendChild(preview)
+
+  const save = async (patch: Partial<FavoriteEntry>): Promise<void> => {
+    await updateFavorite(favCustomKey!, patch)
+    await loadFavorites()
+    void renderFavCustomize()
+  }
+
+  const row = (label: string, control: HTMLElement, top = false): void => {
+    const el = document.createElement('div')
+    el.className = 'set-row' + (top ? ' top' : '')
+    const lab = document.createElement('label')
+    lab.textContent = label
+    el.append(lab, control)
+    form.appendChild(el)
+  }
+
+  const strip = (style: 'flat' | 'gradient', withDefault: boolean): HTMLElement => {
+    const wrap = document.createElement('div')
+    wrap.className = 'swatch-strip'
+    if (withDefault) {
+      const dot = document.createElement('span')
+      dot.className = 'swatch-dot none' + (!fav.tileColor ? ' on' : '')
+      dot.title = 'Default'
+      dot.addEventListener('mousedown', (e) => {
+        e.preventDefault()
+        void save({ tileColor: undefined, tileStyle: undefined })
+      })
+      wrap.appendChild(dot)
+    }
+    for (const [name, pair] of Object.entries(FOLDER_COLORS)) {
+      const dot = document.createElement('span')
+      dot.className = 'swatch-dot'
+      dot.style.background = style === 'gradient' ? tileGradient(pair[0]) : pair[0]
+      dot.title = name
+      const on = fav.tileColor === name && (fav.tileStyle ?? 'flat') === style
+      dot.classList.toggle('on', on)
+      dot.addEventListener('mousedown', (e) => {
+        e.preventDefault()
+        void save({ tileColor: name, tileStyle: style })
+      })
+      wrap.appendChild(dot)
+    }
+    return wrap
+  }
+  row('Color', strip('flat', true), true)
+  row('Gradient', strip('gradient', false), true)
+
+  // Glyph: Default (favicon/command icon) / library icon / text monogram.
+  const tab: 'default' | 'icon' | 'text' =
+    favGlyphTab ?? (fav.iconName ? 'icon' : fav.textIcon ? 'text' : 'default')
+  const seg = document.createElement('div')
+  seg.className = 'seg'
+  for (const value of ['default', 'icon', 'text'] as const) {
+    const b = document.createElement('button')
+    b.textContent = value === 'default' ? 'Default' : value === 'icon' ? 'Icon' : 'Text'
+    b.classList.toggle('on', tab === value)
+    b.addEventListener('mousedown', (e) => {
+      e.preventDefault()
+      favGlyphTab = value
+      if (value === 'default') {
+        void save({ iconName: undefined, textIcon: undefined, emojiIcon: undefined })
+      } else {
+        void renderFavCustomize()
+      }
+    })
+    seg.appendChild(b)
+  }
+  row('Icon', seg)
+
+  if (tab === 'icon') {
+    const grid = document.createElement('div')
+    grid.className = 'icon-grid'
+    for (const [name, svg] of Object.entries(CMD_ICONS)) {
+      const cell = document.createElement('span')
+      cell.className = 'icon-cell' + (fav.iconName === name ? ' on' : '')
+      cell.title = name
+      cell.innerHTML = svg
+      cell.addEventListener('mousedown', (e) => {
+        e.preventDefault()
+        void save({ iconName: name, textIcon: undefined, emojiIcon: undefined })
+      })
+      grid.appendChild(cell)
+    }
+    row('', grid, true)
+  } else if (tab === 'text') {
+    const input = document.createElement('input')
+    input.className = 'lib-input'
+    input.maxLength = 3
+    input.placeholder = 'Up to 3 characters…'
+    input.value = fav.textIcon ?? ''
+    input.addEventListener('input', () => {
+      // Live preview without a full re-render (keeps typing focus).
+      const fresh = buildFavTile({ ...fav, textIcon: input.value || undefined, iconName: undefined, emojiIcon: undefined })
+      pv.replaceChild(fresh, pv.firstChild!)
+    })
+    const commit = (): void => {
+      void updateFavorite(favCustomKey!, {
+        textIcon: input.value.trim() || undefined,
+        iconName: undefined,
+        emojiIcon: undefined,
+      }).then(() => loadFavorites())
+    }
+    input.addEventListener('change', commit)
+    input.addEventListener('blur', commit)
+    row('', input, true)
+    setTimeout(() => input.focus(), 0)
+  }
+
+  paletteList.appendChild(form)
 }
 
 /* ---------- In-palette settings (gear or >SuperChrome: Settings) ---------- */
@@ -2421,7 +2543,7 @@ async function updateList(): Promise<void> {
   renderFooter()
   updateModeStyling()
 
-  if (uiState === 'rename' || uiState === 'settings') return
+  if (uiState === 'rename' || uiState === 'settings' || uiState === 'fav-custom') return
 
   if (uiState === 'group') {
     const query = paletteInput.value.trim().toLowerCase()
