@@ -3,6 +3,12 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.25.3
+
+- Removed window tiling entirely (Tile Tab Left/Right and the fallback):
+  split view is native-only via the companion host; without it, "Split
+  With Current Tab" explains what's needed instead of faking it
+
 ## 0.25.2
 
 - Split view now uses Chrome's own ⌘⌥N shortcut through the native host

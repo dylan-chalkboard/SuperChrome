@@ -1757,10 +1757,14 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
       await chrome.runtime.sendMessage({ type: 'activate-tab', tabId: item.tabId })
       closePalette()
       return
-    case 'tile-beside':
-      await chrome.runtime.sendMessage({ type: 'tile-tab', tabId: item.tabId })
+    case 'tile-beside': {
+      const resp = (await chrome.runtime.sendMessage({ type: 'tile-tab', tabId: item.tabId })) as
+        | { native?: boolean }
+        | undefined
       closePalette()
+      if (!resp?.native) showToast('Split view needs the SuperChrome companion (macOS)')
       return
+    }
     case 'reopen':
       await chrome.runtime.sendMessage({ type: 'restore-session', sessionId: item.sessionId })
       closePalette()

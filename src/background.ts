@@ -12,7 +12,6 @@ import { hostOf } from './features/navigation'
 import { rank } from './features/ranking'
 import { searchSnippets } from './features/snippets/search'
 import { GROUP_COLORS, searchTabs } from './features/tabs/search'
-import { tileBeside } from './features/tabs/tile'
 
 async function togglePaletteIn(
   tab: chrome.tabs.Tab | undefined,
@@ -409,10 +408,8 @@ async function handleMessage(
       const native = (await chrome.runtime
         .sendNativeMessage('com.superchrome.host', { action: 'keystroke', name: 'split-view' })
         .catch(() => null)) as { ok?: boolean; error?: string } | null
-      if (native?.ok) return { native: true }
-      if (native?.error) console.warn('split-view fallback:', native.error)
-      await tileBeside(anchor.windowId, target)
-      return { native: false }
+      if (native?.error) console.warn('split-view failed:', native.error)
+      return { native: native?.ok === true }
     }
     case 'tab-group-update':
       if (message.groupId !== undefined) {

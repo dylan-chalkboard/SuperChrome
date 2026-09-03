@@ -1,5 +1,4 @@
 import { tileGradient } from '../gradients'
-import { tileTab } from '../tabs/tile'
 import type { PaletteItem } from '../../core/types'
 
 export const PAGE_COMMANDS: Record<string, string> = {
@@ -37,8 +36,6 @@ export const PALETTE_COMMANDS = [
   { id: 'duplicate-tab', label: 'Duplicate Tab' },
   { id: 'toggle-pin', label: 'Pin/Unpin Tab' },
   { id: 'split-view', label: 'New Split View' },
-  { id: 'tile-left', label: 'Tile Tab Left' },
-  { id: 'tile-right', label: 'Tile Tab Right' },
   { id: 'move-tab-new-window', label: 'Move Tab to New Window' },
   { id: 'close-tab', label: 'Close Tab' },
   { id: 'new-group-from-tab', label: 'New Tab Group from Tab' },
@@ -91,8 +88,6 @@ export const COMMAND_META: Record<string, { icon: string; color: string }> = {
   'duplicate-tab': { icon: 'tab', color: '#4c9df3' },
   'toggle-pin': { icon: 'pin', color: '#4c9df3' },
   'split-view': { icon: 'split', color: '#3ab5c6' },
-  'tile-left': { icon: 'split', color: '#3ab5c6' },
-  'tile-right': { icon: 'split', color: '#3ab5c6' },
   'move-tab-new-window': { icon: 'external', color: '#3ab5c6' },
   'close-tab': { icon: 'tab', color: '#e05d5d' },
   'new-group-from-tab': { icon: 'group', color: '#4c9df3' },
@@ -194,10 +189,6 @@ export async function runCommand(
       break
     // 'split-tab' was removed: Chrome has no extension API to create a native
     // Split View (w3c/webextensions#967) — bring the command back if it ships.
-    case 'tile-left':
-    case 'tile-right':
-      if (tab) await tileTab(tab, id === 'tile-left' ? 'left' : 'right')
-      break
     case 'move-tab-new-window':
       if (tab?.id) await chrome.windows.create({ tabId: tab.id, focused: true })
       break
