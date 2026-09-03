@@ -3,6 +3,10 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.25.6
+
+- Floppy-disk glyph for Open Downloads, tile-free like the bookmark ribbon
+
 ## 0.25.5
 
 - Confetti rebuilt as a canvas particle system: two cannons, gravity,

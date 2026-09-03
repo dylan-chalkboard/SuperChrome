@@ -12,6 +12,10 @@ export const ONBOARD_TODO_SVG =
 export const ONBOARD_DONE_SVG =
   '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.8" fill="#4caf7d"/><path d="M5.2 8.2l1.9 1.9 3.7-4" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 
+// Floppy disk for Open Downloads; transparent tile.
+export const FLOPPY_SVG =
+  '<svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M2.4 1.5h9.5l2.6 2.6v9.5c0 .5-.4.9-.9.9H2.4c-.5 0-.9-.4-.9-.9V2.4c0-.5.4-.9.9-.9z" fill="#3c3c42"/><rect x="4.9" y="1.5" width="6.3" height="4.7" rx="0.6" fill="#d7d9dd"/><rect x="8.8" y="2.3" width="1.7" height="3.1" rx="0.4" fill="#3c3c42"/><rect x="3.3" y="7.4" width="9.4" height="6.2" rx="0.6" fill="#f2f3f5"/><path d="M3.3 8c0-.33.27-.6.6-.6h8.2c.33 0 .6.27.6.6v1.1H3.3z" fill="#4c9df3"/></svg>'
+
 // Filled red ribbon bookmark with a folded corner; transparent tile.
 export const RIBBON_SVG =
   '<svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M11.6 1.5H5.1c-.9 0-1.6.7-1.6 1.6v10.6c0 .6.7.95 1.2.6l2.8-2.1 2.8 2.1c.5.35 1.2 0 1.2-.6V1.5z" fill="#f04438"/><path d="M11.6 1.5h.9c.9 0 1.6.72 1.6 1.6v.9c0 .88-.7 1.6-1.6 1.6h-.9V1.5z" fill="#c8362c"/></svg>'
