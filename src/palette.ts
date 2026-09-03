@@ -2284,6 +2284,8 @@ async function screenshotPage(): Promise<void> {
 const AD_IFRAME_HOSTS = [
   'doubleclick.net',
   'googlesyndication.com',
+  'adservice.google',
+  '2mdn.net',
   'adnxs.com',
   'amazon-adsystem.com',
   'taboola.com',
@@ -2291,35 +2293,69 @@ const AD_IFRAME_HOSTS = [
   'criteo.com',
   'media.net',
   'rubiconproject.com',
+  'pubmatic.com',
+  'openx.net',
+  'indexww.com',
+  'smartadserver.com',
+  'teads.tv',
+  'adform.net',
   'yieldmo.com',
+  'gumgum.com',
+  'sharethrough.com',
+  'adsafeprotected.com',
 ]
 const AD_SELECTORS = [
   'ins.adsbygoogle',
+  'iframe[id^="aswift"]',
+  'iframe[id^="google_ads"]',
+  'iframe[name^="google_ads"]',
+  '[data-google-query-id]',
   '[id^="div-gpt-ad"]',
+  '[id^="gpt-"]',
   '[id^="google_ads_iframe"]',
   '[id^="taboola-"]',
   '.OUTBRAIN',
   '[data-ad-slot]',
+  '[data-ad-client]',
+  'amp-ad',
   '[aria-label="advertisement" i]',
+  '[class*="advertisement" i]',
+  '[id*="advertisement" i]',
 ]
 
 /** One-shot cosmetic sweep of the current page — not a network ad blocker. */
 function zapAds(): void {
-  let zapped = 0
+  const zappedEls = new Set<HTMLElement>()
   const hide = (el: HTMLElement): void => {
-    if (el.style.display === 'none') return
+    if (zappedEls.has(el) || el.style.display === 'none') return
     el.style.setProperty('display', 'none', 'important')
-    zapped++
+    zappedEls.add(el)
   }
-  document.querySelectorAll<HTMLIFrameElement>('iframe[src]').forEach((frame) => {
-    if (AD_IFRAME_HOSTS.some((host) => frame.src.includes(host))) {
-      const parent = frame.parentElement
-      hide(parent && parent.childElementCount === 1 ? parent : frame)
+  const hideWithShell = (el: HTMLElement): void => {
+    // Publishers reserve space around ad frames; collapse single-child
+    // wrapper shells too so no blank craters remain.
+    let target: HTMLElement = el
+    while (
+      target.parentElement &&
+      target.parentElement !== document.body &&
+      target.parentElement.childElementCount === 1
+    ) {
+      target = target.parentElement
     }
+    hide(target)
+  }
+  document.querySelectorAll<HTMLIFrameElement>('iframe').forEach((frame) => {
+    const src = frame.src || ''
+    if (AD_IFRAME_HOSTS.some((host) => src.includes(host))) hideWithShell(frame)
   })
   for (const selector of AD_SELECTORS) {
-    document.querySelectorAll<HTMLElement>(selector).forEach(hide)
+    try {
+      document.querySelectorAll<HTMLElement>(selector).forEach(hideWithShell)
+    } catch {
+      // Selector unsupported in this engine — skip it.
+    }
   }
+  const zapped = zappedEls.size
   showToast(zapped ? `Zapped ${zapped} ad element${zapped === 1 ? '' : 's'} ⚡` : 'No ads found 🎉')
 }
 

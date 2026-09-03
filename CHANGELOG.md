@@ -3,6 +3,13 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.27.1
+
+- Zap Ads detection substantially widened: AdSense aswift frames, GPT
+  rendered slots (data-google-query-id), blank-src ad iframes, ten more
+  ad-network hosts — and wrapper shells collapse so no blank craters
+  remain
+
 ## 0.27.0
 
 - **`>Screenshot`** — captures the visible page to your clipboard as PNG
