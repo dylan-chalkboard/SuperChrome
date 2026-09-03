@@ -16,6 +16,14 @@ export const ONBOARD_DONE_SVG =
 export const TERMINAL_APP_SVG =
   '<svg width="17" height="17" viewBox="0 0 16 16" fill="none"><rect x="1" y="1.6" width="14" height="12.8" rx="2.6" fill="#565a62"/><rect x="2" y="2.6" width="12" height="10.8" rx="1.6" fill="#17181c"/><circle cx="3.7" cy="4.3" r="0.6" fill="#f04438"/><circle cx="5.4" cy="4.3" r="0.6" fill="#e8c341"/><circle cx="7.1" cy="4.3" r="0.6" fill="#4caf7d"/><path d="M4.3 7l2.1 1.7-2.1 1.7" stroke="#f2f3f5" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.9 10.9h2.4" stroke="#f2f3f5" stroke-width="1.2" stroke-linecap="round"/></svg>'
 
+// Analog clock for Search History; transparent tile.
+export const CLOCK_APP_SVG =
+  '<svg width="17" height="17" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.8" fill="#6d4fc4"/><circle cx="8" cy="8" r="5.3" fill="#f4f1fc"/><circle cx="8" cy="3.9" r="0.45" fill="#b7a6ec"/><circle cx="12.1" cy="8" r="0.45" fill="#b7a6ec"/><circle cx="8" cy="12.1" r="0.45" fill="#b7a6ec"/><circle cx="3.9" cy="8" r="0.45" fill="#b7a6ec"/><path d="M8 8V4.9M8 8l2.1 1.6" stroke="#5b3fb0" stroke-width="1.2" stroke-linecap="round"/><circle cx="8" cy="8" r="0.7" fill="#5b3fb0"/></svg>'
+
+// Overlapping windows for Switch to Tab; transparent tile.
+export const TABS_APP_SVG =
+  '<svg width="17" height="17" viewBox="0 0 16 16" fill="none"><rect x="4.4" y="2.3" width="9.2" height="9.2" rx="1.8" fill="#a94a78"/><rect x="2.4" y="4.5" width="9.2" height="9.2" rx="1.8" fill="#ee7fb2"/><path d="M2.4 6.3c0-1 .8-1.8 1.8-1.8h5.6c1 0 1.8.8 1.8 1.8v.7H2.4z" fill="#f7b1d3"/></svg>'
+
 // Floppy disk for Open Downloads; transparent tile.
 export const FLOPPY_SVG =
   '<svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M2.4 1.5h9.5l2.6 2.6v9.5c0 .5-.4.9-.9.9H2.4c-.5 0-.9-.4-.9-.9V2.4c0-.5.4-.9.9-.9z" fill="#3c3c42"/><rect x="4.9" y="1.5" width="6.3" height="4.7" rx="0.6" fill="#d7d9dd"/><rect x="8.8" y="2.3" width="1.7" height="3.1" rx="0.4" fill="#3c3c42"/><rect x="3.3" y="7.4" width="9.4" height="6.2" rx="0.6" fill="#f2f3f5"/><path d="M3.3 8c0-.33.27-.6.6-.6h8.2c.33 0 .6.27.6.6v1.1H3.3z" fill="#4c9df3"/></svg>'

@@ -3,6 +3,12 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.25.10
+
+- App-style glyphs for Search History (analog clock, purple) and Switch
+  to Tab (overlapping rose windows); the tile-free icon family now has a
+  shared registry
+
 ## 0.25.9
 
 - Search Emoji's icon is an actual 😀

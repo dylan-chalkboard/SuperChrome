@@ -69,9 +69,9 @@ export const PALETTE_COMMANDS = [
 
 /** Per-command icon + tile color shown in the '>' list. */
 export const COMMAND_META: Record<string, { icon: string; color: string }> = {
-  'switch-to-tab': { icon: 'switch', color: '#e0619e' },
+  'switch-to-tab': { icon: 'tabs-app', color: '' },
   'mode-commands': { icon: 'terminal-app', color: '' },
-  'mode-history': { icon: 'clock', color: '#9a6ee8' },
+  'mode-history': { icon: 'clock-app', color: '' },
   'mode-emoji': { icon: 'emoji-glyph', color: '' },
   'mode-snippets': { icon: 'doc', color: '#e8964a' },
   'mode-library': { icon: 'ribbon', color: '' },
