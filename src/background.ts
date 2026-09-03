@@ -473,6 +473,17 @@ async function handleMessage(
       // Tab-mode palette needs to know whether its own tab is now navigating.
       return { newTab: newTab || !tab?.id }
     }
+    case 'screenshot': {
+      try {
+        const dataUrl = await chrome.tabs.captureVisibleTab(
+          sender.tab?.windowId ?? chrome.windows.WINDOW_ID_CURRENT,
+          { format: 'png' },
+        )
+        return { ok: true, dataUrl }
+      } catch {
+        return { ok: false }
+      }
+    }
     case 'fetch-image': {
       if (!message.url) return { ok: false }
       try {

@@ -1234,6 +1234,22 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
   } else if (item.commandId === 'page-trackers') {
     enterTrackers()
     return
+  } else if (item.commandId === 'screenshot') {
+    closePalette()
+    void screenshotPage()
+    return
+  } else if (item.commandId === 'zap-ads') {
+    closePalette()
+    zapAds()
+    return
+  } else if (item.commandId === 'wayback') {
+    void chrome.runtime.sendMessage({
+      type: 'open-url',
+      url: `https://web.archive.org/web/*/${location.href}`,
+      newTab: true,
+    })
+    closePalette()
+    return
   } else if (item.commandId?.startsWith('outline:')) {
     const el = outlineEls[Number(item.commandId.slice('outline:'.length))]
     closePalette()
@@ -2242,6 +2258,69 @@ function toggleBrandMenu(): void {
   brandMenuEl.appendChild(version)
 
   panelEl.appendChild(brandMenuEl)
+}
+
+/* ---------- Screenshot / Zap Ads (page actions) ---------- */
+
+async function screenshotPage(): Promise<void> {
+  // Let the palette's close animation finish so it isn't in the shot.
+  await new Promise((resolve) => setTimeout(resolve, 200))
+  const resp = (await chrome.runtime
+    .sendMessage({ type: 'screenshot' })
+    .catch(() => null)) as { ok?: boolean; dataUrl?: string } | null
+  if (!resp?.ok || !resp.dataUrl) {
+    showToast("Couldn't take screenshot")
+    return
+  }
+  try {
+    const blob = await (await fetch(resp.dataUrl)).blob()
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+    showToast('Screenshot copied')
+  } catch {
+    showToast("Couldn't take screenshot")
+  }
+}
+
+const AD_IFRAME_HOSTS = [
+  'doubleclick.net',
+  'googlesyndication.com',
+  'adnxs.com',
+  'amazon-adsystem.com',
+  'taboola.com',
+  'outbrain.com',
+  'criteo.com',
+  'media.net',
+  'rubiconproject.com',
+  'yieldmo.com',
+]
+const AD_SELECTORS = [
+  'ins.adsbygoogle',
+  '[id^="div-gpt-ad"]',
+  '[id^="google_ads_iframe"]',
+  '[id^="taboola-"]',
+  '.OUTBRAIN',
+  '[data-ad-slot]',
+  '[aria-label="advertisement" i]',
+]
+
+/** One-shot cosmetic sweep of the current page — not a network ad blocker. */
+function zapAds(): void {
+  let zapped = 0
+  const hide = (el: HTMLElement): void => {
+    if (el.style.display === 'none') return
+    el.style.setProperty('display', 'none', 'important')
+    zapped++
+  }
+  document.querySelectorAll<HTMLIFrameElement>('iframe[src]').forEach((frame) => {
+    if (AD_IFRAME_HOSTS.some((host) => frame.src.includes(host))) {
+      const parent = frame.parentElement
+      hide(parent && parent.childElementCount === 1 ? parent : frame)
+    }
+  })
+  for (const selector of AD_SELECTORS) {
+    document.querySelectorAll<HTMLElement>(selector).forEach(hide)
+  }
+  showToast(zapped ? `Zapped ${zapped} ad element${zapped === 1 ? '' : 's'} ⚡` : 'No ads found 🎉')
 }
 
 /* ---------- Confetti (>Confetti) — because Raycast knows joy matters ---------- */
@@ -3276,7 +3355,7 @@ function iconFor(item: RemoteItem): HTMLElement {
     }
     icon.className = 'icon kind-command'
     if (item.color) icon.style.background = item.color
-    icon.innerHTML = (item.icon && CMD_ICONS[item.icon]) || COMMAND_SVG
+    icon.innerHTML = (item.icon && ALL_ICONS[item.icon]) || COMMAND_SVG
     return icon
   }
   if (kind === 'emoji') {

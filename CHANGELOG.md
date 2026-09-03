@@ -3,6 +3,14 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.27.0
+
+- **`>Screenshot`** — captures the visible page to your clipboard as PNG
+- **`>Zap Ads`** — one-shot cosmetic sweep of known ad elements (ad-network
+  iframes, AdSense/GPT/Taboola/Outbrain containers) with a zap count;
+  honest scope: per-page cleanup, not a network ad blocker
+- **`>Wayback Machine`** — opens the current page's Internet Archive history
+
 ## 0.26.4
 
 - ⌘K on image rows (Grab Page Images, Page Info) gains **Copy Image** —
