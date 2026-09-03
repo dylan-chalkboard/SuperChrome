@@ -3,6 +3,11 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.26.1
+
+- Open Downloads actually gets its floppy-disk glyph (a silent patch
+  miss had left the old tile in place)
+
 ## 0.26.0
 
 - **Page tools**: the palette now inspects the page it lives in —
