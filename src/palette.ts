@@ -1215,6 +1215,10 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
   } else if (item.commandId === 'page-links') {
     enterLinks()
     return
+  } else if (item.commandId === 'confetti') {
+    closePalette()
+    launchConfetti()
+    return
   } else if (item.commandId === 'new-folder') {
     enterNewFolder()
     return
@@ -2148,6 +2152,47 @@ function toggleBrandMenu(): void {
   brandMenuEl.appendChild(version)
 
   panelEl.appendChild(brandMenuEl)
+}
+
+/* ---------- Confetti (>Confetti) — because Raycast knows joy matters ---------- */
+
+function launchConfetti(): void {
+  if (reducedMotion()) {
+    showToast('🎉')
+    return
+  }
+  const host = document.createElement('div')
+  host.style.cssText =
+    'position:fixed;inset:0;pointer-events:none;z-index:2147483647;overflow:hidden;'
+  const colors = ['#4c9df3', '#e0619e', '#9a6ee8', '#4caf7d', '#e8964a', '#e8c341', '#3aa99f', '#e05d5d']
+  for (let i = 0; i < 140; i++) {
+    const piece = document.createElement('div')
+    const size = 6 + Math.random() * 6
+    piece.style.cssText =
+      `position:absolute;top:-20px;left:${Math.random() * 100}%;` +
+      `width:${size}px;height:${size * 0.4 + Math.random() * size * 0.8}px;` +
+      `background:${colors[i % colors.length]};` +
+      `border-radius:${Math.random() < 0.3 ? '50%' : '2px'};` +
+      `opacity:${0.7 + Math.random() * 0.3}`
+    const drift = (Math.random() - 0.5) * 260
+    piece.animate(
+      [
+        { transform: 'translate3d(0,-20px,0) rotate(0deg)' },
+        {
+          transform: `translate3d(${drift}px, ${window.innerHeight + 60}px, 0) rotate(${(Math.random() - 0.5) * 1000}deg)`,
+        },
+      ],
+      {
+        duration: 1800 + Math.random() * 1600,
+        delay: Math.random() * 350,
+        easing: 'cubic-bezier(.15,.45,.35,1)',
+        fill: 'forwards',
+      },
+    )
+    host.appendChild(piece)
+  }
+  document.documentElement.appendChild(host)
+  setTimeout(() => host.remove(), 4200)
 }
 
 /* ---------- Page links (>Grab Page Links) ---------- */

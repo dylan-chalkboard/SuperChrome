@@ -3,6 +3,11 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.25.4
+
+- `>Confetti` 🎉 — rains palette-colored confetti over the current page
+  (reduced-motion users get a tasteful 🎉 toast instead)
+
 ## 0.25.3
 
 - Removed window tiling entirely (Tile Tab Left/Right and the fallback):

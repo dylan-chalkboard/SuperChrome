@@ -21,6 +21,7 @@ export const FOLDER_SVG =
   '<svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M1.5 4.2C1.5 3.26 2.26 2.5 3.2 2.5h2.9c.45 0 .88.18 1.2.5l.9.9h4.6c.94 0 1.7.76 1.7 1.7v6.2c0 .94-.76 1.7-1.7 1.7H3.2c-.94 0-1.7-.76-1.7-1.7V4.2z" fill="#3f97ee"/><path d="M1.5 6.2c0-.94.76-1.7 1.7-1.7h9.6c.94 0 1.7.76 1.7 1.7v5.6c0 .94-.76 1.7-1.7 1.7H3.2c-.94 0-1.7-.76-1.7-1.7V6.2z" fill="#7ab8f5"/></svg>'
 
 export const CMD_ICONS: Record<string, string> = {
+  confetti: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 13l3-8 5 5-8 3z" stroke="currentColor" stroke-linejoin="round"/><path d="M9.5 3.5l.5-1M12.5 6.5l1-.5M11 2.5l-.3 1.5M13.5 4l-1.5.4" stroke="currentColor" stroke-linecap="round"/></svg>',
   folder: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1.5 3.5h4.5l1.5 2h7v7h-13v-9z" stroke="currentColor" stroke-linejoin="round"/></svg>',
   'arrow-left': '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M13 8H3M7 3.5L2.5 8 7 12.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   'arrow-right': '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 3.5L13.5 8 9 12.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
