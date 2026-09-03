@@ -46,7 +46,13 @@ export async function searchTabs(
       grouped: !!tabGroup,
       groupId: tabGroup?.id,
       groupTitle: tabGroup?.title,
-      typeText: t.active && t.windowId === currentWindowId ? 'Active' : undefined,
+      typeText:
+        t.active && t.windowId === currentWindowId
+          ? 'Active'
+          : typeof (t as { splitViewId?: number }).splitViewId === 'number' &&
+              (t as { splitViewId?: number }).splitViewId! >= 0
+            ? 'Split'
+            : undefined,
     }
   }
 

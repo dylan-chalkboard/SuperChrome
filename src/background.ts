@@ -12,6 +12,7 @@ import { hostOf } from './features/navigation'
 import { rank } from './features/ranking'
 import { searchSnippets } from './features/snippets/search'
 import { GROUP_COLORS, searchTabs } from './features/tabs/search'
+import { tileBeside } from './features/tabs/tile'
 
 async function togglePaletteIn(
   tab: chrome.tabs.Tab | undefined,
@@ -389,6 +390,15 @@ async function handleMessage(
         })
       }
       return {}
+    case 'tile-tab': {
+      if (message.tabId === undefined) return {}
+      const anchor = await senderTab(sender)
+      const target = await chrome.tabs.get(message.tabId).catch(() => undefined)
+      if (!target || anchor?.windowId === undefined) return {}
+      if (target.id === anchor.id) return {}
+      await tileBeside(anchor.windowId, target)
+      return {}
+    }
     case 'tab-group-update':
       if (message.groupId !== undefined) {
         await chrome.tabGroups.update(message.groupId, {

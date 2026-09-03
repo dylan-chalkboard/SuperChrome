@@ -3,6 +3,15 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.25.0
+
+- **Tab tiling** (Chrome has no API to create native Split View, so this is
+  the honest version): `>Tile Tab Left/Right` snaps the current tab and its
+  window into side-by-side halves, and `⌘K` on any tab row offers **Tile
+  Beside Current Tab** — pick a tab from `@` and it lands next to the one
+  you're on
+- Tabs in a native Chrome split view show a "Split" tag in `@`
+
 ## 0.24.4
 
 - "Switch to Tab" indicator is more prominent: a boxed right-arrow tile

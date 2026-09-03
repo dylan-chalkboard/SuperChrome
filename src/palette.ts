@@ -1416,6 +1416,7 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
     case 'tab': {
       const actions: PaletteAction[] = [
         { id: 'switch', label: 'Switch to Tab' },
+        { id: 'tile-beside', label: 'Tile Beside Current Tab' },
         { id: 'add-to-group', label: 'Add to Group…' },
         { id: 'new-group', label: 'New Group from Tab' },
       ]
@@ -1521,6 +1522,7 @@ const ACTION_ICONS: Record<string, string> = {
   'group-rename': PENCIL_SVG,
   'group-color': CMD_ICONS.paint,
   'group-dissolve': CMD_ICONS.group,
+  'tile-beside': CMD_ICONS.split,
   'add-to-group': CMD_ICONS.group,
   'new-group': CMD_ICONS.group,
   ungroup: CMD_ICONS.group,
@@ -1753,6 +1755,10 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
       return
     case 'switch':
       await chrome.runtime.sendMessage({ type: 'activate-tab', tabId: item.tabId })
+      closePalette()
+      return
+    case 'tile-beside':
+      await chrome.runtime.sendMessage({ type: 'tile-tab', tabId: item.tabId })
       closePalette()
       return
     case 'reopen':
