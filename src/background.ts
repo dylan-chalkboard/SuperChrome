@@ -395,9 +395,15 @@ async function handleMessage(
       let target = await chrome.tabs.get(message.tabId).catch(() => undefined)
       if (!target || anchor?.windowId === undefined) return {}
       if (target.id === anchor.id) return {}
-      // Native split view first: park the target right after the anchor tab,
-      // then press Chrome's own split-view shortcut (⌘⌥N) via the native
-      // host. Window tiling remains the fallback when the host is absent.
+      // Confirm the companion host exists before touching any tabs — without
+      // it there's nothing useful to do and the move would just confuse.
+      const present = await chrome.runtime
+        .sendNativeMessage('com.superchrome.host', { action: 'ping' })
+        .then(() => true)
+        .catch(() => false)
+      if (!present) return { native: false }
+      // Park the target right after the anchor tab, then press Chrome's own
+      // split-view shortcut (⌘⌥N) via the host.
       if (target.id !== undefined && anchor.id !== undefined && anchor.index !== undefined) {
         await chrome.tabs
           .move(target.id, { windowId: anchor.windowId, index: anchor.index + 1 })
