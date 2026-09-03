@@ -12,6 +12,8 @@ export interface PaletteItem {
   emoji?: string
   text?: string
   icon?: string
+  /** Direct image URL for the row icon (page thumbnails). */
+  iconUrl?: string
   color?: string
   groupColor?: string
   grouped?: boolean

@@ -10,6 +10,8 @@ export interface RemoteItem {
   emoji?: string
   text?: string
   icon?: string
+  /** Direct image URL for the row icon (page thumbnails). */
+  iconUrl?: string
   color?: string
   groupColor?: string
   grouped?: boolean
@@ -38,6 +40,8 @@ export interface FavoriteEntry {
   commandId?: string
   id?: string
   icon?: string
+  /** Direct image URL for the row icon (page thumbnails). */
+  iconUrl?: string
   color?: string
   /** User customization: preset background and glyph override. */
   tileColor?: string

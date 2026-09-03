@@ -3,6 +3,22 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.26.0
+
+- **Page tools**: the palette now inspects the page it lives in —
+  - `>Page Outline`: every heading as an indented, filterable list; Enter
+    smooth-scrolls there and flashes the section
+  - `>Page Info`: title, description, canonical, language, og:* and
+    twitter:* tags, favicon — Enter copies any value; image tags show
+    thumbnails
+  - `>Grab Page Images`: every image (plus og:image) with real thumbnails;
+    Enter opens full-size
+  - `>Page Trackers`: matches scripts and the network resource timeline
+    against 30+ signatures (GA, GTM, Meta/TikTok/LinkedIn pixels, Mixpanel,
+    Amplitude, Segment, PostHog, Hotjar, FullStory, Clarity, Sentry,
+    Datadog, HubSpot, …) grouped by Analytics/Ads/Session Replay/Errors/
+    Marketing — or a clean bill of health
+
 ## 0.25.10
 
 - App-style glyphs for Search History (analog clock, purple) and Switch

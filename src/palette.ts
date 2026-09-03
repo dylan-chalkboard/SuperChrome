@@ -38,6 +38,7 @@ import { GROUP_COLORS } from './features/tabs/search'
 import { cleanHost } from './features/navigation'
 import { parseQuicklinks, serializeQuicklinks } from './features/quicklinks'
 import { parseSnippets, serializeSnippets } from './features/snippets'
+import { findTrackers } from './features/page/trackers'
 import {
   favKey,
   favToItem,
@@ -500,7 +501,9 @@ let modeGlyphEl: HTMLElement | null = null
 let modePrefix = ''
 let actionsEl: HTMLElement | null = null
 let brandMenuEl: HTMLElement | null = null
-let pageLinks: RemoteItem[] = []
+let pageListItems: RemoteItem[] = []
+let pageListLabel = ''
+let outlineEls: HTMLElement[] = []
 let creatingFolder = false
 let newFolderParentId: string | undefined
 let favCustomKey: string | null = null
@@ -1217,6 +1220,29 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     return
   } else if (item.commandId === 'page-links') {
     enterLinks()
+    return
+  } else if (item.commandId === 'page-images') {
+    enterImages()
+    return
+  } else if (item.commandId === 'page-outline') {
+    enterOutline()
+    return
+  } else if (item.commandId === 'page-info') {
+    enterPageInfo()
+    return
+  } else if (item.commandId === 'page-trackers') {
+    enterTrackers()
+    return
+  } else if (item.commandId?.startsWith('outline:')) {
+    const el = outlineEls[Number(item.commandId.slice('outline:'.length))]
+    closePalette()
+    if (el) {
+      el.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' })
+      el.animate(
+        [{ backgroundColor: 'rgba(232, 195, 65, 0.55)' }, { backgroundColor: 'transparent' }],
+        { duration: 1400, easing: 'ease-out' },
+      )
+    }
     return
   } else if (item.commandId === 'confetti') {
     closePalette()
@@ -2323,17 +2349,28 @@ function launchDvd(): void {
 
 /* ---------- Page links (>Grab Page Links) ---------- */
 
-function enterLinks(): void {
+function enterPageList(label: string, items: RemoteItem[], noun: string): void {
   if (!paletteInput || !paletteList) return
+  pageListItems = items
+  pageListLabel = label
+  uiState = 'links'
+  savedQuery = paletteInput.value
+  paletteInput.value = ''
+  paletteInput.placeholder = `Filter ${items.length} ${noun}…`
+  paletteInput.focus()
+  void updateList()
+}
+
+function enterLinks(): void {
   const seen = new Set<string>()
-  pageLinks = []
+  const items: RemoteItem[] = []
   document.querySelectorAll<HTMLAnchorElement>('a[href]').forEach((a) => {
     const href = a.href
     if (!/^https?:/i.test(href) || seen.has(href)) return
     seen.add(href)
     const label =
       (a.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 80) || a.title || href
-    pageLinks.push({
+    items.push({
       kind: 'search',
       label,
       detail: '',
@@ -2342,12 +2379,138 @@ function enterLinks(): void {
       color: tileGradient('#4caf7d'),
     })
   })
-  uiState = 'links'
-  savedQuery = paletteInput.value
-  paletteInput.value = ''
-  paletteInput.placeholder = `Filter ${pageLinks.length} links…`
-  paletteInput.focus()
-  void updateList()
+  enterPageList('Page Links', items, 'links')
+}
+
+function enterImages(): void {
+  const seen = new Set<string>()
+  const items: RemoteItem[] = []
+  const push = (src: string, label: string): void => {
+    if (!/^https?:/i.test(src) || seen.has(src)) return
+    seen.add(src)
+    items.push({
+      kind: 'search',
+      label: label || basenameOf(src),
+      detail: '',
+      url: src,
+      icon: 'image',
+      iconUrl: src,
+      color: tileGradient('#9a6ee8'),
+      typeText: 'Image',
+    })
+  }
+  const og = document.querySelector<HTMLMetaElement>('meta[property="og:image"]')
+  if (og?.content) push(og.content, 'og:image')
+  document.querySelectorAll<HTMLImageElement>('img[src]').forEach((img) => {
+    push(img.currentSrc || img.src, (img.alt || '').trim().slice(0, 80))
+  })
+  enterPageList('Page Images', items, 'images')
+}
+
+function basenameOf(url: string): string {
+  try {
+    return new URL(url).pathname.split('/').filter(Boolean).pop() ?? url
+  } catch {
+    return url
+  }
+}
+
+function enterOutline(): void {
+  outlineEls = []
+  const items: RemoteItem[] = []
+  const headings = document.querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, h6')
+  let minLevel = 6
+  headings.forEach((h) => {
+    if ((h.textContent ?? '').trim()) minLevel = Math.min(minLevel, Number(h.tagName[1]))
+  })
+  headings.forEach((h) => {
+    const text = (h.textContent ?? '').trim().replace(/\s+/g, ' ')
+    if (!text) return
+    const level = Number(h.tagName[1])
+    const index = outlineEls.length
+    outlineEls.push(h)
+    items.push({
+      kind: 'command',
+      label: '\u00A0\u00A0'.repeat(Math.max(0, level - minLevel)) + text.slice(0, 90),
+      detail: '',
+      commandId: `outline:${index}`,
+      icon: 'form',
+      color: tileGradient('#4caf7d'),
+      typeText: h.tagName,
+    })
+  })
+  enterPageList('Page Outline', items, 'headings')
+}
+
+function enterPageInfo(): void {
+  const items: RemoteItem[] = []
+  const add = (label: string, value: string | null | undefined, icon = 'info', iconUrl?: string): void => {
+    const text = (value ?? '').trim()
+    if (!text) return
+    items.push({
+      kind: 'calc',
+      label,
+      detail: text.length > 90 ? `${text.slice(0, 90)}…` : text,
+      text,
+      icon,
+      iconUrl,
+      color: tileGradient('#4c9df3'),
+      typeText: 'Copy',
+    })
+  }
+  const meta = (sel: string): string | null =>
+    document.querySelector<HTMLMetaElement>(sel)?.content ?? null
+  add('Title', document.title, 'doc')
+  add('URL', location.href, 'link')
+  add('Description', meta('meta[name="description"]'))
+  add('Canonical', document.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href, 'link')
+  add('Language', document.documentElement.lang)
+  add('Author', meta('meta[name="author"]'))
+  add('Keywords', meta('meta[name="keywords"]'))
+  add('Theme Color', meta('meta[name="theme-color"]'), 'paint')
+  for (const key of ['title', 'description', 'image', 'url', 'site_name', 'type']) {
+    const value = meta(`meta[property="og:${key}"]`)
+    add(`og:${key}`, value, key === 'image' ? 'image' : 'info', key === 'image' ? (value ?? undefined) : undefined)
+  }
+  for (const key of ['card', 'site', 'title', 'image']) {
+    const value = meta(`meta[name="twitter:${key}"]`)
+    add(`twitter:${key}`, value, key === 'image' ? 'image' : 'info', key === 'image' ? (value ?? undefined) : undefined)
+  }
+  const iconLink = document.querySelector<HTMLLinkElement>('link[rel~="icon"]')
+  add('Favicon', iconLink?.href, 'image', iconLink?.href)
+  enterPageList('Page Info', items, 'fields')
+}
+
+function enterTrackers(): void {
+  const urls = new Set<string>()
+  document.querySelectorAll<HTMLScriptElement>('script[src]').forEach((el) => urls.add(el.src))
+  for (const entry of performance.getEntriesByType('resource')) {
+    urls.add((entry as PerformanceResourceTiming).name)
+  }
+  const found = findTrackers([...urls])
+  const items: RemoteItem[] = found.map((t) => ({
+    kind: 'calc' as const,
+    label: t.name,
+    detail: t.evidence,
+    text: `${t.name} (${t.category}) — ${t.evidence}`,
+    icon: t.category === 'Ads' ? 'bag' : t.category === 'Errors' ? 'code' : t.category === 'Session Replay' ? 'gauge' : 'search',
+    color: tileGradient(
+      t.category === 'Ads' ? '#e05d5d' : t.category === 'Errors' ? '#e8964a' : t.category === 'Session Replay' ? '#e0619e' : '#9a6ee8',
+    ),
+    group: t.category,
+    typeText: 'Copy',
+  }))
+  if (!items.length) {
+    items.push({
+      kind: 'calc',
+      label: 'No known trackers detected 🎉',
+      detail: 'Checked scripts and network resources against 30+ signatures',
+      text: 'No known trackers detected',
+      icon: 'shield',
+      color: tileGradient('#4caf7d'),
+    })
+  }
+  enterPageList('Trackers', items, 'trackers')
 }
 
 /** Create a bookmark folder — inside the current library folder, else Other Bookmarks. */
@@ -2780,12 +2943,12 @@ async function updateList(): Promise<void> {
 
   if (uiState === 'links') {
     const q = paletteInput.value.trim().toLowerCase()
-    const rows = pageLinks
-      .map((l) => ({ l, s: localFuzzy(q, `${l.label} ${l.url}`.toLowerCase()) }))
+    const rows = pageListItems
+      .map((l) => ({ l, s: localFuzzy(q, `${l.label} ${l.url ?? ''} ${l.detail}`.toLowerCase()) }))
       .filter((x) => x.s !== null)
       .sort((a, b) => b.s! - a.s!)
       .map((x) => x.l)
-    renderItems(`Page Links (${pageLinks.length})`, rows)
+    renderItems(`${pageListLabel} (${pageListItems.length})`, rows)
     return
   }
 
@@ -3017,6 +3180,19 @@ function labelEl(item: RemoteItem): HTMLElement {
 function iconFor(item: RemoteItem): HTMLElement {
   const icon = document.createElement('span')
   const kind = item.kind
+  if (item.iconUrl) {
+    icon.className = 'icon plain'
+    const img = document.createElement('img')
+    img.src = item.iconUrl
+    img.style.objectFit = 'cover'
+    img.onerror = () => {
+      icon.textContent = ''
+      icon.className = `icon kind-${kind}`
+      icon.innerHTML = (item.icon && CMD_ICONS[item.icon]) || DOC_SVG
+    }
+    icon.appendChild(img)
+    return icon
+  }
   if ((kind === 'bookmark' || kind === 'tab' || kind === 'closed' || kind === 'history') && item.url) {
     icon.className = 'icon plain'
     const img = document.createElement('img')
@@ -3067,7 +3243,12 @@ function iconFor(item: RemoteItem): HTMLElement {
   }
   icon.className = `icon kind-${kind}`
   if (kind === 'calc') {
-    icon.textContent = '='
+    if (item.icon && CMD_ICONS[item.icon]) {
+      if (item.color) icon.style.background = item.color
+      icon.innerHTML = CMD_ICONS[item.icon]
+    } else {
+      icon.textContent = '='
+    }
     return icon
   }
   if (kind === 'download') {
