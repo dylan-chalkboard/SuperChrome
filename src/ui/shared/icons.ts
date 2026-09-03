@@ -64,3 +64,32 @@ export const CMD_ICONS: Record<string, string> = {
   table: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor"/><path d="M2 6.5h12M2 9.5h12M6.5 3v10M10.5 3v10" stroke="currentColor"/></svg>',
   form: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="3" width="11" height="10" rx="1" stroke="currentColor"/><path d="M5 6h6M5 8.5h6M5 11h3" stroke="currentColor" stroke-linecap="round"/></svg>',
 }
+
+/** Extra glyphs for favorite-tile customization (not tied to commands). */
+export const EXTRA_ICONS: Record<string, string> = {
+  heart: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 13.5S2.5 10 2.5 6.2C2.5 4.4 4 3 5.7 3c1 0 1.9.5 2.3 1.3C8.4 3.5 9.3 3 10.3 3 12 3 13.5 4.4 13.5 6.2 13.5 10 8 13.5 8 13.5z" stroke="currentColor" stroke-linejoin="round"/></svg>',
+  star: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2l1.8 3.7 4 .6-2.9 2.8.7 4L8 11.2 4.4 13l.7-4-2.9-2.7 4-.6z" stroke="currentColor" stroke-linejoin="round"/></svg>',
+  home: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2.5 8L8 3l5.5 5M4 7v6.5h8V7" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  mail: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="8" rx="1" stroke="currentColor"/><path d="M2.5 5l5.5 4 5.5-4" stroke="currentColor" stroke-linejoin="round"/></svg>',
+  chat: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2.5 3.5h11v7H8l-3 2.5v-2.5H2.5z" stroke="currentColor" stroke-linejoin="round"/></svg>',
+  calendar: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="3.5" width="11" height="9.5" rx="1" stroke="currentColor"/><path d="M2.5 6.5h11M5.5 2v3M10.5 2v3" stroke="currentColor" stroke-linecap="round"/></svg>',
+  terminal: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor"/><path d="M4.5 6l2 2-2 2M8.5 10.5h3" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  database: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="4" rx="4.5" ry="1.8" stroke="currentColor"/><path d="M3.5 4v8c0 1 2 1.8 4.5 1.8s4.5-.8 4.5-1.8V4M3.5 8c0 1 2 1.8 4.5 1.8S12.5 9 12.5 8" stroke="currentColor"/></svg>',
+  cloud: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4.5 12.5a3 3 0 010-6A4 4 0 0112.3 7a2.8 2.8 0 01-.3 5.5z" stroke="currentColor" stroke-linejoin="round"/></svg>',
+  lock: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="3.5" y="7" width="9" height="6" rx="1" stroke="currentColor"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke="currentColor"/></svg>',
+  bell: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2.5a4 4 0 00-4 4V9l-1.2 2h10.4L12 9V6.5a4 4 0 00-4-4zM6.8 13a1.3 1.3 0 002.4 0" stroke="currentColor" stroke-linejoin="round"/></svg>',
+  book: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 3h5v10H4a1 1 0 01-1-1zM13 3H8v10h4a1 1 0 001-1z" stroke="currentColor" stroke-linejoin="round"/></svg>',
+  briefcase: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="5" width="11" height="7.5" rx="1" stroke="currentColor"/><path d="M6 5V3.5h4V5M2.5 8.5h11" stroke="currentColor"/></svg>',
+  cart: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 3h2l1.6 7h6.8l1.6-5H5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.3" cy="12.7" r="1" stroke="currentColor"/><circle cx="11" cy="12.7" r="1" stroke="currentColor"/></svg>',
+  camera: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="4.5" width="12" height="8" rx="1.5" stroke="currentColor"/><circle cx="8" cy="8.5" r="2.3" stroke="currentColor"/><path d="M5.5 4.5l1-1.5h3l1 1.5" stroke="currentColor" stroke-linejoin="round"/></svg>',
+  pin: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 14s4.5-5 4.5-8a4.5 4.5 0 10-9 0C3.5 9 8 14 8 14z" stroke="currentColor" stroke-linejoin="round"/><circle cx="8" cy="6" r="1.6" stroke="currentColor"/></svg>',
+  play: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M5 3.5l8 4.5-8 4.5z" stroke="currentColor" stroke-linejoin="round"/></svg>',
+  bolt: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M9 2L4 9h3l-1 5 5-7H8z" stroke="currentColor" stroke-linejoin="round"/></svg>',
+  chart: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 13V7M7 13V3.5M11 13V9M2 13.5h12" stroke="currentColor" stroke-linecap="round"/></svg>',
+  moon: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M12.8 9.7A5.5 5.5 0 116.3 3.2a4.5 4.5 0 006.5 6.5z" stroke="currentColor" stroke-linejoin="round"/></svg>',
+  sun: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor"/><path d="M8 2v1.5M8 12.5V14M2 8h1.5M12.5 8H14M3.8 3.8l1 1M11.2 11.2l1 1M12.2 3.8l-1 1M4.8 11.2l-1 1" stroke="currentColor" stroke-linecap="round"/></svg>',
+  user: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5.3" r="2.5" stroke="currentColor"/><path d="M3 13.5a5 5 0 0110 0" stroke="currentColor" stroke-linecap="round"/></svg>',
+}
+
+/** Everything pickable in the favorite customizer. */
+export const ALL_ICONS: Record<string, string> = { ...CMD_ICONS, ...EXTRA_ICONS }

@@ -206,6 +206,24 @@ export async function searchBookmarks(
     ]
   }
 
+  // Open tabs join the blended results: a match you already have open is
+  // usually the fastest answer, and Enter switches straight to it.
+  const openTabs = await chrome.tabs.query({})
+  const tabEntries = openTabs
+    .filter((t) => t.id !== undefined && t.url)
+    .map((t) => ({
+      item: {
+        kind: 'tab' as const,
+        label: t.title || t.url!,
+        detail: '',
+        url: t.url!,
+        tabId: t.id,
+        typeText: 'Switch to Tab',
+      },
+      text: `${t.title} ${t.url}`.toLowerCase(),
+      usageKey: `tab:${t.url}`,
+    }))
+
   // History rides along in the ranked list; bookmarked URLs win the dedup.
   const bookmarkUrls = new Set(flat.map((b) => b.url))
   const historyEntries = (
@@ -219,7 +237,7 @@ export async function searchBookmarks(
     }))
 
   const results = rank<PaletteItem>(
-    [...bookmarkEntries, ...folderEntries, ...commands, ...historyEntries],
+    [...bookmarkEntries, ...folderEntries, ...commands, ...tabEntries, ...historyEntries],
     query,
     usage,
     decay,

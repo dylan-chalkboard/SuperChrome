@@ -9,7 +9,7 @@
  */
 
 import { getSettings } from './core/settings'
-import { FOLDER_COLORS, folderSvg } from './features/bookmarks/colors'
+import { FOLDER_COLORS, TILE_COLORS, TILE_GRADIENTS, folderSvg } from './features/bookmarks/colors'
 import { folderColorOf, loadFolderColors, setFolderColor } from './ui/shared/folder-colors'
 import { ONBOARD_STEPS, onboardProgress, onboardVisible } from './features/onboarding'
 import {
@@ -48,7 +48,7 @@ import {
   toggleFavorite,
   updateFavorite,
 } from './ui/shared/favorites'
-import { BOOKMARK_SVG, CLOCK_SVG, CMD_ICONS, COMMAND_SVG, DOC_SVG, ONBOARD_DONE_SVG, ONBOARD_TODO_SVG, RIBBON_SVG } from './ui/shared/icons'
+import { ALL_ICONS, BOOKMARK_SVG, CLOCK_SVG, CMD_ICONS, COMMAND_SVG, DOC_SVG, ONBOARD_DONE_SVG, ONBOARD_TODO_SVG, RIBBON_SVG } from './ui/shared/icons'
 import { MODE_PLACEHOLDERS, MODE_PREFIX, PREFIX_CHARS, mode } from './ui/shared/mode'
 import type { FavoriteEntry, PaletteAction, RemoteItem } from './ui/shared/types'
 
@@ -495,7 +495,7 @@ let pageLinks: RemoteItem[] = []
 let creatingFolder = false
 let newFolderParentId: string | undefined
 let favCustomKey: string | null = null
-let favGlyphTab: 'default' | 'icon' | 'text' | null = null
+let favGlyphTab: 'default' | 'icon' | 'emoji' | 'text' | null = null
 
 let uiState: UiState = 'list'
 let flatItems: RemoteItem[] = []
@@ -879,7 +879,7 @@ function onGlobalKey(e: KeyboardEvent): void {
 
   // Settings/customize views own the keyboard: controls get everything but Esc.
   if (uiState === 'settings' || uiState === 'fav-custom') {
-    if (e.key === 'Escape') {
+    if (e.key === 'Escape' || (uiState === 'fav-custom' && e.key === 'Enter')) {
       e.preventDefault()
       if (uiState === 'settings') exitSettings()
       else exitFavCustomize()
@@ -1273,9 +1273,15 @@ let favIndex = -1
 function buildFavTile(f: FavoriteEntry): HTMLElement {
   const tile = document.createElement('div')
   tile.className = 'fav-tile'
-  if (f.tileColor && FOLDER_COLORS[f.tileColor]) {
-    const hex = FOLDER_COLORS[f.tileColor][0]
-    tile.style.background = f.tileStyle === 'gradient' ? tileGradient(hex) : hex
+  if (f.tileColor) {
+    if (f.tileStyle === 'gradient') {
+      const bg =
+        TILE_GRADIENTS[f.tileColor] ??
+        (TILE_COLORS[f.tileColor] ? tileGradient(TILE_COLORS[f.tileColor][0]) : undefined)
+      if (bg) tile.style.background = bg
+    } else if (TILE_COLORS[f.tileColor]) {
+      tile.style.background = TILE_COLORS[f.tileColor][0]
+    }
   }
   if (f.emojiIcon) {
     const glyph = document.createElement('span')
@@ -1284,8 +1290,8 @@ function buildFavTile(f: FavoriteEntry): HTMLElement {
     tile.appendChild(glyph)
     return tile
   }
-  if (f.iconName && CMD_ICONS[f.iconName]) {
-    tile.innerHTML = CMD_ICONS[f.iconName]
+  if (f.iconName && ALL_ICONS[f.iconName]) {
+    tile.innerHTML = ALL_ICONS[f.iconName]
     return tile
   }
   if (f.textIcon) {
@@ -1473,6 +1479,8 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
   }
 }
 
+const STAR_SLASH_SVG =
+  '<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 2l1.8 3.7 4 .6-2.9 2.8.7 4L8 11.2 4.4 13l.7-4-2.9-2.7 4-.6z" stroke="currentColor" stroke-linejoin="round"/><path d="M2.5 14L13.5 2" stroke="currentColor" stroke-linecap="round"/></svg>'
 const STAR_SVG =
   '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.2L8 11.5l-3.8 2 .7-4.2-3.1-3 4.3-.6z"/></svg>'
 const PENCIL_SVG =
@@ -1496,7 +1504,7 @@ const ACTION_ICONS: Record<string, string> = {
   'copy-md': CMD_ICONS.link,
   'copy-text': CMD_ICONS.doc,
   'favorite-add': STAR_SVG,
-  'favorite-remove': STAR_SVG,
+  'favorite-remove': STAR_SLASH_SVG,
   rename: PENCIL_SVG,
   move: FOLDER_OUTLINE_SVG,
   'move-up': ARROW_UP_SVG,
@@ -1537,6 +1545,11 @@ function openActions(at?: { x: number; y: number }): void {
   currentActions = favMenuContext
     ? [...actionsFor(item), { id: 'fav-custom', label: 'Customize Favorite…' }]
     : actionsFor(item)
+  // Destructive actions always sit at the bottom, whatever the source list.
+  currentActions = [
+    ...currentActions.filter((a) => !a.danger),
+    ...currentActions.filter((a) => a.danger),
+  ]
   actionIndex = 0
   uiState = 'actions'
 
@@ -2252,10 +2265,10 @@ async function renderFavCustomize(): Promise<void> {
       })
       wrap.appendChild(dot)
     }
-    for (const [name, pair] of Object.entries(FOLDER_COLORS)) {
+    const addDot = (name: string, background: string): void => {
       const dot = document.createElement('span')
       dot.className = 'swatch-dot'
-      dot.style.background = style === 'gradient' ? tileGradient(pair[0]) : pair[0]
+      dot.style.background = background
       dot.title = name
       const on = fav.tileColor === name && (fav.tileStyle ?? 'flat') === style
       dot.classList.toggle('on', on)
@@ -2265,19 +2278,27 @@ async function renderFavCustomize(): Promise<void> {
       })
       wrap.appendChild(dot)
     }
+    for (const [name, pair] of Object.entries(TILE_COLORS)) {
+      addDot(name, style === 'gradient' ? tileGradient(pair[0]) : pair[0])
+    }
+    if (style === 'gradient') {
+      for (const [name, css] of Object.entries(TILE_GRADIENTS)) addDot(name, css)
+    }
     return wrap
   }
   row('Color', strip('flat', true), true)
   row('Gradient', strip('gradient', false), true)
 
   // Glyph: Default (favicon/command icon) / library icon / text monogram.
-  const tab: 'default' | 'icon' | 'text' =
-    favGlyphTab ?? (fav.iconName ? 'icon' : fav.textIcon ? 'text' : 'default')
+  const tab: 'default' | 'icon' | 'emoji' | 'text' =
+    favGlyphTab ??
+    (fav.iconName ? 'icon' : fav.emojiIcon ? 'emoji' : fav.textIcon ? 'text' : 'default')
   const seg = document.createElement('div')
   seg.className = 'seg'
-  for (const value of ['default', 'icon', 'text'] as const) {
+  for (const value of ['default', 'icon', 'emoji', 'text'] as const) {
     const b = document.createElement('button')
-    b.textContent = value === 'default' ? 'Default' : value === 'icon' ? 'Icon' : 'Text'
+    b.textContent =
+      value === 'default' ? 'Default' : value === 'icon' ? 'Icon' : value === 'emoji' ? 'Emoji' : 'Text'
     b.classList.toggle('on', tab === value)
     b.addEventListener('mousedown', (e) => {
       e.preventDefault()
@@ -2295,7 +2316,7 @@ async function renderFavCustomize(): Promise<void> {
   if (tab === 'icon') {
     const grid = document.createElement('div')
     grid.className = 'icon-grid'
-    for (const [name, svg] of Object.entries(CMD_ICONS)) {
+    for (const [name, svg] of Object.entries(ALL_ICONS)) {
       const cell = document.createElement('span')
       cell.className = 'icon-cell' + (fav.iconName === name ? ' on' : '')
       cell.title = name
@@ -2307,26 +2328,23 @@ async function renderFavCustomize(): Promise<void> {
       grid.appendChild(cell)
     }
     row('', grid, true)
-  } else if (tab === 'text') {
+  } else if (tab === 'emoji' || tab === 'text') {
     const input = document.createElement('input')
     input.className = 'lib-input'
-    input.maxLength = 3
-    input.placeholder = 'Up to 3 characters…'
-    input.value = fav.textIcon ?? ''
+    input.maxLength = tab === 'emoji' ? 4 : 3
+    input.placeholder = tab === 'emoji' ? 'Type an emoji…' : 'Up to 3 characters…'
+    input.value = (tab === 'emoji' ? fav.emojiIcon : fav.textIcon) ?? ''
     input.addEventListener('input', () => {
-      // Live preview without a full re-render (keeps typing focus).
-      const fresh = buildFavTile({ ...fav, textIcon: input.value || undefined, iconName: undefined, emojiIcon: undefined })
-      pv.replaceChild(fresh, pv.firstChild!)
+      // Immediate save + live preview (no re-render, keeps typing focus) —
+      // Enter can then close the panel with nothing left pending.
+      const value = input.value.trim()
+      const patch: Partial<FavoriteEntry> =
+        tab === 'emoji'
+          ? { emojiIcon: value || undefined, iconName: undefined, textIcon: undefined }
+          : { textIcon: value || undefined, iconName: undefined, emojiIcon: undefined }
+      pv.replaceChild(buildFavTile({ ...fav, ...patch }), pv.firstChild!)
+      void updateFavorite(favCustomKey!, patch).then(() => loadFavorites())
     })
-    const commit = (): void => {
-      void updateFavorite(favCustomKey!, {
-        textIcon: input.value.trim() || undefined,
-        iconName: undefined,
-        emojiIcon: undefined,
-      }).then(() => loadFavorites())
-    }
-    input.addEventListener('change', commit)
-    input.addEventListener('blur', commit)
     row('', input, true)
     setTimeout(() => input.focus(), 0)
   }

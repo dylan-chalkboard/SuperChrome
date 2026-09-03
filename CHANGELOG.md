@@ -3,6 +3,17 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.24.0
+
+- **Customize Favorite** grew: 18 colors + hue-shift gradients + 8
+  hand-picked gradients (sunset, ocean, candy, …), a much larger icon
+  library (~60 glyphs), an Emoji tab alongside Icon/Text, and Enter closes
+  the panel as Done
+- **Open tabs in the main search**: matching queries surface already-open
+  tabs tagged "Switch to Tab" — Enter jumps to them
+- "Remove from Favorites" uses a slashed-star icon, and destructive
+  actions always sit at the bottom of the ⌘K menu
+
 ## 0.23.1
 
 - "Remove from Favorites" renders as a destructive (red) action

@@ -25,3 +25,31 @@ export function folderSvg(color?: string | null): string {
     '</svg>'
   )
 }
+
+/* ---------- Favorite-tile palettes (superset of the folder presets) ---------- */
+
+export const TILE_COLORS: Record<string, [string, string]> = {
+  ...FOLDER_COLORS,
+  teal: ['#3aa99f', '#6cc4bc'],
+  cyan: ['#3ab5c6', '#72cdd9'],
+  indigo: ['#5a67e8', '#8d96f0'],
+  rose: ['#e0619e', '#eb94bd'],
+  gold: ['#bf9a15', '#d9bb50'],
+  slate: ['#64748b', '#93a0b3'],
+  lime: ['#8fbc3a', '#b3d474'],
+  navy: ['#2f5ecc', '#6b8bdd'],
+  brown: ['#a07850', '#bd9d7e'],
+  black: ['#2c2c30', '#55555c'],
+}
+
+/** Hand-picked multi-hue gradients, beyond the hue-shift ones. */
+export const TILE_GRADIENTS: Record<string, string> = {
+  sunset: 'linear-gradient(135deg, #f04438, #e8c341)',
+  ocean: 'linear-gradient(135deg, #4c9df3, #3aa99f)',
+  candy: 'linear-gradient(135deg, #e0619e, #9a6ee8)',
+  forest: 'linear-gradient(135deg, #4caf7d, #2f6f4f)',
+  fire: 'linear-gradient(135deg, #e8964a, #e05d5d)',
+  night: 'linear-gradient(135deg, #5a67e8, #1e1e3c)',
+  dawn: 'linear-gradient(135deg, #e8c341, #e0619e)',
+  steel: 'linear-gradient(135deg, #93a0b3, #3c4453)',
+}
