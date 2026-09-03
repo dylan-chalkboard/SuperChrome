@@ -423,9 +423,7 @@ const PALETTE_CSS = `
 .light .group-label { color: #00000059; }
 .light .item .title { color: #26262b; }
 .light .item .title b { color: #000000; }
-.light .item .detail, .light .open-tab-arrow { display: flex; flex-shrink: 0; color: #ffffff59; margin-left: 6px; }
-.light .open-tab-arrow { color: #00000045; }
-.item .type { color: #00000045; }
+.light .item .detail, .light .item .type { color: #00000045; }
 .light .item .icon { background: #00000010; }
 .light .item .icon.plain, .light .item .icon.kind-folder { background: transparent; }
 .light .fav-tile { background: #0000000d; }

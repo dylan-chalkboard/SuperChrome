@@ -3,6 +3,11 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.24.3
+
+- Fixed: right-column labels rendered near-invisible in dark mode (a
+  mangled light-mode CSS rule leaked into dark)
+
 ## 0.24.2
 
 - Rows whose URL is already open show a "Switch to Tab" tag with an
