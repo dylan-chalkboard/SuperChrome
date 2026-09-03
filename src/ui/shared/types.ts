@@ -21,6 +21,8 @@ export interface RemoteItem {
   positions?: number[]
   /** Overrides the kind label in the row's right-hand column ("3 items", "2d ago"). */
   typeText?: string
+  /** URL already open in a tab: row shows "Switch to Tab" and switches. */
+  openTab?: boolean
 }
 
 export interface PaletteAction {

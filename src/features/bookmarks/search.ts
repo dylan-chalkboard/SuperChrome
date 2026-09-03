@@ -209,6 +209,16 @@ export async function searchBookmarks(
   // Open tabs join the blended results: a match you already have open is
   // usually the fastest answer, and Enter switches straight to it.
   const openTabs = await chrome.tabs.query({})
+  const normUrl = (u: string): string => {
+    try {
+      const url = new URL(u)
+      url.hash = ''
+      return url.href.replace(/\/$/, '')
+    } catch {
+      return u
+    }
+  }
+  const openUrls = new Set(openTabs.filter((t) => t.url).map((t) => normUrl(t.url!)))
   const tabEntries = openTabs
     .filter((t) => t.id !== undefined && t.url)
     .map((t) => ({
@@ -218,11 +228,17 @@ export async function searchBookmarks(
         detail: '',
         url: t.url!,
         tabId: t.id,
-        typeText: 'Switch to Tab',
+        openTab: true,
       },
       text: `${t.title} ${t.url}`.toLowerCase(),
       usageKey: `tab:${t.url}`,
     }))
+  // Bookmarks/history pointing at an open tab get the same treatment.
+  for (const entry of bookmarkEntries) {
+    if (entry.item.url && openUrls.has(normUrl(entry.item.url))) {
+      ;(entry.item as PaletteItem).openTab = true
+    }
+  }
 
   // History rides along in the ranked list; bookmarked URLs win the dedup.
   const bookmarkUrls = new Set(flat.map((b) => b.url))
@@ -231,7 +247,13 @@ export async function searchBookmarks(
   )
     .filter((r) => r.url && !bookmarkUrls.has(r.url))
     .map((r) => ({
-      item: { kind: 'history' as const, label: r.title || r.url!, detail: '', url: r.url },
+      item: {
+        kind: 'history' as const,
+        label: r.title || r.url!,
+        detail: '',
+        url: r.url,
+        openTab: r.url ? openUrls.has(normUrl(r.url)) : undefined,
+      },
       text: `${r.title ?? ''} ${r.url}`.toLowerCase(),
       usageKey: `history:${r.url}`,
     }))

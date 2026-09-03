@@ -266,6 +266,8 @@ const PALETTE_CSS = `
   flex: 1; overflow: hidden; text-overflow: ellipsis;
   color: #ffffff4d; font-size: 13px;
 }
+.open-tab-arrow { display: flex; flex-shrink: 0; color: #ffffff59; margin-left: 6px; }
+.light .open-tab-arrow { color: #00000045; }
 .item .type {
   flex-shrink: 0; margin-left: auto;
   color: #ffffff4d; font-size: 12px;
@@ -421,7 +423,9 @@ const PALETTE_CSS = `
 .light .group-label { color: #00000059; }
 .light .item .title { color: #26262b; }
 .light .item .title b { color: #000000; }
-.light .item .detail, .light .item .type { color: #00000045; }
+.light .item .detail, .light .open-tab-arrow { display: flex; flex-shrink: 0; color: #ffffff59; margin-left: 6px; }
+.light .open-tab-arrow { color: #00000045; }
+.item .type { color: #00000045; }
 .light .item .icon { background: #00000010; }
 .light .item .icon.plain, .light .item .icon.kind-folder { background: transparent; }
 .light .fav-tile { background: #0000000d; }
@@ -2754,7 +2758,7 @@ function renderItems(
     detail.textContent = item.detail || (item.url ? shortUrl(item.url) : '')
     const type = document.createElement('span')
     type.className = 'type'
-    type.textContent = item.typeText ?? TYPE_LABELS[item.kind] ?? ''
+    type.textContent = item.openTab ? 'Switch to Tab' : (item.typeText ?? TYPE_LABELS[item.kind] ?? '')
     row.append(iconFor(item), title, detail)
     if (item.groupColor) {
       const dot = document.createElement('span')
@@ -2770,6 +2774,13 @@ function renderItems(
       row.appendChild(star)
     }
     row.appendChild(type)
+    if (item.openTab) {
+      const arrow = document.createElement('span')
+      arrow.className = 'open-tab-arrow'
+      arrow.innerHTML =
+        '<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="3" stroke="currentColor"/><path d="M6 10l4-4M7 6h3v3" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      row.appendChild(arrow)
+    }
     row.addEventListener('mousedown', (e) => {
       if (e.button === 2) return
       e.preventDefault()

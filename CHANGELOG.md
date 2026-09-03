@@ -3,6 +3,11 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.24.2
+
+- Rows whose URL is already open show a "Switch to Tab" tag with an
+  arrow-in-a-box icon on the right (bookmarks, history, and tab results)
+
 ## 0.24.1
 
 - Opening a bookmark/history/search result whose URL is already open

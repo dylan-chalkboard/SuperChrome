@@ -20,6 +20,8 @@ export interface PaletteItem {
   groupTitle?: string
   /** Right-column override ("Active", "3 items", "2d ago"); kind label otherwise. */
   typeText?: string
+  /** URL is already open in a tab: row shows "Open Tab" + arrow and switches. */
+  openTab?: boolean
   downloadId?: number
   /** Overrides the mode's default group header in the results list. */
   group?: string
