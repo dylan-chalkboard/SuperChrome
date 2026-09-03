@@ -3,6 +3,14 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.25.1
+
+- **Native split view via the macOS host**: ⌘K → "Split With Current Tab"
+  now pulls the tab into your window and has the native host click
+  Chrome's real split-view menu item (Accessibility scripting); window
+  tiling remains the automatic fallback when the host is absent or the
+  menu changes
+
 ## 0.25.0
 
 - **Tab tiling** (Chrome has no API to create native Split View, so this is

@@ -1416,7 +1416,7 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
     case 'tab': {
       const actions: PaletteAction[] = [
         { id: 'switch', label: 'Switch to Tab' },
-        { id: 'tile-beside', label: 'Tile Beside Current Tab' },
+        { id: 'tile-beside', label: 'Split With Current Tab' },
         { id: 'add-to-group', label: 'Add to Group…' },
         { id: 'new-group', label: 'New Group from Tab' },
       ]

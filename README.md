@@ -48,7 +48,7 @@ Open with `Cmd+P` or the toolbar icon (type `>` for commands):
 
 ## Native DevTools bridge (macOS, optional)
 
-Extensions can't open DevTools — no API exists. The workaround is a tiny native messaging host that presses `Cmd+Opt+I` for you, making `>Developer: Open DevTools` open the real thing:
+Extensions can't open DevTools — no API exists. The workaround is a tiny native messaging host that presses `Cmd+Opt+I` for you, making `>Developer: Open DevTools` open the real thing (it also powers native split view for ⌘K → Split With Current Tab):
 
 ```sh
 ./native-host/install.sh <your-extension-id>   # ID is on chrome://extensions

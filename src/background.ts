@@ -393,11 +393,26 @@ async function handleMessage(
     case 'tile-tab': {
       if (message.tabId === undefined) return {}
       const anchor = await senderTab(sender)
-      const target = await chrome.tabs.get(message.tabId).catch(() => undefined)
+      let target = await chrome.tabs.get(message.tabId).catch(() => undefined)
       if (!target || anchor?.windowId === undefined) return {}
       if (target.id === anchor.id) return {}
+      // Native split view first: pull the tab into this window, then let the
+      // native host click Chrome's real split-view context-menu item. When
+      // the host is missing or the menu hunt fails, tile windows instead.
+      if (target.windowId !== anchor.windowId && target.id !== undefined) {
+        await chrome.tabs.move(target.id, { windowId: anchor.windowId, index: -1 }).catch(() => {})
+        target = (await chrome.tabs.get(target.id).catch(() => undefined)) ?? target
+      }
+      const native = (await chrome.runtime
+        .sendNativeMessage('com.superchrome.host', {
+          action: 'split-tab',
+          title: (target.title ?? '').slice(0, 40),
+        })
+        .catch(() => null)) as { ok?: boolean; error?: string } | null
+      if (native?.ok) return { native: true }
+      if (native?.error) console.warn('split-tab fallback:', native.error)
       await tileBeside(anchor.windowId, target)
-      return {}
+      return { native: false }
     }
     case 'tab-group-update':
       if (message.groupId !== undefined) {
