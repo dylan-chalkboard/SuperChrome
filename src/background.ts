@@ -473,6 +473,27 @@ async function handleMessage(
       // Tab-mode palette needs to know whether its own tab is now navigating.
       return { newTab: newTab || !tab?.id }
     }
+    case 'close-duplicates': {
+      const tabs = await chrome.tabs.query({})
+      const seen = new Map<string, chrome.tabs.Tab>()
+      const toClose: number[] = []
+      for (const tab of tabs) {
+        if (!tab.url || tab.id === undefined || tab.pinned) continue
+        const key = tab.url
+        const kept = seen.get(key)
+        if (!kept) {
+          seen.set(key, tab)
+        } else if (tab.active && !kept.active) {
+          // Keep the active one; close the earlier keeper.
+          if (kept.id !== undefined) toClose.push(kept.id)
+          seen.set(key, tab)
+        } else {
+          toClose.push(tab.id)
+        }
+      }
+      if (toClose.length) await chrome.tabs.remove(toClose).catch(() => {})
+      return { closed: toClose.length }
+    }
     case 'screenshot': {
       try {
         const dataUrl = await chrome.tabs.captureVisibleTab(

@@ -3,6 +3,14 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.28.0
+
+- **`>QR This Page`** — offline-generated QR of the current URL in the
+  palette (no third-party image services); scan to hand the page to your
+  phone, plus a copy-URL row
+- **`>Close Duplicate Tabs`** — closes tabs pointing at the same URL
+  (keeps the active one, skips pinned) and toasts the count
+
 ## 0.27.2
 
 - Screenshot flashes the screen on capture, macOS-style

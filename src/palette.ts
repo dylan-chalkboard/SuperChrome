@@ -39,6 +39,7 @@ import { cleanHost } from './features/navigation'
 import { parseQuicklinks, serializeQuicklinks } from './features/quicklinks'
 import { parseSnippets, serializeSnippets } from './features/snippets'
 import { findTrackers } from './features/page/trackers'
+import qrcode from 'qrcode-generator'
 import {
   favKey,
   favToItem,
@@ -504,6 +505,7 @@ let actionsEl: HTMLElement | null = null
 let brandMenuEl: HTMLElement | null = null
 let pageListItems: RemoteItem[] = []
 let pageListLabel = ''
+let pageListHeader: HTMLElement | null = null
 let outlineEls: HTMLElement[] = []
 let creatingFolder = false
 let newFolderParentId: string | undefined
@@ -1241,6 +1243,16 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
   } else if (item.commandId === 'zap-ads') {
     closePalette()
     zapAds()
+    return
+  } else if (item.commandId === 'qr-page') {
+    enterQr()
+    return
+  } else if (item.commandId === 'close-duplicate-tabs') {
+    void chrome.runtime.sendMessage({ type: 'close-duplicates' }).then((resp) => {
+      const closed = (resp as { closed?: number } | undefined)?.closed ?? 0
+      showToast(closed ? `Closed ${closed} duplicate tab${closed === 1 ? '' : 's'}` : 'No duplicates found 🎉')
+      void updateList()
+    })
     return
   } else if (item.commandId === 'wayback') {
     void chrome.runtime.sendMessage({
@@ -2260,6 +2272,56 @@ function toggleBrandMenu(): void {
   panelEl.appendChild(brandMenuEl)
 }
 
+/* ---------- QR This Page ---------- */
+
+function enterQr(): void {
+  const qr = qrcode(0, 'M')
+  qr.addData(location.href)
+  qr.make()
+  const count = qr.getModuleCount()
+  const size = 220
+  const cell = size / count
+  const canvas = document.createElement('canvas')
+  canvas.width = size * devicePixelRatio
+  canvas.height = size * devicePixelRatio
+  canvas.style.cssText = `width:${size}px;height:${size}px;display:block;`
+  const ctx = canvas.getContext('2d')!
+  ctx.scale(devicePixelRatio, devicePixelRatio)
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, size, size)
+  ctx.fillStyle = '#101013'
+  for (let r = 0; r < count; r++) {
+    for (let c = 0; c < count; c++) {
+      if (qr.isDark(r, c)) ctx.fillRect(c * cell, r * cell, Math.ceil(cell), Math.ceil(cell))
+    }
+  }
+  const header = document.createElement('div')
+  header.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 0 8px;'
+  const card = document.createElement('div')
+  card.style.cssText = 'background:#ffffff;padding:14px;border-radius:14px;'
+  card.appendChild(canvas)
+  const caption = document.createElement('div')
+  caption.style.cssText = 'font-size:12px;color:inherit;opacity:0.55;max-width:80%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
+  caption.textContent = location.href
+  header.append(card, caption)
+  enterPageList(
+    'Scan with your phone',
+    [
+      {
+        kind: 'calc',
+        label: 'Copy Page URL',
+        detail: '',
+        text: location.href,
+        icon: 'link',
+        color: tileGradient('#4c9df3'),
+        typeText: 'Copy',
+      },
+    ],
+    'options',
+    header,
+  )
+}
+
 /* ---------- Screenshot / Zap Ads (page actions) ---------- */
 
 async function screenshotPage(): Promise<void> {
@@ -2520,10 +2582,16 @@ function launchDvd(): void {
 
 /* ---------- Page links (>Grab Page Links) ---------- */
 
-function enterPageList(label: string, items: RemoteItem[], noun: string): void {
+function enterPageList(
+  label: string,
+  items: RemoteItem[],
+  noun: string,
+  header?: HTMLElement,
+): void {
   if (!paletteInput || !paletteList) return
   pageListItems = items
   pageListLabel = label
+  pageListHeader = header ?? null
   uiState = 'links'
   savedQuery = paletteInput.value
   paletteInput.value = ''
@@ -3119,7 +3187,7 @@ async function updateList(): Promise<void> {
       .filter((x) => x.s !== null)
       .sort((a, b) => b.s! - a.s!)
       .map((x) => x.l)
-    renderItems(`${pageListLabel} (${pageListItems.length})`, rows)
+    renderItems(`${pageListLabel} (${pageListItems.length})`, rows, undefined, pageListHeader ?? undefined)
     return
   }
 
