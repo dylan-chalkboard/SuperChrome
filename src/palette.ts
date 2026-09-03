@@ -2161,38 +2161,77 @@ function launchConfetti(): void {
     showToast('🎉')
     return
   }
-  const host = document.createElement('div')
-  host.style.cssText =
-    'position:fixed;inset:0;pointer-events:none;z-index:2147483647;overflow:hidden;'
+  const canvas = document.createElement('canvas')
+  canvas.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483647;'
+  canvas.width = window.innerWidth * devicePixelRatio
+  canvas.height = window.innerHeight * devicePixelRatio
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.scale(devicePixelRatio, devicePixelRatio)
+  document.documentElement.appendChild(canvas)
+
   const colors = ['#4c9df3', '#e0619e', '#9a6ee8', '#4caf7d', '#e8964a', '#e8c341', '#3aa99f', '#e05d5d']
-  for (let i = 0; i < 140; i++) {
-    const piece = document.createElement('div')
-    const size = 6 + Math.random() * 6
-    piece.style.cssText =
-      `position:absolute;top:-20px;left:${Math.random() * 100}%;` +
-      `width:${size}px;height:${size * 0.4 + Math.random() * size * 0.8}px;` +
-      `background:${colors[i % colors.length]};` +
-      `border-radius:${Math.random() < 0.3 ? '50%' : '2px'};` +
-      `opacity:${0.7 + Math.random() * 0.3}`
-    const drift = (Math.random() - 0.5) * 260
-    piece.animate(
-      [
-        { transform: 'translate3d(0,-20px,0) rotate(0deg)' },
-        {
-          transform: `translate3d(${drift}px, ${window.innerHeight + 60}px, 0) rotate(${(Math.random() - 0.5) * 1000}deg)`,
-        },
-      ],
-      {
-        duration: 1800 + Math.random() * 1600,
-        delay: Math.random() * 350,
-        easing: 'cubic-bezier(.15,.45,.35,1)',
-        fill: 'forwards',
-      },
-    )
-    host.appendChild(piece)
+  interface Piece {
+    x: number; y: number; vx: number; vy: number
+    w: number; h: number; rot: number; rotV: number
+    wobble: number; wobbleV: number
+    color: string; life: number; ttl: number
   }
-  document.documentElement.appendChild(host)
-  setTimeout(() => host.remove(), 4200)
+  const pieces: Piece[] = []
+  const cannon = (originX: number, angleDeg: number): void => {
+    for (let i = 0; i < 90; i++) {
+      const angle = ((angleDeg + (Math.random() - 0.5) * 55) * Math.PI) / 180
+      const velocity = 11 + Math.random() * 9
+      pieces.push({
+        x: originX,
+        y: window.innerHeight * 0.92,
+        vx: Math.cos(angle) * velocity,
+        vy: -Math.sin(angle) * velocity,
+        w: 7 + Math.random() * 4,
+        h: 4 + Math.random() * 3,
+        rot: Math.random() * Math.PI,
+        rotV: (Math.random() - 0.5) * 0.3,
+        wobble: Math.random() * Math.PI * 2,
+        wobbleV: 0.15 + Math.random() * 0.2,
+        color: colors[i % colors.length],
+        life: 0,
+        ttl: 140 + Math.random() * 60,
+      })
+    }
+  }
+  cannon(window.innerWidth * 0.15, 65)
+  cannon(window.innerWidth * 0.85, 115)
+
+  const tick = (): void => {
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight)
+    let alive = 0
+    for (const p of pieces) {
+      p.life++
+      if (p.life > p.ttl) continue
+      p.vy += 0.26
+      p.vx *= 0.992
+      p.vy *= 0.992
+      p.x += p.vx + Math.cos(p.wobble) * 0.8
+      p.y += p.vy
+      p.rot += p.rotV
+      p.wobble += p.wobbleV
+      const fade = 1 - Math.max(0, (p.life / p.ttl - 0.7) / 0.3)
+      if (p.y > window.innerHeight + 20 || fade <= 0) continue
+      alive++
+      ctx.save()
+      ctx.translate(p.x, p.y)
+      ctx.rotate(p.rot)
+      // scaleY oscillation reads as a 3D tumble.
+      ctx.scale(1, 0.35 + Math.abs(Math.sin(p.wobble)) * 0.65)
+      ctx.globalAlpha = fade
+      ctx.fillStyle = p.color
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h)
+      ctx.restore()
+    }
+    if (alive > 0) requestAnimationFrame(tick)
+    else canvas.remove()
+  }
+  requestAnimationFrame(tick)
 }
 
 /* ---------- Page links (>Grab Page Links) ---------- */

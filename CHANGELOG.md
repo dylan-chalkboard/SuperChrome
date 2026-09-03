@@ -3,6 +3,11 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.25.5
+
+- Confetti rebuilt as a canvas particle system: two cannons, gravity,
+  drag, 3D tumble, and fade — instead of falling rectangles
+
 ## 0.25.4
 
 - `>Confetti` 🎉 — rains palette-colored confetti over the current page
