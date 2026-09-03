@@ -3,6 +3,14 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.29.0
+
+- **State restoration**: reopening the palette within 90 seconds picks up
+  exactly where you left off — mode, query, folder depth (bookmarks and
+  library), and the selected row; after that it opens fresh. Requesting a
+  different mode explicitly always wins, and sub-states (settings, save
+  flow) reset by design
+
 ## 0.28.0
 
 - **`>QR This Page`** — offline-generated QR of the current URL in the

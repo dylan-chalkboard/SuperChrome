@@ -178,6 +178,15 @@ export function libraryCurrentFolderId(): string | undefined {
   return stack.length ? stack[stack.length - 1].id : undefined
 }
 
+/** Snapshot/restore of the browse stack, for palette state restoration. */
+export function libraryStackSnapshot(): Array<{ id: string; label: string }> {
+  return [...stack]
+}
+
+export function restoreLibraryStack(saved: Array<{ id: string; label: string }>): void {
+  stack = [...saved]
+}
+
 /** True while a save panel or triage owns the keyboard and hides the input row. */
 export function libraryOwnsInput(): boolean {
   return state !== 'browse'

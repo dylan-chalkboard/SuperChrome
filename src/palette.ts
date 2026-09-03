@@ -29,6 +29,8 @@ import {
   libraryOwnsInput,
   libraryUp,
   libraryCurrentFolderId,
+  libraryStackSnapshot,
+  restoreLibraryStack,
   openLibrarySave,
   renderLibrary,
   resetLibrary,
@@ -506,6 +508,19 @@ let brandMenuEl: HTMLElement | null = null
 let pageListItems: RemoteItem[] = []
 let pageListLabel = ''
 let pageListHeader: HTMLElement | null = null
+
+/** Where the palette was when it closed — restored on reopen for 90s. */
+interface PaletteSnapshot {
+  prefix: string
+  query: string
+  browse: Array<{ id: string; label: string }>
+  library: Array<{ id: string; label: string }>
+  selected: number
+  at: number
+}
+let lastSnapshot: PaletteSnapshot | null = null
+let pendingRestoreIndex: number | null = null
+const SNAPSHOT_TTL_MS = 90_000
 let outlineEls: HTMLElement[] = []
 let creatingFolder = false
 let newFolderParentId: string | undefined
@@ -622,6 +637,18 @@ function captureModePrefix(): void {
 }
 
 function closePalette(): void {
+  // Browse-level state only; sub-states (settings, save flow, …) reset.
+  lastSnapshot =
+    (uiState === 'list' || uiState === 'actions') && paletteInput
+      ? {
+          prefix: modePrefix,
+          query: paletteInput.value,
+          browse: [...browseStack],
+          library: libraryStackSnapshot(),
+          selected: selectedIndex,
+          at: Date.now(),
+        }
+      : null
   for (const type of ['keydown', 'keypress', 'keyup'] as const) {
     window.removeEventListener(type, onGlobalKey, true)
   }
@@ -678,6 +705,19 @@ function openPalette(prefix: string): void {
   paletteInput.spellcheck = false
   modePrefix = prefix && PREFIX_CHARS.includes(prefix[0]) ? prefix[0] : ''
   paletteInput.value = modePrefix ? prefix.slice(1) : prefix
+  // Reopening soon after closing picks up right where you left off —
+  // unless a specific different mode was requested.
+  if (
+    lastSnapshot &&
+    Date.now() - lastSnapshot.at < SNAPSHOT_TTL_MS &&
+    (prefix === '' || lastSnapshot.prefix === modePrefix)
+  ) {
+    modePrefix = lastSnapshot.prefix
+    paletteInput.value = lastSnapshot.query
+    browseStack = [...lastSnapshot.browse]
+    restoreLibraryStack(lastSnapshot.library)
+    pendingRestoreIndex = lastSnapshot.selected
+  }
   paletteInput.addEventListener('input', () => {
     if (uiState === 'actions') closeActions()
     if (uiState === 'rename') return
@@ -3385,6 +3425,10 @@ function renderItems(
     })
     paletteList!.appendChild(row)
   })
+  if (pendingRestoreIndex !== null) {
+    selectedIndex = Math.max(0, Math.min(pendingRestoreIndex, items.length - 1))
+    pendingRestoreIndex = null
+  }
   highlightSelection(true)
 }
 
