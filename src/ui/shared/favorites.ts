@@ -72,6 +72,23 @@ export async function toggleFavorite(item: RemoteItem): Promise<string | null> {
   return index >= 0 ? 'Removed from Favorites' : 'Added to Favorites'
 }
 
+/** Patch a favorite's customization; undefined values clear the field. */
+export async function updateFavorite(
+  key: string,
+  patch: Partial<FavoriteEntry>,
+): Promise<void> {
+  const favorites = await loadFavorites()
+  const entry = favorites.find((f) => favKey(f) === key)
+  if (!entry) return
+  const record = entry as unknown as Record<string, unknown>
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === undefined) delete record[k]
+    else record[k] = v
+  }
+  favoritesCache = favorites
+  await chrome.storage.sync.set({ favorites })
+}
+
 export function favToItem(f: FavoriteEntry): RemoteItem {
   if (f.kind === 'command') {
     return { kind: 'command', label: f.label, detail: '', commandId: f.commandId, icon: f.icon, color: f.color }

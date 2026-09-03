@@ -41,9 +41,11 @@ import { parseSnippets, serializeSnippets } from './features/snippets'
 import {
   favToItem,
   favoriteActionFor,
+  favoriteKeyOf,
   isFavorite,
   loadFavorites,
   toggleFavorite,
+  updateFavorite,
 } from './ui/shared/favorites'
 import { BOOKMARK_SVG, CLOCK_SVG, CMD_ICONS, COMMAND_SVG, DOC_SVG, ONBOARD_DONE_SVG, ONBOARD_TODO_SVG, RIBBON_SVG } from './ui/shared/icons'
 import { MODE_PLACEHOLDERS, MODE_PREFIX, PREFIX_CHARS, mode } from './ui/shared/mode'
@@ -221,23 +223,24 @@ const PALETTE_CSS = `
   flex-shrink: 0;
 }
 .item .icon.plain { background: transparent; }
-.fav-bar { display: flex; gap: 6px; padding: 10px 12px 4px; overflow: hidden; }
+.fav-bar { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px 4px; }
 .fav-item {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
-  width: 56px; flex: none;
+  width: 64px; flex: none;
 }
 .fav-tile {
-  width: 40px; height: 40px; border-radius: 10px;
+  width: 46px; height: 46px; border-radius: 12px;
   background: #ffffff10; color: #ffffff;
   display: flex; align-items: center; justify-content: center;
   transition: box-shadow 0.12s ease;
 }
+.fav-tile .fav-emoji { font-size: 24px; line-height: 1; }
 .fav-item:hover .fav-tile, .fav-item.selected .fav-tile { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35); }
 .fav-star { display: flex; flex-shrink: 0; color: #e8c341; }
-.fav-tile img { width: 24px; height: 24px; border-radius: 5px; }
-.fav-tile svg { width: 20px; height: 20px; }
+.fav-tile img { width: 28px; height: 28px; border-radius: 6px; }
+.fav-tile svg { width: 23px; height: 23px; }
 .fav-cap {
-  max-width: 54px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 62px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-size: 9px; color: #ffffff59;
 }
 .item .icon.kind-command { background: var(--sc-command, linear-gradient(135deg, #4cd5f3, #4c65f3)); color: #ffffff; }
@@ -457,6 +460,7 @@ let brandMenuEl: HTMLElement | null = null
 let pageLinks: RemoteItem[] = []
 let creatingFolder = false
 let newFolderParentId: string | undefined
+let favEmojiKey: string | null = null
 
 let uiState: UiState = 'list'
 let flatItems: RemoteItem[] = []
@@ -1238,9 +1242,28 @@ function favTileEl(f: FavoriteEntry, index: number): HTMLElement {
   })
   const tile = document.createElement('div')
   tile.className = 'fav-tile'
-  if (f.kind === 'command') {
-    if (f.color) tile.style.background = f.color
-    tile.innerHTML = (f.icon && CMD_ICONS[f.icon]) || COMMAND_SVG
+  if (f.tileColor && FOLDER_COLORS[f.tileColor]) {
+    tile.style.background = FOLDER_COLORS[f.tileColor][0]
+  }
+  if (f.emojiIcon) {
+    const glyph = document.createElement('span')
+    glyph.className = 'fav-emoji'
+    glyph.textContent = f.emojiIcon
+    tile.appendChild(glyph)
+  } else if (f.kind === 'command') {
+    // Mirror iconFor's special cases so command tiles always show something.
+    if (f.icon === 'logo') {
+      const img = document.createElement('img')
+      img.className = 'logo-img'
+      img.src = chrome.runtime.getURL('/icons/footer.png')
+      img.draggable = false
+      tile.appendChild(img)
+    } else if (f.icon === 'ribbon') {
+      tile.innerHTML = RIBBON_SVG
+    } else {
+      if (!f.tileColor && f.color) tile.style.background = f.color
+      tile.innerHTML = (f.icon && CMD_ICONS[f.icon]) || COMMAND_SVG
+    }
   } else if (f.kind === 'folder') {
     tile.classList.add('kind-folder')
     tile.innerHTML = folderSvg(folderColorOf(f.id))
@@ -1424,6 +1447,8 @@ const ACTION_ICONS: Record<string, string> = {
   'move-down': ARROW_DOWN_SVG,
   'folder-color': CMD_ICONS.paint,
   'onboard-hide': CMD_ICONS.reset,
+  'fav-color': CMD_ICONS.paint,
+  'fav-emoji': STAR_SVG,
   'group-rename': PENCIL_SVG,
   'group-color': CMD_ICONS.paint,
   'group-dissolve': CMD_ICONS.group,
@@ -1440,6 +1465,8 @@ const ACTION_ICONS: Record<string, string> = {
   'download-show': FOLDER_OUTLINE_SVG,
 }
 
+let favMenuContext = false
+
 function openActions(at?: { x: number; y: number }): void {
   // ⌘K acts on the focused favorite tile when the bar has keyboard focus.
   const item =
@@ -1450,8 +1477,15 @@ function openActions(at?: { x: number; y: number }): void {
   closeBrandMenu()
   void markOnboard('actions')
   pendingMenuAt = at ?? null
+  favMenuContext = favIndex >= 0
   actionTarget = item
-  currentActions = actionsFor(item)
+  currentActions = favMenuContext
+    ? [
+        ...actionsFor(item),
+        { id: 'fav-color', label: 'Tile Color…' },
+        { id: 'fav-emoji', label: 'Emoji Icon…' },
+      ]
+    : actionsFor(item)
   actionIndex = 0
   uiState = 'actions'
 
@@ -1611,7 +1645,87 @@ function openTabGroupColorPicker(item: RemoteItem): void {
   renderFooter()
 }
 
+/** Swatch submenu for a favorite tile's background color. */
+function openFavColorPicker(item: RemoteItem): void {
+  if (!panelEl) return
+  actionTarget = item
+  currentActions = [
+    { id: 'fav-color:none', label: 'Default' },
+    ...Object.keys(FOLDER_COLORS).map((name) => ({
+      id: `fav-color:${name}`,
+      label: name[0].toUpperCase() + name.slice(1),
+    })),
+  ]
+  actionIndex = 0
+  uiState = 'actions'
+  actionsEl?.remove()
+  actionsEl = document.createElement('div')
+  actionsEl.className = 'actions'
+  currentActions.forEach((action, index) => {
+    const row = document.createElement('div')
+    row.className = 'action-row'
+    const name = action.id.slice('fav-color:'.length)
+    const pair = FOLDER_COLORS[name]
+    const dot = document.createElement('span')
+    dot.className = 'menu-icon'
+    dot.innerHTML = pair
+      ? `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="${pair[0]}"/></svg>`
+      : `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="none" stroke="#8a8a8e"/></svg>`
+    const label = document.createElement('span')
+    label.textContent = action.label
+    const spacer = document.createElement('span')
+    spacer.className = 'spacer'
+    row.append(dot, label, spacer)
+    if (index < 9) row.appendChild(kbd(String(index + 1)))
+    row.addEventListener('mousedown', (e) => {
+      e.preventDefault()
+      void runAction(action, item)
+    })
+    row.addEventListener('mousemove', () => {
+      if (actionIndex !== index) {
+        actionIndex = index
+        highlightActions()
+      }
+    })
+    actionsEl!.appendChild(row)
+  })
+  panelEl.appendChild(actionsEl)
+  highlightActions()
+  renderFooter()
+}
+
+/** Emoji-icon input for a favorite tile (empty entry clears it). */
+function enterFavEmoji(item: RemoteItem): void {
+  if (!paletteInput || !paletteList) return
+  favEmojiKey = favoriteKeyOf(item)
+  if (!favEmojiKey) return
+  uiState = 'rename'
+  subStateTarget = null
+  savedQuery = paletteInput.value
+  paletteInput.value = ''
+  paletteInput.placeholder = 'Emoji for this favorite (leave empty to clear)…'
+  paletteInput.focus()
+  paletteList.textContent = ''
+  flatItems = []
+  const hint = document.createElement('div')
+  hint.className = 'empty'
+  hint.textContent = `Emoji icon for "${item.label}" — ↵ to save, esc to cancel`
+  paletteList.appendChild(hint)
+  renderFooter()
+}
+
 async function runAction(action: PaletteAction, item: RemoteItem): Promise<void> {
+  if (action.id.startsWith('fav-color:')) {
+    const name = action.id.slice('fav-color:'.length)
+    const key = favoriteKeyOf(item)
+    if (key) {
+      await updateFavorite(key, { tileColor: name === 'none' ? undefined : name })
+      await loadFavorites()
+    }
+    closeActions()
+    void updateList()
+    return
+  }
   if (action.id.startsWith('tab-group-color:')) {
     const color = action.id.slice('tab-group-color:'.length)
     if (item.groupId !== undefined) {
@@ -1726,6 +1840,14 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
     case 'onboard-hide':
       await dismissOnboarding()
       break
+    case 'fav-color':
+      closeActions()
+      openFavColorPicker(item)
+      return
+    case 'fav-emoji':
+      closeActions()
+      enterFavEmoji(item)
+      return
     case 'group-rename':
       closeActions()
       enterGroupRename(item)
@@ -1861,6 +1983,14 @@ function enterRename(item: RemoteItem): void {
 
 async function commitRename(): Promise<void> {
   const title = paletteInput?.value.trim()
+  if (favEmojiKey) {
+    const glyph = (title ?? '').slice(0, 8)
+    await updateFavorite(favEmojiKey, { emojiIcon: glyph || undefined })
+    await loadFavorites()
+    favEmojiKey = null
+    exitSubState(true)
+    return
+  }
   if (creatingFolder) {
     if (title) {
       await chrome.runtime.sendMessage({
@@ -1964,6 +2094,7 @@ async function commitGroup(groupItem: RemoteItem): Promise<void> {
 
 function exitSubState(_commit: boolean): void {
   creatingFolder = false
+  favEmojiKey = null
   if (uiState === 'actions') closeActions()
   if (!paletteInput) return
   uiState = 'list'

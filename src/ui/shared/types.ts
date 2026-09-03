@@ -37,4 +37,7 @@ export interface FavoriteEntry {
   id?: string
   icon?: string
   color?: string
+  /** User customization: preset tile color name and/or an emoji glyph. */
+  tileColor?: string
+  emojiIcon?: string
 }
