@@ -1136,6 +1136,11 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     return
   }
   recordUsage(item)
+  // Any command execution ticks the Getting Started box, whichever branch
+  // handles it (special-cased commands never reached the generic runner).
+  if (item.kind === 'command' && item.commandId && !item.commandId.startsWith('onboard:')) {
+    void markOnboard('command')
+  }
   if (item.kind === 'bookmark' || item.kind === 'history' || item.kind === 'search') {
     void chrome.runtime.sendMessage({ type: 'open-url', url: item.url, newTab: altAction })
   } else if (item.kind === 'tab') {
@@ -1212,7 +1217,6 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     window.print()
     return
   } else {
-    void markOnboard('command')
     void chrome.runtime.sendMessage({ type: 'run-command', id: item.commandId })
   }
   closePalette()
@@ -1254,8 +1258,15 @@ function favTileEl(f: FavoriteEntry, index: number): HTMLElement {
   cap.textContent = f.label
   el.append(tile, cap)
   el.addEventListener('mousedown', (e) => {
+    if (e.button === 2) return
     e.preventDefault()
     void executeItem(favToItem(f), e.metaKey || e.ctrlKey)
+  })
+  el.addEventListener('contextmenu', (e) => {
+    e.preventDefault()
+    setFavIndex(index)
+    if (uiState === 'actions') closeActions()
+    openActions({ x: e.clientX, y: e.clientY })
   })
   return el
 }
@@ -1429,7 +1440,7 @@ const ACTION_ICONS: Record<string, string> = {
   'download-show': FOLDER_OUTLINE_SVG,
 }
 
-function openActions(): void {
+function openActions(at?: { x: number; y: number }): void {
   // ⌘K acts on the focused favorite tile when the bar has keyboard focus.
   const item =
     favIndex >= 0 && favBarItems[favIndex]
@@ -1438,6 +1449,7 @@ function openActions(): void {
   if (!item || !panelEl) return
   closeBrandMenu()
   void markOnboard('actions')
+  pendingMenuAt = at ?? null
   actionTarget = item
   currentActions = actionsFor(item)
   actionIndex = 0
@@ -1470,8 +1482,28 @@ function openActions(): void {
     actionsEl!.appendChild(row)
   })
   panelEl.appendChild(actionsEl)
+  placeActionsAtCursor()
   highlightActions()
   renderFooter()
+}
+
+/** Right-click anchor: position the menu at the pointer, clamped to the panel. */
+let pendingMenuAt: { x: number; y: number } | null = null
+function placeActionsAtCursor(): void {
+  if (!pendingMenuAt || !actionsEl || !panelEl) {
+    pendingMenuAt = null
+    return
+  }
+  const rect = panelEl.getBoundingClientRect()
+  const menuW = actionsEl.offsetWidth
+  const menuH = actionsEl.offsetHeight
+  const left = Math.max(8, Math.min(pendingMenuAt.x - rect.left, rect.width - menuW - 8))
+  const top = Math.max(8, Math.min(pendingMenuAt.y - rect.top, rect.height - menuH - 8))
+  actionsEl.style.left = `${left}px`
+  actionsEl.style.top = `${top}px`
+  actionsEl.style.right = 'auto'
+  actionsEl.style.bottom = 'auto'
+  pendingMenuAt = null
 }
 
 function closeActions(): void {
@@ -2468,8 +2500,16 @@ function renderItems(
     }
     row.appendChild(type)
     row.addEventListener('mousedown', (e) => {
+      if (e.button === 2) return
       e.preventDefault()
       void executeItem(item, e.metaKey || e.ctrlKey)
+    })
+    row.addEventListener('contextmenu', (e) => {
+      e.preventDefault()
+      selectedIndex = index
+      highlightSelection()
+      if (uiState === 'actions') closeActions()
+      openActions({ x: e.clientX, y: e.clientY })
     })
     row.addEventListener('mousemove', () => {
       if (selectedIndex !== index) {
