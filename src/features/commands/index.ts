@@ -13,14 +13,14 @@ export const PAGE_COMMANDS: Record<string, string> = {
 }
 
 export const PALETTE_COMMANDS = [
-  { id: 'switch-to-tab', label: 'Switch to Tab…' },
+  { id: 'switch-to-tab', label: 'Tabs' },
   // Mode launchers: searchable from the home view; the palette intercepts
   // these and sets the mode prefix instead of running anything.
-  { id: 'mode-commands', label: 'Search Commands' },
-  { id: 'mode-history', label: 'Search History' },
-  { id: 'mode-emoji', label: 'Search Emoji' },
-  { id: 'mode-snippets', label: 'Search Snippets' },
-  { id: 'mode-library', label: 'Browse Bookmarks' },
+  { id: 'mode-commands', label: 'Commands' },
+  { id: 'mode-history', label: 'History' },
+  { id: 'mode-emoji', label: 'Emoji' },
+  { id: 'mode-snippets', label: 'Snippets' },
+  { id: 'mode-library', label: 'Bookmarks' },
   { id: 'open-options', label: 'SuperChrome: Settings' },
   { id: 'show-onboarding', label: 'SuperChrome: Getting Started' },
   { id: 'page-links', label: 'Grab Page Links' },
@@ -64,7 +64,7 @@ export const PALETTE_COMMANDS = [
   { id: 'open-webstore', label: 'Open Chrome Web Store' },
   { id: 'open-bookmarks-manager', label: 'Open Bookmarks Manager' },
   { id: 'open-history', label: 'Open History' },
-  { id: 'open-downloads', label: 'Open Downloads' },
+  { id: 'open-downloads', label: 'Downloads' },
   { id: 'open-extensions', label: 'Open Extensions' },
   { id: 'open-shortcuts', label: 'Open Keyboard Shortcuts' },
   { id: 'open-version', label: 'Open Chrome Version' },

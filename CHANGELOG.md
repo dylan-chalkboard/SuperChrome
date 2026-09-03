@@ -3,6 +3,11 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.26.2
+
+- Mode launchers renamed to bare nouns — Commands, Tabs, History, Emoji,
+  Downloads, Snippets, Bookmarks — reading like apps next to their icons
+
 ## 0.26.1
 
 - Open Downloads actually gets its floppy-disk glyph (a silent patch
