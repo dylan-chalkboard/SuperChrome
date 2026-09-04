@@ -13,6 +13,7 @@ import {
   matchQuicklink,
   parseQuicklinks,
   parseSnippets,
+  preserveQuicklinkExtras,
   serializeQuicklinks,
   serializeSnippets,
   tileGradient,
@@ -239,6 +240,29 @@ describe('quicklinks', () => {
     const links = parseQuicklinks('x | X | https://example.com')
     expect(links).toEqual([{ keyword: 'x', name: 'X', template: 'https://example.com' }])
     expect(parseQuicklinks(serializeQuicklinks(links))).toEqual(links)
+  })
+  it('allows pipes inside the template (dropdown options)', () => {
+    const line = 'yt2 | YT Filtered | https://yt.com/?sp={argument options="Videos|EgIQAQ, Channels|EgIQAg"}'
+    const links = parseQuicklinks(line)
+    expect(links).toHaveLength(1)
+    expect(links[0].template).toBe('https://yt.com/?sp={argument options="Videos|EgIQAQ, Channels|EgIQAg"}')
+    expect(parseQuicklinks(serializeQuicklinks(links))).toEqual(links)
+  })
+  it('preserves colors and icons across textarea round-trips', () => {
+    const existing = [
+      { keyword: 'dash', name: 'Dash', template: 'https://d.com', color: '#e05d5d', icon: '🚀' },
+      { keyword: 'g', name: 'Google', template: 'https://g.com/?q={query}' },
+    ]
+    const edited = parseQuicklinks('dash | Dashboard | https://d.com\nnew | New | https://n.com')
+    const merged = preserveQuicklinkExtras(edited, existing)
+    expect(merged[0]).toEqual({
+      keyword: 'dash',
+      name: 'Dashboard',
+      template: 'https://d.com',
+      color: '#e05d5d',
+      icon: '🚀',
+    })
+    expect(merged[1]).toEqual({ keyword: 'new', name: 'New', template: 'https://n.com' })
   })
 })
 

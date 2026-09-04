@@ -37,8 +37,16 @@ import {
 } from './features/bookmarks/view'
 import { tileGradient } from './features/gradients'
 import { GROUP_COLORS } from './features/tabs/search'
-import { cleanHost } from './features/navigation'
-import { parseQuicklinks, renderTemplate, serializeQuicklinks, templateArguments } from './features/quicklinks'
+import { cleanHost, hostOf } from './features/navigation'
+import {
+  parseQuicklinks,
+  preserveQuicklinkExtras,
+  quicklinkStyle,
+  renderTemplate,
+  serializeQuicklinks,
+  stripQlPlaceholders,
+  templateArguments,
+} from './features/quicklinks'
 import type { ArgumentSpec } from './features/quicklinks'
 import { parseSnippets, serializeSnippets } from './features/snippets'
 import { findTrackers } from './features/page/trackers'
@@ -399,6 +407,10 @@ const PALETTE_CSS = `
 .settings input[type='text'] { width: 100%; box-sizing: border-box; padding: 6px 10px; }
 .settings input[type='text']:focus { border-color: #4c9df388; }
 .ql-error { font-size: 12px; color: #e05d5d; min-height: 15px; }
+.ql-glyph { font-size: 12px; font-weight: 600; color: #fff; display: flex; align-items: center; justify-content: center; }
+.ql-examples { flex-wrap: wrap; }
+.ql-examples button { background: #ffffff10; border: 1px solid #ffffff20; }
+.light .ql-examples button { background: #00000008; border-color: #00000020; }
 .settings input[type='number'] { width: 70px; }
 .settings input[type='color'] {
   width: 38px; height: 26px; padding: 2px; cursor: pointer;
@@ -1378,6 +1390,9 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
   } else if (item.commandId === 'save-page-quicklink') {
     enterQuicklinkEdit({ name: document.title, link: location.href })
     return
+  } else if (item.commandId === 'view-quicklinks') {
+    void enterQuicklinksView()
+    return
   } else if (item.commandId?.startsWith('onboard:')) {
     const key = item.commandId.slice('onboard:'.length)
     void markOnboard(key)
@@ -1946,23 +1961,38 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
       closePalette()
       return
     case 'ql-edit':
+    case 'ql-duplicate': {
       closeActions()
-      enterQuicklinkEdit({
-        keyword: item.qlKeyword,
-        name: item.qlName,
-        link: item.template,
-        editKeyword: item.qlKeyword,
-      })
+      const s = await getSettings()
+      const link = s.quicklinks.find((l) => l.keyword === item.qlKeyword)
+      if (action.id === 'ql-edit') {
+        enterQuicklinkEdit({
+          keyword: item.qlKeyword,
+          name: item.qlName,
+          link: item.template,
+          color: link?.color,
+          icon: link?.icon,
+          editKeyword: item.qlKeyword,
+        })
+      } else {
+        enterQuicklinkEdit({
+          name: `${item.qlName ?? item.label} Copy`,
+          link: item.template,
+          color: link?.color,
+          icon: link?.icon,
+        })
+      }
       return
-    case 'ql-duplicate':
-      closeActions()
-      enterQuicklinkEdit({ name: `${item.qlName ?? item.label} Copy`, link: item.template })
-      return
+    }
     case 'ql-delete': {
       const s = await getSettings()
       await chrome.storage.sync.set({
         settings: { ...s, quicklinks: s.quicklinks.filter((l) => l.keyword !== item.qlKeyword) },
       })
+      // The >Quicklinks browser renders from its own snapshot; drop the row.
+      if (uiState === 'links') {
+        pageListItems = pageListItems.filter((p) => p.qlKeyword !== item.qlKeyword)
+      }
       showToast(`Quicklink “${item.qlName ?? item.label}” deleted`)
       break
     }
@@ -3246,12 +3276,32 @@ async function renderSettings(): Promise<void> {
     openInNewTab: newTab.checked,
     reduceMotion: reduceMotionBox.checked,
     frecencyDecayDays: Math.min(90, Math.max(1, Number(decay.value) || s.frecencyDecayDays)),
-    quicklinks: parseQuicklinks(quicklinksArea.value),
+    quicklinks: preserveQuicklinkExtras(parseQuicklinks(quicklinksArea.value), s.quicklinks),
     snippets: parseSnippets(snippetsArea.value),
     disabledSites: sitesArea.value.split('\n').map(cleanHost).filter(Boolean),
   })
 
   paletteList.appendChild(form)
+}
+
+/* ---------- Quicklinks browser (>Quicklinks) ---------- */
+
+async function enterQuicklinksView(): Promise<void> {
+  const s = await getSettings()
+  const rows = s.quicklinks.map((l): RemoteItem => {
+    const argful = templateArguments(l.template).length > 0
+    return {
+      kind: 'search',
+      label: l.name,
+      detail: `${l.keyword} · ${hostOf(stripQlPlaceholders(l.template)) ?? l.template}`,
+      template: l.template,
+      qlKeyword: l.keyword,
+      qlName: l.name,
+      typeText: 'Quicklink',
+      ...quicklinkStyle(l, argful),
+    }
+  })
+  enterPageList('Quicklinks', rows, 'quicklinks')
 }
 
 /* ---------- Quicklink argument prompts + open-time substitution ---------- */
@@ -3356,7 +3406,14 @@ async function finishQuicklink(
 
 /* ---------- Create Quicklink form (Raycast-style) ---------- */
 
-let quicklinkFields: { keyword: HTMLInputElement; name: HTMLInputElement; link: HTMLInputElement; error: HTMLElement } | null = null
+let quicklinkFields: {
+  keyword: HTMLInputElement
+  name: HTMLInputElement
+  link: HTMLInputElement
+  icon: HTMLInputElement
+  getColor: () => string | undefined
+  error: HTMLElement
+} | null = null
 /** When set, saving replaces the quicklink with this keyword instead of adding. */
 let quicklinkEditing: string | null = null
 
@@ -3364,6 +3421,8 @@ function enterQuicklinkEdit(prefill?: {
   keyword?: string
   name?: string
   link?: string
+  color?: string
+  icon?: string
   editKeyword?: string
 }): void {
   if (!paletteInput || !paletteList || uiState === 'quicklink-edit') return
@@ -3388,7 +3447,13 @@ function exitQuicklinkEdit(): void {
   void updateList()
 }
 
-function renderQuicklinkEdit(prefill?: { keyword?: string; name?: string; link?: string }): void {
+function renderQuicklinkEdit(prefill?: {
+  keyword?: string
+  name?: string
+  link?: string
+  color?: string
+  icon?: string
+}): void {
   if (!paletteList) return
   paletteList.textContent = ''
   selectorEl = null
@@ -3429,6 +3494,86 @@ function renderQuicklinkEdit(prefill?: { keyword?: string; name?: string; link?:
   linkWrap.append(link, hint)
   row('Link', linkWrap)
 
+  // Color + icon, Raycast-style: preset tile colors and an emoji/monogram
+  // glyph; both optional — favicon (or the search glyph) is the default.
+  let chosenColor = prefill?.color
+  const strip = document.createElement('div')
+  strip.className = 'swatch-strip'
+  const dots: Array<{ dot: HTMLSpanElement; value: string | undefined }> = []
+  const addDot = (value: string | undefined, background: string, title: string): void => {
+    const dot = document.createElement('span')
+    dot.className = 'swatch-dot' + (value === undefined ? ' none' : '')
+    if (value !== undefined) dot.style.background = background
+    dot.title = title
+    dot.classList.toggle('on', chosenColor === value)
+    dot.addEventListener('mousedown', (e) => {
+      e.preventDefault()
+      chosenColor = value
+      dots.forEach((d) => d.dot.classList.toggle('on', d.value === value))
+    })
+    strip.appendChild(dot)
+    dots.push({ dot, value })
+  }
+  addDot(undefined, '', 'Default')
+  for (const [colorName, pair] of Object.entries(TILE_COLORS)) addDot(pair[0], pair[0], colorName)
+  row('Color', strip)
+
+  const icon = field('🔗 or ab', prefill?.icon ?? '')
+  icon.maxLength = 4
+  icon.style.width = '72px'
+  row('Icon', icon)
+
+  // Clickable examples: each fills the form with a working template so the
+  // placeholder syntax (arguments, dropdowns, clipboard, dates) teaches itself.
+  const EXAMPLES: Array<{ chip: string; keyword: string; name: string; link: string }> = [
+    {
+      chip: 'Search',
+      keyword: 'g',
+      name: 'Google',
+      link: 'https://www.google.com/search?q={argument name="query"}',
+    },
+    {
+      chip: 'Dropdown',
+      keyword: 'tr',
+      name: 'Translate',
+      link: 'https://translate.google.com/?sl=auto&tl={argument name="to" options="en, es, fr, de"}&text={argument name="text"}&op=translate',
+    },
+    {
+      chip: 'Two args',
+      keyword: 'repo',
+      name: 'GitHub Repo',
+      link: 'https://github.com/{argument name="org"}/{argument name="repo"}',
+    },
+    {
+      chip: 'Clipboard',
+      keyword: 'clip',
+      name: 'Search Clipboard',
+      link: 'https://www.google.com/search?q={clipboard}',
+    },
+    {
+      chip: 'Date',
+      keyword: 'day',
+      name: 'Today’s Calendar',
+      link: 'https://calendar.google.com/calendar/r/day/{date format="yyyy/MM/dd"}',
+    },
+  ]
+  const examples = document.createElement('div')
+  examples.className = 'seg ql-examples'
+  for (const example of EXAMPLES) {
+    const b = document.createElement('button')
+    b.textContent = example.chip
+    b.title = example.link
+    b.addEventListener('mousedown', (e) => {
+      e.preventDefault()
+      if (!keyword.value.trim()) keyword.value = example.keyword
+      name.value = example.name
+      link.value = example.link
+      link.focus()
+    })
+    examples.appendChild(b)
+  }
+  row('Examples', examples)
+
   const error = document.createElement('div')
   error.className = 'set-row'
   const errorText = document.createElement('span')
@@ -3436,7 +3581,7 @@ function renderQuicklinkEdit(prefill?: { keyword?: string; name?: string; link?:
   error.append(document.createElement('label'), errorText)
   form.appendChild(error)
 
-  quicklinkFields = { keyword, name, link, error: errorText }
+  quicklinkFields = { keyword, name, link, icon, getColor: () => chosenColor, error: errorText }
   paletteList.appendChild(form)
   keyword.focus()
 }
@@ -3465,7 +3610,15 @@ async function saveQuicklinkEdit(): Promise<void> {
   if (s.quicklinks.some((l) => l.keyword.toLowerCase() === keyword && l.keyword !== editing)) {
     return fail(`Keyword “${keyword}” is already taken.`, quicklinkFields.keyword)
   }
-  const entry = { keyword, name, template: link }
+  const color = quicklinkFields.getColor()
+  const iconGlyph = quicklinkFields.icon.value.trim()
+  const entry = {
+    keyword,
+    name,
+    template: link,
+    ...(color ? { color } : {}),
+    ...(iconGlyph ? { icon: iconGlyph } : {}),
+  }
   const quicklinks = editing
     ? s.quicklinks.map((l) => (l.keyword === editing ? entry : l))
     : [...s.quicklinks, entry]
@@ -3851,6 +4004,13 @@ function iconFor(item: RemoteItem): HTMLElement {
     return icon
   }
   if (kind === 'command' || kind === 'search') {
+    if (item.emoji) {
+      // Custom quicklink glyph: emoji or short monogram on its color tile.
+      icon.className = 'icon kind-command ql-glyph'
+      if (item.color) icon.style.background = item.color
+      icon.textContent = item.emoji
+      return icon
+    }
     if (item.icon === 'logo') {
       icon.className = 'icon plain'
       const img = document.createElement('img')

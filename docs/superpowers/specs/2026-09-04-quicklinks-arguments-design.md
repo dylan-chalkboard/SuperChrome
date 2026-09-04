@@ -109,6 +109,18 @@ Create-form hint becomes: "Include {argument} to prompt (add
 options=\"a, b\" for a dropdown) — or {clipboard}, {selection}, {date},
 {uuid}. {query} still works."
 
+## Follow-ups shipped in v0.32.0–v0.33.0
+
+- "Create a quicklink" Getting Started step (marks on any form save).
+- `>Quicklinks` browser view (enterPageList) with the same ⌘K actions.
+- Optional `color` (preset tile hexes) and `icon` (emoji/monogram) on
+  `Quicklink`, set in the create form; rows render them via
+  `quicklinkStyle()`. Not representable in the pipe textarea — re-attached
+  by keyword on save (`preserveQuicklinkExtras`).
+- Pipe-safe textarea parsing: only the first two pipes delimit, so
+  templates may contain `options="Label|value"`.
+- Example chips in the create form that fill working templates.
+
 ## Testing & release
 
 - Engine: exhaustive unit tests (parse, attrs, options label|value,

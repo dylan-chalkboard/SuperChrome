@@ -2,7 +2,7 @@ import { tryCalculate, tryConvert } from '../calculator'
 import { commandEntries } from '../commands'
 import { tileGradient } from '../gradients'
 import { hostOf, urlFromQuery } from '../navigation'
-import { matchQuicklink, templateArguments } from '../quicklinks'
+import { matchQuicklink, quicklinkStyle, stripQlPlaceholders, templateArguments } from '../quicklinks'
 import { frecency, rank } from '../ranking'
 import type { UsageMap } from '../ranking'
 import type { PaletteItem } from '../../core/types'
@@ -266,38 +266,25 @@ export async function searchBookmarks(
   // carry their template; the palette renders the final URL when opened,
   // since clipboard/selection placeholders only exist in the page. The
   // exact-keyword match above is excluded so the same link never shows twice.
-  const stripPlaceholders = (template: string): string => template.replace(/\{[^{}]*\}/g, '')
-  const favicon = (template: string): string =>
-    chrome.runtime.getURL('/_favicon/') +
-    `?pageUrl=${encodeURIComponent(stripPlaceholders(template))}&size=32`
   const quicklinkEntries = settings.quicklinks
     .filter((l) => l.keyword !== quicklink?.link.keyword)
-    .map((l) => ({
-      item: templateArguments(l.template).length
-        ? {
-            kind: 'search' as const,
-            label: `Search ${l.name}…`,
-            detail: '',
-            template: l.template,
-            qlKeyword: l.keyword,
-            qlName: l.name,
-            icon: 'search',
-            color: tileGradient('#e8964a'),
-            typeText: 'Quicklink',
-          }
-        : {
-            kind: 'search' as const,
-            label: l.name,
-            detail: hostOf(stripPlaceholders(l.template)) ?? '',
-            template: l.template,
-            qlKeyword: l.keyword,
-            qlName: l.name,
-            iconUrl: favicon(l.template),
-            typeText: 'Quicklink',
-          },
-      text: `${l.name} ${l.keyword}`.toLowerCase(),
-      usageKey: `quicklink:${l.keyword}`,
-    }))
+    .map((l) => {
+      const argful = templateArguments(l.template).length > 0
+      return {
+        item: {
+          kind: 'search' as const,
+          label: argful ? `Search ${l.name}…` : l.name,
+          detail: argful ? '' : (hostOf(stripQlPlaceholders(l.template)) ?? ''),
+          template: l.template,
+          qlKeyword: l.keyword,
+          qlName: l.name,
+          typeText: 'Quicklink',
+          ...quicklinkStyle(l, argful),
+        },
+        text: `${l.name} ${l.keyword}`.toLowerCase(),
+        usageKey: `quicklink:${l.keyword}`,
+      }
+    })
 
   const results = rank<PaletteItem>(
     [...bookmarkEntries, ...folderEntries, ...commands, ...quicklinkEntries, ...tabEntries, ...historyEntries],
@@ -324,14 +311,12 @@ export async function searchBookmarks(
           ? `Search ${link.name} for “${rest}”`
           : `Open ${link.name}…`
         : `Open ${link.name}`,
-      detail: args.length && rest ? '' : (hostOf(stripPlaceholders(link.template)) ?? ''),
+      detail: args.length && rest ? '' : (hostOf(stripQlPlaceholders(link.template)) ?? ''),
       template: link.template,
       qlRest: rest,
       qlKeyword: link.keyword,
       qlName: link.name,
-      ...(args.length && rest
-        ? { icon: 'search', color: tileGradient('#e8964a') }
-        : { iconUrl: favicon(link.template) }),
+      ...quicklinkStyle(link, args.length > 0 && Boolean(rest)),
       group: 'Quicklink',
     })
   }

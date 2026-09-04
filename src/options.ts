@@ -3,6 +3,7 @@ import {
   cleanHost,
   parseQuicklinks,
   parseSnippets,
+  preserveQuicklinkExtras,
   serializeQuicklinks,
   serializeSnippets,
 } from './lib'
@@ -58,7 +59,11 @@ function applyAppearance(mode: UserSettings['appearance']): void {
   document.body.classList.toggle('light', light)
 }
 
+/** Colors/icons aren't in the textarea format; keep the loaded set to re-attach on save. */
+let loadedQuicklinks: Quicklink[] = []
+
 function populate(s: UserSettings): void {
+  loadedQuicklinks = s.quicklinks
   opacity.value = String(s.glassOpacity)
   opacityValue.textContent = `${Math.round(s.glassOpacity * 100)}%`
   colorCommand.value = s.iconColors.command
@@ -92,7 +97,7 @@ function collect(): UserSettings {
     openInNewTab: newTab.checked,
     reduceMotion: reduceMotion.checked,
     disabledSites: sites.value.split('\n').map(cleanHost).filter(Boolean),
-    quicklinks: parseQuicklinks(quicklinks.value),
+    quicklinks: preserveQuicklinkExtras(parseQuicklinks(quicklinks.value), loadedQuicklinks),
     snippets: parseSnippets(snippets.value),
   }
 }

@@ -3,6 +3,18 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.33.0
+
+- **`>Quicklinks`** — browse every quicklink in one filtered list; ⌘K
+  there edits, duplicates, or deletes
+- **Colors and icons**: the create form gains preset tile colors and an
+  emoji/monogram glyph; custom-styled rows render with them instead of the
+  favicon. Survive textarea edits (re-attached by keyword)
+- **Examples in the create form**: clickable chips (Search, Dropdown, Two
+  args, Clipboard, Date) fill the fields with working templates
+- Settings textarea now tolerates pipes inside templates (dropdown
+  `options="A|a"` no longer breaks parsing)
+
 ## 0.32.0
 
 - Getting Started gains a "Create a quicklink" step — clicking it opens
