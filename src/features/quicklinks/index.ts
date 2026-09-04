@@ -85,6 +85,11 @@ export function quicklinkStyle(
   l: Quicklink,
   searchStyle: boolean,
 ): { emoji?: string; icon?: string; iconUrl?: string; color?: string } {
+  // "icon:<name>" = library glyph picked in the form; anything else is an
+  // emoji/monogram rendered as text.
+  if (l.icon?.startsWith('icon:')) {
+    return { icon: l.icon.slice('icon:'.length), color: tileGradient(l.color ?? '#e8964a') }
+  }
   if (l.icon) return { emoji: l.icon, color: tileGradient(l.color ?? '#e8964a') }
   if (l.color) return { icon: searchStyle ? 'search' : 'link', color: tileGradient(l.color) }
   if (searchStyle) return { icon: 'search', color: tileGradient('#e8964a') }

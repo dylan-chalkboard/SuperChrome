@@ -38,6 +38,8 @@ import {
 import { tileGradient } from './features/gradients'
 import { GROUP_COLORS } from './features/tabs/search'
 import { cleanHost, hostOf } from './features/navigation'
+import { DROPDOWN_CSS, createDropdown, dropdownHandleKey } from './ui/shared/dropdown'
+import type { Dropdown } from './ui/shared/dropdown'
 import {
   completePlaceholder,
   parseQuicklinks,
@@ -431,15 +433,14 @@ const PALETTE_CSS = `
 .light .ql-menu-preview { color: #00000059; }
 .ql-args { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; padding-right: 16px; overflow: hidden; }
 .ql-chip { color: #ffffff; font-size: 15px; white-space: nowrap; }
-.ql-args input, .ql-args select {
+.ql-args input {
   background: transparent; border: 1px solid #ffffff2e; border-radius: 8px;
   color: #e8e8e8; font: inherit; font-size: 13.5px; padding: 5px 10px; outline: none;
   min-width: 90px; max-width: 220px;
 }
-.ql-args select { cursor: pointer; }
-.ql-args input:focus, .ql-args select:focus { border-color: #4c9df388; }
+.ql-args input:focus { border-color: #4c9df388; }
 .light .ql-chip { color: #1c1c1e; }
-.light .ql-args input, .light .ql-args select { border-color: #00000026; color: #26262b; }
+.light .ql-args input { border-color: #00000026; color: #26262b; }
 .ql-examples button { background: #ffffff10; border: 1px solid #ffffff20; }
 .light .ql-examples button { background: #00000008; border-color: #00000020; }
 .settings input[type='number'] { width: 70px; }
@@ -733,7 +734,7 @@ function openPalette(prefix: string): void {
   const shadow = paletteHost.attachShadow({ mode: 'closed' })
 
   const style = document.createElement('style')
-  style.textContent = PALETTE_CSS + LIBRARY_CSS
+  style.textContent = PALETTE_CSS + LIBRARY_CSS + DROPDOWN_CSS
 
   const backdrop = document.createElement('div')
   backdrop.className = 'backdrop'
@@ -1002,6 +1003,9 @@ function onGlobalKey(e: KeyboardEvent): void {
     closeBrandMenu()
     return
   }
+
+  // A focused custom dropdown (argument fields, settings) claims its keys.
+  if (dropdownHandleKey(e)) return
 
   // Inline argument fields own the keyboard: Enter opens, Esc backs out;
   // everything else (typing, Tab, select arrows) is native field behavior.
@@ -3261,20 +3265,18 @@ async function renderSettings(): Promise<void> {
   row('Icon colors', swatches)
   divider()
 
-  const defaultModeSel = wire(document.createElement('select'))
-  for (const [value, label] of [
-    ['bookmarks', 'Bookmarks'],
-    ['commands', 'Commands'],
-    ['tabs', 'Tabs'],
-    ['history', 'History'],
-  ]) {
-    const opt = document.createElement('option')
-    opt.value = value
-    opt.textContent = label
-    defaultModeSel.appendChild(opt)
-  }
-  defaultModeSel.value = s.defaultMode
-  row('Default mode', defaultModeSel)
+  const defaultModeDd = createDropdown({
+    options: [
+      { value: 'bookmarks', label: 'Bookmarks' },
+      { value: 'commands', label: 'Commands' },
+      { value: 'tabs', label: 'Tabs' },
+      { value: 'history', label: 'History' },
+    ],
+    value: s.defaultMode,
+    container: panelEl ?? paletteList,
+    onChange: save,
+  })
+  row('Default mode', defaultModeDd.el)
 
   const check = (label: string, checked: boolean): HTMLInputElement => {
     const wrap = document.createElement('label')
@@ -3326,7 +3328,7 @@ async function renderSettings(): Promise<void> {
       history: colorHistory.value,
       fallback: colorFallback.value,
     },
-    defaultMode: defaultModeSel.value as UserSettings['defaultMode'],
+    defaultMode: defaultModeDd.value as UserSettings['defaultMode'],
     openInNewTab: newTab.checked,
     reduceMotion: reduceMotionBox.checked,
     frecencyDecayDays: Math.min(90, Math.max(1, Number(decay.value) || s.frecencyDecayDays)),
@@ -3365,7 +3367,7 @@ let capturedSelection = ''
 let qlArgsUi: {
   template: string
   newTab: boolean
-  fields: Array<{ arg: ArgumentSpec; el: HTMLInputElement | HTMLSelectElement }>
+  fields: Array<{ arg: ArgumentSpec; input?: HTMLInputElement; dropdown?: Dropdown }>
   row: HTMLElement
   display: RemoteItem
 } | null = null
@@ -3416,27 +3418,22 @@ function enterQlArgsInline(
   row.appendChild(chip)
 
   const fields = args.map((arg) => {
-    let el: HTMLInputElement | HTMLSelectElement
-    if (arg.options) {
-      const sel = document.createElement('select')
-      for (const o of arg.options) {
-        const opt = document.createElement('option')
-        opt.value = o.value
-        opt.textContent = o.label
-        sel.appendChild(opt)
-      }
+    if (arg.options && panelEl) {
       const preset = prefill[arg.key] ?? arg.default
-      if (preset && arg.options.some((o) => o.value === preset)) sel.value = preset
-      el = sel
-    } else {
-      const input = document.createElement('input')
-      input.spellcheck = false
-      input.placeholder = arg.name || 'Argument'
-      input.value = prefill[arg.key] ?? arg.default ?? ''
-      el = input
+      const dropdown = createDropdown({
+        options: arg.options,
+        value: preset && arg.options.some((o) => o.value === preset) ? preset : undefined,
+        container: panelEl,
+      })
+      row.appendChild(dropdown.el)
+      return { arg, dropdown }
     }
-    row.appendChild(el)
-    return { arg, el }
+    const input = document.createElement('input')
+    input.spellcheck = false
+    input.placeholder = arg.name || 'Argument'
+    input.value = prefill[arg.key] ?? arg.default ?? ''
+    row.appendChild(input)
+    return { arg, input }
   })
 
   qlArgsUi = {
@@ -3447,8 +3444,9 @@ function enterQlArgsInline(
     display: { ...item, template: undefined, group: undefined },
   }
   paletteInput.insertAdjacentElement('afterend', row)
-  const firstEmpty = fields.find((f) => f.el instanceof HTMLInputElement && !f.el.value)
-  ;(firstEmpty ?? fields[0])?.el.focus()
+  const firstEmpty = fields.find((f) => f.input && !f.input.value)
+  const focusTarget = firstEmpty ?? fields[0]
+  ;(focusTarget?.input ?? focusTarget?.dropdown)?.focus()
   void updateList()
 }
 
@@ -3456,15 +3454,16 @@ function enterQlArgsInline(
 async function submitQlArgs(newTabOverride: boolean): Promise<void> {
   if (!qlArgsUi) return
   const empty = qlArgsUi.fields.find(
-    (f) => f.el instanceof HTMLInputElement && !f.el.value.trim() && f.arg.default === undefined,
+    (f) => f.input && !f.input.value.trim() && f.arg.default === undefined,
   )
-  if (empty) {
-    empty.el.focus()
+  if (empty?.input) {
+    empty.input.focus()
     return
   }
   const values: Record<string, string> = {}
   for (const f of qlArgsUi.fields) {
-    values[f.arg.key] = f.el.value.trim() || (f.arg.default ?? '')
+    const raw = f.input?.value ?? f.dropdown?.value ?? ''
+    values[f.arg.key] = raw.trim() || (f.arg.default ?? '')
   }
   const { template, newTab } = qlArgsUi
   exitQlArgsInline(false)
@@ -3503,7 +3502,7 @@ let quicklinkFields: {
   keyword: HTMLInputElement
   name: HTMLInputElement
   link: HTMLInputElement
-  icon: HTMLInputElement
+  getIcon: () => string | undefined
   getColor: () => string | undefined
   error: HTMLElement
 } | null = null
@@ -3725,10 +3724,66 @@ function renderQuicklinkEdit(prefill?: {
   for (const [colorName, pair] of Object.entries(TILE_COLORS)) addDot(pair[0], pair[0], colorName)
   row('Color', strip)
 
-  const icon = field('🔗 or ab', prefill?.icon ?? '')
-  icon.maxLength = 4
-  icon.style.width = '72px'
-  row('Icon', icon)
+  // Icon: same picker as favorite customization — Default (favicon/search
+  // glyph), a library icon (stored as "icon:<name>"), an emoji, or a monogram.
+  let chosenIcon = prefill?.icon
+  let iconTab: 'default' | 'icon' | 'emoji' | 'text' = !chosenIcon
+    ? 'default'
+    : chosenIcon.startsWith('icon:')
+      ? 'icon'
+      : /[^\x20-\x7e]/.test(chosenIcon)
+        ? 'emoji'
+        : 'text'
+  const iconArea = document.createElement('div')
+  const renderIconArea = (): void => {
+    iconArea.textContent = ''
+    const seg = document.createElement('div')
+    seg.className = 'seg'
+    for (const value of ['default', 'icon', 'emoji', 'text'] as const) {
+      const b = document.createElement('button')
+      b.textContent = value[0].toUpperCase() + value.slice(1)
+      b.classList.toggle('on', iconTab === value)
+      b.addEventListener('mousedown', (e) => {
+        e.preventDefault()
+        iconTab = value
+        if (value === 'default') chosenIcon = undefined
+        else if (value === 'icon' && !chosenIcon?.startsWith('icon:')) chosenIcon = undefined
+        else if (value !== 'icon' && chosenIcon?.startsWith('icon:')) chosenIcon = undefined
+        renderIconArea()
+      })
+      seg.appendChild(b)
+    }
+    iconArea.appendChild(seg)
+    if (iconTab === 'icon') {
+      const grid = document.createElement('div')
+      grid.className = 'icon-grid'
+      for (const [glyphName, svg] of Object.entries(ALL_ICONS)) {
+        const cell = document.createElement('span')
+        cell.className = 'icon-cell' + (chosenIcon === `icon:${glyphName}` ? ' on' : '')
+        cell.title = glyphName
+        cell.innerHTML = svg
+        cell.addEventListener('mousedown', (e) => {
+          e.preventDefault()
+          chosenIcon = `icon:${glyphName}`
+          renderIconArea()
+        })
+        grid.appendChild(cell)
+      }
+      iconArea.appendChild(grid)
+    } else if (iconTab === 'emoji' || iconTab === 'text') {
+      const glyphInput = field(iconTab === 'emoji' ? 'Type an emoji…' : 'Up to 3 characters…', chosenIcon ?? '')
+      glyphInput.maxLength = iconTab === 'emoji' ? 4 : 3
+      glyphInput.style.width = '150px'
+      glyphInput.style.marginTop = '8px'
+      glyphInput.addEventListener('input', () => {
+        chosenIcon = glyphInput.value.trim() || undefined
+      })
+      iconArea.appendChild(glyphInput)
+      setTimeout(() => glyphInput.focus(), 0)
+    }
+  }
+  renderIconArea()
+  row('Icon', iconArea)
 
   // Clickable examples: each fills the form with a working template so the
   // placeholder syntax (arguments, dropdowns, clipboard, dates) teaches itself.
@@ -3788,7 +3843,14 @@ function renderQuicklinkEdit(prefill?: {
   error.append(document.createElement('label'), errorText)
   form.appendChild(error)
 
-  quicklinkFields = { keyword, name, link, icon, getColor: () => chosenColor, error: errorText }
+  quicklinkFields = {
+    keyword,
+    name,
+    link,
+    getIcon: () => chosenIcon,
+    getColor: () => chosenColor,
+    error: errorText,
+  }
   paletteList.appendChild(form)
   keyword.focus()
 }
@@ -3818,7 +3880,7 @@ async function saveQuicklinkEdit(): Promise<void> {
     return fail(`Keyword “${keyword}” is already taken.`, quicklinkFields.keyword)
   }
   const color = quicklinkFields.getColor()
-  const iconGlyph = quicklinkFields.icon.value.trim()
+  const iconGlyph = quicklinkFields.getIcon()?.trim() ?? ''
   const entry = {
     keyword,
     name,

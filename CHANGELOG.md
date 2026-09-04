@@ -3,6 +3,17 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.36.0
+
+- **Custom dropdown component** (`src/ui/shared/dropdown.ts`): argument
+  dropdowns and the settings "Default mode" select no longer use the
+  native Chrome control — styled trigger + floating menu with keyboard
+  support (space/arrows open, arrows move, enter picks, type-ahead jump),
+  matching the palette's look in both themes
+- **Quicklink icon picker**: the create form's Icon field is now the same
+  picker as favorite customization — Default / library Icon grid / Emoji /
+  Text monogram (library icons stored as `icon:<name>`)
+
 ## 0.35.1
 
 - Argument entry no longer changes the input row's height — the search
