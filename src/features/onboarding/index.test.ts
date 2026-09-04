@@ -11,6 +11,9 @@ describe('onboarding', () => {
     expect(onboardComplete({ done: all })).toBe(true)
     expect(onboardComplete({ done: { ...all, hotkey: false } })).toBe(false)
   })
+  it('includes the quicklink step', () => {
+    expect(ONBOARD_STEPS.some((s) => s.key === 'quicklink')).toBe(true)
+  })
   it('hides when dismissed or complete', () => {
     const all = Object.fromEntries(ONBOARD_STEPS.map((s) => [s.key, true]))
     expect(onboardVisible({ done: {} })).toBe(true)

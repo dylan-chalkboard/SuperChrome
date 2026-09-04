@@ -1388,6 +1388,7 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     else if (key === 'tab') setInput('@')
     else if (key === 'library') setInput('*')
     else if (key === 'save') openLibrarySave()
+    else if (key === 'quicklink') enterQuicklinkEdit()
     else if (key === 'actions') {
       showToast('Select any row and press ⌘K')
       void updateList()
@@ -3469,6 +3470,7 @@ async function saveQuicklinkEdit(): Promise<void> {
     ? s.quicklinks.map((l) => (l.keyword === editing ? entry : l))
     : [...s.quicklinks, entry]
   await chrome.storage.sync.set({ settings: { ...s, quicklinks } })
+  void markOnboard('quicklink')
   exitQuicklinkEdit()
   showToast(`Quicklink “${name}” ${editing ? 'updated' : 'saved'}`)
 }

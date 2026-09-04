@@ -3,6 +3,11 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.32.0
+
+- Getting Started gains a "Create a quicklink" step — clicking it opens
+  the create form, and saving any quicklink ticks it off
+
 ## 0.31.0
 
 - **Quicklink arguments**: `{argument name="…"}` with `options="a, b"`

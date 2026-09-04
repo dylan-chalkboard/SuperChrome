@@ -16,6 +16,7 @@ export const ONBOARD_STEPS: OnboardStep[] = [
   { key: 'save', label: 'Save a bookmark with ⌘D' },
   { key: 'favorite', label: 'Add a favorite' },
   { key: 'library', label: 'Browse your bookmarks with *' },
+  { key: 'quicklink', label: 'Create a quicklink' },
 ]
 
 export interface OnboardState {
