@@ -126,6 +126,7 @@ const PALETTE_CSS = `
 .input-row.mode-emoji { --mode-tint: rgba(76, 175, 125, 0.22); border-bottom-color: rgba(76, 175, 125, 0.35); }
 .input-row.mode-downloads { --mode-tint: rgba(58, 169, 159, 0.22); border-bottom-color: rgba(58, 169, 159, 0.35); }
 .input-row.mode-snippets { --mode-tint: rgba(232, 150, 74, 0.22); border-bottom-color: rgba(232, 150, 74, 0.35); }
+.input-row.mode-quicklink { --mode-tint: rgba(232, 150, 74, 0.22); border-bottom-color: rgba(232, 150, 74, 0.35); }
 .input-row.mode-library { --mode-tint: rgba(224, 93, 93, 0.22); border-bottom-color: rgba(224, 93, 93, 0.35); }
 @keyframes menu-in {
   from { opacity: 0; transform: translateY(4px); }
@@ -578,6 +579,7 @@ let queryToken = 0
 
 let currentActions: PaletteAction[] = []
 let actionIndex = 0
+let actionsReturnState: UiState = 'list'
 let actionTarget: RemoteItem | null = null
 let subStateTarget: RemoteItem | null = null
 let savedQuery = ''
@@ -876,6 +878,15 @@ function inFolderContext(): boolean {
 /** Tint the input row, color the prefix glyph, and light up the mode's chip. */
 function updateModeStyling(): void {
   if (!inputRowEl) return
+  // Inline argument entry is its own mode: quicklink tint, no prefix chips —
+  // the keyword chip and argument boxes own the row.
+  if (uiState === 'ql-args') {
+    inputRowEl.className = 'input-row mode-quicklink typing'
+    if (backBtnEl) backBtnEl.style.display = 'none'
+    if (hintEl) hintEl.style.display = 'none'
+    if (modeGlyphEl) modeGlyphEl.textContent = ''
+    return
+  }
   const mode = currentMode()
   const browsing =
     (mode === 'bookmarks' && browseStack.length > 0) || (mode === 'library' && libraryDepth() > 0)
@@ -1034,7 +1045,7 @@ function onGlobalKey(e: KeyboardEvent): void {
   if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
     e.preventDefault()
     if (uiState === 'actions') closeActions()
-    else if (uiState === 'list') openActions()
+    else if (uiState === 'list' || uiState === 'links') openActions()
     return
   }
 
@@ -1806,6 +1817,7 @@ function openActions(at?: { x: number; y: number }): void {
     ...currentActions.filter((a) => a.danger),
   ]
   actionIndex = 0
+  actionsReturnState = uiState === 'links' ? 'links' : 'list'
   uiState = 'actions'
 
   actionsEl = document.createElement('div')
@@ -1863,7 +1875,9 @@ function closeActions(): void {
   actionsEl?.remove()
   actionsEl = null
   actionTarget = null
-  uiState = 'list'
+  // ⌘K from the Quicklinks (links) view returns there, not to the home list.
+  uiState = actionsReturnState
+  actionsReturnState = 'list'
   renderFooter()
 }
 
@@ -3393,7 +3407,7 @@ function enterQlArgsInline(
   row.className = 'ql-args'
   const chip = document.createElement('span')
   chip.className = 'ql-chip'
-  chip.textContent = item.qlKeyword ?? item.qlName ?? item.label
+  chip.textContent = `${item.emoji ? `${item.emoji} ` : ''}${item.qlKeyword ?? item.qlName ?? item.label}`
   row.appendChild(chip)
 
   const fields = args.map((arg) => {

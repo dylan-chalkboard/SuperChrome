@@ -3,6 +3,16 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.35.0
+
+- **Quicklink mode**: entering argument entry now tints the input row
+  orange like the other modes, hides the prefix chips, and shows the
+  quicklink's glyph + keyword as a chip — the argument boxes sit inside
+  the search bar, Raycast-style
+- **⌘K works inside `>Quicklinks`**: Open / Edit / Duplicate / Delete on
+  the selected row, and closing the menu returns to the Quicklinks view
+  instead of dropping back to home
+
 ## 0.34.0
 
 - **Inline arguments, Raycast-style**: picking an arg-ful quicklink keeps
