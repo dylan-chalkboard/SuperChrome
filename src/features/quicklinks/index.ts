@@ -1,4 +1,9 @@
-/* ---------- Quicklinks: keyword links, with or without a {query} placeholder ---------- */
+/* ---------- Quicklinks: keyword links, with or without argument placeholders ---------- */
+
+import { templateArguments } from './placeholders'
+import type { ArgumentSpec } from './placeholders'
+
+export * from './placeholders'
 
 export interface Quicklink {
   keyword: string
@@ -15,15 +20,16 @@ export const DEFAULT_QUICKLINKS: Quicklink[] = [
 ]
 
 export interface QuicklinkMatch {
-  name: string
-  url: string
-  query: string
-  kind: 'search' | 'open'
+  link: Quicklink
+  /** Text typed after the keyword — prefills the first argument. */
+  rest: string
+  args: ArgumentSpec[]
 }
 
 /**
- * Match "yt lofi beats" against {query} templates, or a bare "dash" against
- * static ones; null when no keyword fits.
+ * Match the first typed word against quicklink keywords. Arg-ful templates
+ * accept a bare keyword (prompt flow) or trailing text; static templates
+ * match on the bare keyword only. Null when no keyword fits.
  */
 export function matchQuicklink(raw: string, links: Quicklink[]): QuicklinkMatch | null {
   const q = raw.trim()
@@ -32,15 +38,9 @@ export function matchQuicklink(raw: string, links: Quicklink[]): QuicklinkMatch 
   const rest = space < 0 ? '' : q.slice(space + 1).trim()
   const link = links.find((l) => l.keyword.toLowerCase() === keyword)
   if (!link) return null
-  const isSearch = link.template.includes('{query}')
-  if (isSearch !== Boolean(rest)) return null
-  if (!isSearch) return { name: link.name, url: link.template, query: '', kind: 'open' }
-  return {
-    name: link.name,
-    url: link.template.replace('{query}', encodeURIComponent(rest)),
-    query: rest,
-    kind: 'search',
-  }
+  const args = templateArguments(link.template)
+  if (!args.length && rest) return null
+  return { link, rest, args }
 }
 
 /** One quicklink per line: "keyword | Name | https://…". Invalid lines drop. */

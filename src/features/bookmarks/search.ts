@@ -2,7 +2,7 @@ import { tryCalculate, tryConvert } from '../calculator'
 import { commandEntries } from '../commands'
 import { tileGradient } from '../gradients'
 import { hostOf, urlFromQuery } from '../navigation'
-import { matchQuicklink } from '../quicklinks'
+import { matchQuicklink, templateArguments } from '../quicklinks'
 import { frecency, rank } from '../ranking'
 import type { UsageMap } from '../ranking'
 import type { PaletteItem } from '../../core/types'
@@ -259,24 +259,28 @@ export async function searchBookmarks(
     }))
 
   // Quicklinks: "yt lofi beats" searches the keyword's site directly; a bare
-  // static keyword ("dash") offers the link itself.
+  // keyword offers the link (prompting for any arguments at open time).
   const quicklink = matchQuicklink(rawQuery, settings.quicklinks)
 
-  // Quicklinks also surface by name alongside bookmarks, Raycast-style. A
-  // static link opens; a {query} link fills the input with its keyword so the
-  // user types the argument. The exact-keyword match above is excluded so the
-  // same link never shows twice.
-  const favicon = (url: string): string =>
-    chrome.runtime.getURL('/_favicon/') + `?pageUrl=${encodeURIComponent(url)}&size=32`
+  // Quicklinks also surface by name alongside bookmarks, Raycast-style. Rows
+  // carry their template; the palette renders the final URL when opened,
+  // since clipboard/selection placeholders only exist in the page. The
+  // exact-keyword match above is excluded so the same link never shows twice.
+  const stripPlaceholders = (template: string): string => template.replace(/\{[^{}]*\}/g, '')
+  const favicon = (template: string): string =>
+    chrome.runtime.getURL('/_favicon/') +
+    `?pageUrl=${encodeURIComponent(stripPlaceholders(template))}&size=32`
   const quicklinkEntries = settings.quicklinks
-    .filter((l) => l.name !== quicklink?.name)
+    .filter((l) => l.keyword !== quicklink?.link.keyword)
     .map((l) => ({
-      item: l.template.includes('{query}')
+      item: templateArguments(l.template).length
         ? {
             kind: 'search' as const,
             label: `Search ${l.name}…`,
             detail: '',
-            fillInput: `${l.keyword} `,
+            template: l.template,
+            qlKeyword: l.keyword,
+            qlName: l.name,
             icon: 'search',
             color: tileGradient('#e8964a'),
             typeText: 'Quicklink',
@@ -284,8 +288,10 @@ export async function searchBookmarks(
         : {
             kind: 'search' as const,
             label: l.name,
-            detail: hostOf(l.template) ?? '',
-            url: l.template,
+            detail: hostOf(stripPlaceholders(l.template)) ?? '',
+            template: l.template,
+            qlKeyword: l.keyword,
+            qlName: l.name,
             iconUrl: favicon(l.template),
             typeText: 'Quicklink',
           },
@@ -310,26 +316,24 @@ export async function searchBookmarks(
     })
   }
   if (quicklink) {
-    results.unshift(
-      quicklink.kind === 'open'
-        ? {
-            kind: 'search',
-            label: `Open ${quicklink.name}`,
-            detail: hostOf(quicklink.url) ?? '',
-            url: quicklink.url,
-            iconUrl: favicon(quicklink.url),
-            group: 'Quicklink',
-          }
-        : {
-            kind: 'search',
-            label: `Search ${quicklink.name} for “${quicklink.query}”`,
-            detail: '',
-            url: quicklink.url,
-            icon: 'search',
-            color: tileGradient('#e8964a'),
-            group: 'Quicklink',
-          },
-    )
+    const { link, rest, args } = quicklink
+    results.unshift({
+      kind: 'search',
+      label: args.length
+        ? rest
+          ? `Search ${link.name} for “${rest}”`
+          : `Open ${link.name}…`
+        : `Open ${link.name}`,
+      detail: args.length && rest ? '' : (hostOf(stripPlaceholders(link.template)) ?? ''),
+      template: link.template,
+      qlRest: rest,
+      qlKeyword: link.keyword,
+      qlName: link.name,
+      ...(args.length && rest
+        ? { icon: 'search', color: tileGradient('#e8964a') }
+        : { iconUrl: favicon(link.template) }),
+      group: 'Quicklink',
+    })
   }
   // Address-bar behavior: a URL-shaped query gets a direct "Open" row on top.
   const directUrl = urlFromQuery(rawQuery)

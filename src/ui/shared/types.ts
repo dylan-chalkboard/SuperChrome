@@ -25,8 +25,12 @@ export interface RemoteItem {
   typeText?: string
   /** URL already open in a tab: row shows "Switch to Tab" and switches. */
   openTab?: boolean
-  /** Selecting the row types this into the palette input instead of acting. */
-  fillInput?: string
+  /** Quicklink rows: URL template rendered at open time (arguments, clipboard, dates…). */
+  template?: string
+  /** Text typed after the quicklink keyword — prefills the first argument. */
+  qlRest?: string
+  qlKeyword?: string
+  qlName?: string
 }
 
 export interface PaletteAction {

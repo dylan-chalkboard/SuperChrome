@@ -198,31 +198,34 @@ describe('snippets', () => {
 
 describe('quicklinks', () => {
   const DASH = { keyword: 'dash', name: 'Team Dashboard', template: 'https://example.com/dash' }
+  const REPO = {
+    keyword: 'repo',
+    name: 'GitHub Repo',
+    template: 'https://github.com/{argument name="org"}/{argument name="repo"}',
+  }
 
-  it('matches a keyword and encodes the query', () => {
-    expect(matchQuicklink('yt lofi beats', DEFAULT_QUICKLINKS)).toEqual({
-      name: 'YouTube',
-      url: 'https://www.youtube.com/results?search_query=lofi%20beats',
-      query: 'lofi beats',
-      kind: 'search',
-    })
+  it('matches a keyword with trailing text as the first argument', () => {
+    const m = matchQuicklink('yt lofi beats', DEFAULT_QUICKLINKS)
+    expect(m?.link.name).toBe('YouTube')
+    expect(m?.rest).toBe('lofi beats')
+    expect(m?.args).toHaveLength(1)
   })
-  it('is case-insensitive on the keyword and needs a query after it', () => {
-    expect(matchQuicklink('GH superchrome', DEFAULT_QUICKLINKS)?.name).toBe('GitHub')
-    expect(matchQuicklink('yt', DEFAULT_QUICKLINKS)).toBeNull()
-    expect(matchQuicklink('yt ', DEFAULT_QUICKLINKS)).toBeNull()
+  it('matches a bare keyword on an arg-ful link for the prompt flow', () => {
+    expect(matchQuicklink('yt', DEFAULT_QUICKLINKS)?.rest).toBe('')
+    expect(matchQuicklink('yt ', DEFAULT_QUICKLINKS)?.rest).toBe('')
     expect(matchQuicklink('unknown thing', DEFAULT_QUICKLINKS)).toBeNull()
   })
-  it('opens a static link on its bare keyword', () => {
-    expect(matchQuicklink('dash', [DASH])).toEqual({
-      name: 'Team Dashboard',
-      url: 'https://example.com/dash',
-      query: '',
-      kind: 'open',
-    })
-    expect(matchQuicklink('DASH ', [DASH])?.kind).toBe('open')
+  it('is case-insensitive on the keyword', () => {
+    expect(matchQuicklink('GH superchrome', DEFAULT_QUICKLINKS)?.link.name).toBe('GitHub')
   })
-  it('does not match a static link with an argument', () => {
+  it('surfaces multiple named arguments in order', () => {
+    expect(matchQuicklink('repo', [REPO])?.args.map((a) => a.name)).toEqual(['org', 'repo'])
+  })
+  it('matches a static link only on its bare keyword', () => {
+    const m = matchQuicklink('dash', [DASH])
+    expect(m?.link.template).toBe('https://example.com/dash')
+    expect(m?.args).toEqual([])
+    expect(matchQuicklink('DASH ', [DASH])).not.toBeNull()
     expect(matchQuicklink('dash foo', [DASH])).toBeNull()
   })
   it('parses and serializes the options-page text format', () => {

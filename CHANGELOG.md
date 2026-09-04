@@ -3,6 +3,22 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.31.0
+
+- **Quicklink arguments**: `{argument name="…"}` with `options="a, b"`
+  dropdowns (rendered as palette rows), `default="…"` for optional
+  arguments, and multiple named arguments prompted in sequence — Esc steps
+  back. `{query}` still works as an alias
+- **Dynamic placeholders**: `{clipboard}`, `{selection}` (page selection
+  when the palette opened), `{date format="yyyy-MM-dd" offset="+2d"}`,
+  `{time}`, `{datetime}`, `{day}`, `{uuid}` — substituted when the link
+  opens. Pipe modifiers: `trim`, `uppercase`, `lowercase`,
+  `percent-encode`, `raw`
+- **Manage quicklinks from ⌘K**: Edit, Duplicate, and Delete on any
+  quicklink row
+- Quicklink URLs now render at open time (needs the new `clipboardRead`
+  permission for `{clipboard}`)
+
 ## 0.30.0
 
 - **Quicklinks, Raycast-style**: `>Create Quicklink` opens an in-palette

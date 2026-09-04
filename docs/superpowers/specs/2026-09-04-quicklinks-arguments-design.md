@@ -33,9 +33,10 @@ Supported placeholders:
 - `{uuid}` — random UUID.
 
 Modifiers via pipe, applied in order: `trim`, `uppercase`, `lowercase`,
-`percent-encode`, `raw`. Every placeholder value is percent-encoded by
-default (templates are URLs); `raw` disables it; an explicit
-`percent-encode` encodes at its position in the chain instead.
+`percent-encode`, `raw`. User content (argument/clipboard/selection) is
+percent-encoded by default (templates are URLs); `raw` disables it.
+Generated values (dates, uuid) render as-is unless `percent-encode` is
+asked for explicitly.
 
 Unknown placeholder types are left as literal text. Not supported (out of
 scope): `{calculator}`, `{browser-tab}`, `{snippet}`, `{cursor}`, clipboard

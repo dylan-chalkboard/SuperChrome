@@ -27,8 +27,12 @@ export interface PaletteItem {
   downloadId?: number
   /** Overrides the mode's default group header in the results list. */
   group?: string
-  /** Selecting the row types this into the palette input instead of acting. */
-  fillInput?: string
+  /** Quicklink rows: URL template rendered at open time (arguments, clipboard, dates…). */
+  template?: string
+  /** Text typed after the quicklink keyword — prefills the first argument. */
+  qlRest?: string
+  qlKeyword?: string
+  qlName?: string
   /** Indices into the ranked text that matched the query, for highlighting. */
   positions?: number[]
 }

@@ -38,7 +38,8 @@ import {
 import { tileGradient } from './features/gradients'
 import { GROUP_COLORS } from './features/tabs/search'
 import { cleanHost } from './features/navigation'
-import { parseQuicklinks, serializeQuicklinks } from './features/quicklinks'
+import { parseQuicklinks, renderTemplate, serializeQuicklinks, templateArguments } from './features/quicklinks'
+import type { ArgumentSpec } from './features/quicklinks'
 import { parseSnippets, serializeSnippets } from './features/snippets'
 import { findTrackers } from './features/page/trackers'
 import qrcode from 'qrcode-generator'
@@ -491,7 +492,7 @@ const GROUP_LABELS: Record<string, string> = {
   library: 'Bookmarks',
 }
 
-type UiState = 'list' | 'actions' | 'rename' | 'move' | 'group' | 'settings' | 'links' | 'fav-custom' | 'quicklink-edit'
+type UiState = 'list' | 'actions' | 'rename' | 'move' | 'group' | 'settings' | 'links' | 'fav-custom' | 'quicklink-edit' | 'ql-args'
 
 let paletteHost: HTMLDivElement | null = null
 let paletteInput: HTMLInputElement | null = null
@@ -680,6 +681,9 @@ function closePalette(): void {
 
 function openPalette(prefix: string): void {
   lastFocused = document.activeElement as HTMLElement | null
+  // {selection} placeholders substitute the text selected before the palette
+  // took focus, so capture it now.
+  capturedSelection = window.getSelection()?.toString() ?? ''
   paletteHost = document.createElement('div')
   paletteHost.style.cssText = 'position:fixed;inset:0;z-index:2147483647;'
   const shadow = paletteHost.attachShadow({ mode: 'closed' })
@@ -725,6 +729,11 @@ function openPalette(prefix: string): void {
   paletteInput.addEventListener('input', () => {
     if (uiState === 'actions') closeActions()
     if (uiState === 'rename') return
+    if (uiState === 'ql-args') {
+      // Argument typing filters options; it never switches modes.
+      void updateList()
+      return
+    }
     captureModePrefix()
     void updateList()
   })
@@ -1082,6 +1091,7 @@ function onGlobalKey(e: KeyboardEvent): void {
   if (e.key === 'Escape') {
     e.preventDefault()
     if (uiState === 'move' || uiState === 'group' || uiState === 'links') exitSubState(false)
+    else if (uiState === 'ql-args') qlArgBack()
     else if (browseStack.length && currentMode() === 'bookmarks') popFolder()
     // Inside a prefix mode, Esc steps back to home; only home Esc closes.
     else if (modePrefix) setInput('')
@@ -1171,6 +1181,10 @@ function highlightSelection(instant = false): void {
 /* ---------- Executing items ---------- */
 
 function recordUsage(item: RemoteItem): void {
+  if (item.template !== undefined && item.qlKeyword) {
+    void chrome.runtime.sendMessage({ type: 'record-usage', key: `quicklink:${item.qlKeyword}` })
+    return
+  }
   const key =
     item.kind === 'bookmark'
       ? `bookmark:${item.url}`
@@ -1226,10 +1240,13 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     await commitGroup(item)
     return
   }
-  if (item.fillInput !== undefined) {
-    // Quicklink-by-name rows with a {query} template: type the keyword and
-    // let the user supply the argument.
-    setInput(item.fillInput)
+  if (uiState === 'ql-args') {
+    commitQlArg(item.text ?? '')
+    return
+  }
+  if (item.template !== undefined) {
+    recordUsage(item)
+    void openQuicklink(item, altAction)
     return
   }
   if (item.kind === 'download') {
@@ -1548,6 +1565,15 @@ function actionsFor(item: RemoteItem): PaletteAction[] {
         { id: 'delete', label: 'Delete Bookmark', danger: true },
       ]
     case 'search':
+      if (item.template !== undefined) {
+        return [
+          { id: 'open', label: 'Open' },
+          { id: 'open-new-tab', label: 'Open in New Tab' },
+          { id: 'ql-edit', label: 'Edit Quicklink…' },
+          { id: 'ql-duplicate', label: 'Duplicate Quicklink…' },
+          { id: 'ql-delete', label: 'Delete Quicklink', danger: true },
+        ]
+      }
       if (item.iconUrl && item.url) {
         // Image rows from Grab Page Images / Page Info.
         return [
@@ -1906,6 +1932,11 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
     case 'open':
     case 'open-new-tab':
       recordUsage(item)
+      if (item.template !== undefined) {
+        closeActions()
+        await openQuicklink(item, action.id === 'open-new-tab')
+        return
+      }
       await chrome.runtime.sendMessage({
         type: 'open-url',
         url: item.url,
@@ -1913,6 +1944,27 @@ async function runAction(action: PaletteAction, item: RemoteItem): Promise<void>
       })
       closePalette()
       return
+    case 'ql-edit':
+      closeActions()
+      enterQuicklinkEdit({
+        keyword: item.qlKeyword,
+        name: item.qlName,
+        link: item.template,
+        editKeyword: item.qlKeyword,
+      })
+      return
+    case 'ql-duplicate':
+      closeActions()
+      enterQuicklinkEdit({ name: `${item.qlName ?? item.label} Copy`, link: item.template })
+      return
+    case 'ql-delete': {
+      const s = await getSettings()
+      await chrome.storage.sync.set({
+        settings: { ...s, quicklinks: s.quicklinks.filter((l) => l.keyword !== item.qlKeyword) },
+      })
+      showToast(`Quicklink “${item.qlName ?? item.label}” deleted`)
+      break
+    }
     case 'copy-image': {
       const resp = (await chrome.runtime.sendMessage({ type: 'fetch-image', url: item.url })) as
         | { ok?: boolean; mime?: string; base64?: string }
@@ -3201,14 +3253,122 @@ async function renderSettings(): Promise<void> {
   paletteList.appendChild(form)
 }
 
+/* ---------- Quicklink argument prompts + open-time substitution ---------- */
+
+let capturedSelection = ''
+let qlPrompt: {
+  template: string
+  name: string
+  newTab: boolean
+  args: ArgumentSpec[]
+  values: Record<string, string>
+  index: number
+} | null = null
+
+/** Typed text against a dropdown argument: option label/value wins, else verbatim. */
+function resolveArgInput(arg: ArgumentSpec, typed: string): string {
+  const hit = arg.options?.find(
+    (o) => o.label.toLowerCase() === typed.toLowerCase() || o.value.toLowerCase() === typed.toLowerCase(),
+  )
+  return hit ? hit.value : typed
+}
+
+async function openQuicklink(item: RemoteItem, newTab: boolean): Promise<void> {
+  const template = item.template ?? ''
+  const name = item.qlName ?? item.label
+  const args = templateArguments(template)
+  const values: Record<string, string> = {}
+  if (item.qlRest && args.length) values[args[0].key] = resolveArgInput(args[0], item.qlRest)
+  const pending = args.filter((a) => values[a.key] === undefined && a.default === undefined)
+  if (!pending.length) {
+    await finishQuicklink(template, values, newTab)
+    return
+  }
+  qlPrompt = { template, name, newTab, args: pending, values, index: 0 }
+  if (uiState === 'actions') closeActions()
+  uiState = 'ql-args'
+  savedQuery = modePrefix + (paletteInput?.value ?? '')
+  modePrefix = ''
+  promptQlArg()
+}
+
+function promptQlArg(): void {
+  if (!paletteInput || !qlPrompt) return
+  const arg = qlPrompt.args[qlPrompt.index]
+  paletteInput.value = ''
+  paletteInput.placeholder = `${qlPrompt.name} — ${arg.name || 'value'}…`
+  paletteInput.focus()
+  void updateList()
+}
+
+function commitQlArg(value: string): void {
+  if (!qlPrompt) return
+  const arg = qlPrompt.args[qlPrompt.index]
+  if (!value) return // required argument — wait for input
+  qlPrompt.values[arg.key] = value
+  qlPrompt.index++
+  if (qlPrompt.index < qlPrompt.args.length) {
+    promptQlArg()
+    return
+  }
+  const { template, values, newTab } = qlPrompt
+  exitQlArgs(false)
+  void finishQuicklink(template, values, newTab)
+}
+
+/** Esc inside the prompt flow: step back one argument, then out to the list. */
+function qlArgBack(): void {
+  if (!qlPrompt) return
+  if (qlPrompt.index > 0) {
+    qlPrompt.index--
+    promptQlArg()
+    return
+  }
+  exitQlArgs(true)
+}
+
+function exitQlArgs(restore: boolean): void {
+  qlPrompt = null
+  uiState = 'list'
+  if (!paletteInput) return
+  paletteInput.placeholder = 'Search bookmarks and commands…'
+  if (restore) {
+    modePrefix = savedQuery && PREFIX_CHARS.includes(savedQuery[0]) ? savedQuery[0] : ''
+    paletteInput.value = modePrefix ? savedQuery.slice(1) : savedQuery
+    paletteInput.focus()
+    void updateList()
+  }
+}
+
+async function finishQuicklink(
+  template: string,
+  values: Record<string, string>,
+  newTab: boolean,
+): Promise<void> {
+  const clipboard = /\{clipboard/.test(template)
+    ? await navigator.clipboard.readText().catch(() => '')
+    : ''
+  const url = renderTemplate(template, { args: values, clipboard, selection: capturedSelection })
+  void chrome.runtime.sendMessage({ type: 'open-url', url, newTab })
+  closePalette()
+}
+
 /* ---------- Create Quicklink form (Raycast-style) ---------- */
 
 let quicklinkFields: { keyword: HTMLInputElement; name: HTMLInputElement; link: HTMLInputElement; error: HTMLElement } | null = null
+/** When set, saving replaces the quicklink with this keyword instead of adding. */
+let quicklinkEditing: string | null = null
 
-function enterQuicklinkEdit(prefill?: { name?: string; link?: string }): void {
+function enterQuicklinkEdit(prefill?: {
+  keyword?: string
+  name?: string
+  link?: string
+  editKeyword?: string
+}): void {
   if (!paletteInput || !paletteList || uiState === 'quicklink-edit') return
   if (uiState === 'actions') closeActions()
   uiState = 'quicklink-edit'
+  quicklinkEditing = prefill?.editKeyword ?? null
   savedQuery = modePrefix + paletteInput.value
   if (inputRowEl) inputRowEl.style.display = 'none'
   renderQuicklinkEdit(prefill)
@@ -3218,6 +3378,7 @@ function enterQuicklinkEdit(prefill?: { name?: string; link?: string }): void {
 function exitQuicklinkEdit(): void {
   if (!paletteInput) return
   quicklinkFields = null
+  quicklinkEditing = null
   uiState = 'list'
   if (inputRowEl) inputRowEl.style.display = ''
   modePrefix = savedQuery && PREFIX_CHARS.includes(savedQuery[0]) ? savedQuery[0] : ''
@@ -3226,7 +3387,7 @@ function exitQuicklinkEdit(): void {
   void updateList()
 }
 
-function renderQuicklinkEdit(prefill?: { name?: string; link?: string }): void {
+function renderQuicklinkEdit(prefill?: { keyword?: string; name?: string; link?: string }): void {
   if (!paletteList) return
   paletteList.textContent = ''
   selectorEl = null
@@ -3254,15 +3415,16 @@ function renderQuicklinkEdit(prefill?: { name?: string; link?: string }): void {
     return input
   }
 
-  const keyword = field('gh', '')
+  const keyword = field('gh', prefill?.keyword ?? '')
   const name = field('Quicklink name', prefill?.name ?? '')
-  const link = field('https://github.com/search?q={query}', prefill?.link ?? '')
+  const link = field('https://github.com/search?q={argument}', prefill?.link ?? '')
   row('Keyword', keyword)
   row('Name', name)
   const linkWrap = document.createElement('div')
   const hint = document.createElement('span')
   hint.className = 'set-hint'
-  hint.textContent = 'Include {query} to make it a search; leave it out for a plain link'
+  hint.textContent =
+    'Include {argument} to prompt (add options="a, b" for a dropdown) — or {clipboard}, {selection}, {date}, {uuid}. Plain links work too.'
   linkWrap.append(link, hint)
   row('Link', linkWrap)
 
@@ -3292,19 +3454,23 @@ async function saveQuicklinkEdit(): Promise<void> {
   if (!name) return fail('Name is required.', quicklinkFields.name)
   if (!link) return fail('Link is required.', quicklinkFields.link)
   try {
-    const url = new URL(link.replace('{query}', 'test'))
+    const url = new URL(link.replace(/\{[^{}]*\}/g, 'test'))
     if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error()
   } catch {
     return fail('Link must be an http(s) URL.', quicklinkFields.link)
   }
   const s = await getSettings()
-  if (s.quicklinks.some((l) => l.keyword.toLowerCase() === keyword)) {
+  const editing = quicklinkEditing
+  if (s.quicklinks.some((l) => l.keyword.toLowerCase() === keyword && l.keyword !== editing)) {
     return fail(`Keyword “${keyword}” is already taken.`, quicklinkFields.keyword)
   }
-  const next = { ...s, quicklinks: [...s.quicklinks, { keyword, name, template: link }] }
-  await chrome.storage.sync.set({ settings: next })
+  const entry = { keyword, name, template: link }
+  const quicklinks = editing
+    ? s.quicklinks.map((l) => (l.keyword === editing ? entry : l))
+    : [...s.quicklinks, entry]
+  await chrome.storage.sync.set({ settings: { ...s, quicklinks } })
   exitQuicklinkEdit()
-  showToast(`Quicklink “${name}” saved`)
+  showToast(`Quicklink “${name}” ${editing ? 'updated' : 'saved'}`)
 }
 
 /* ---------- List rendering ---------- */
@@ -3334,6 +3500,57 @@ async function updateList(): Promise<void> {
   updateModeStyling()
 
   if (uiState === 'rename' || uiState === 'settings' || uiState === 'fav-custom' || uiState === 'quicklink-edit') return
+
+  if (uiState === 'ql-args' && qlPrompt) {
+    const arg = qlPrompt.args[qlPrompt.index]
+    const typed = paletteInput.value.trim()
+    const argLabel = arg.name || 'value'
+    let items: RemoteItem[]
+    if (arg.options) {
+      items = arg.options
+        .map((o) => ({ o, s: localFuzzy(typed.toLowerCase(), o.label.toLowerCase()) }))
+        .filter((x) => x.s !== null)
+        .sort((a, b) => b.s! - a.s!)
+        .map(
+          (x): RemoteItem => ({
+            kind: 'search',
+            label: x.o.label,
+            detail: x.o.value === x.o.label ? '' : x.o.value,
+            text: x.o.value,
+            icon: 'search',
+            color: tileGradient('#e8964a'),
+            typeText: 'Option',
+          }),
+        )
+      if (!items.length && typed) {
+        items = [
+          {
+            kind: 'search',
+            label: `Use “${typed}”`,
+            detail: '',
+            text: typed,
+            icon: 'search',
+            color: tileGradient('#e8964a'),
+            typeText: 'Option',
+          },
+        ]
+      }
+    } else {
+      items = [
+        {
+          kind: 'search',
+          label: typed ? `${argLabel}: ${typed}` : `Type ${argLabel}…`,
+          detail: '',
+          text: typed,
+          icon: 'search',
+          color: tileGradient('#e8964a'),
+          typeText: qlPrompt.index === qlPrompt.args.length - 1 ? 'Open' : 'Next',
+        },
+      ]
+    }
+    renderItems(`${qlPrompt.name} — ${argLabel}`, items)
+    return
+  }
 
   if (uiState === 'group') {
     const query = paletteInput.value.trim().toLowerCase()
