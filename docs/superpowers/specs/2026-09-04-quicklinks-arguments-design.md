@@ -120,6 +120,11 @@ options=\"a, b\" for a dropdown) — or {clipboard}, {selection}, {date},
 - Pipe-safe textarea parsing: only the first two pipes delimit, so
   templates may contain `options="Label|value"`.
 - Example chips in the create form that fill working templates.
+- v0.34.0 replaced the sequential prompt flow with Raycast-style inline
+  argument fields in the input row (text inputs + native selects for
+  dropdowns), added a `{`-triggered placeholder autocomplete menu in the
+  create form (inserting `{argument name="Argument"}` with the name
+  pre-selected), and flattened row labels to name + domain.
 
 ## Testing & release
 

@@ -273,8 +273,8 @@ export async function searchBookmarks(
       return {
         item: {
           kind: 'search' as const,
-          label: argful ? `Search ${l.name}…` : l.name,
-          detail: argful ? '' : (hostOf(stripQlPlaceholders(l.template)) ?? ''),
+          label: l.name,
+          detail: hostOf(stripQlPlaceholders(l.template)) ?? '',
           template: l.template,
           qlKeyword: l.keyword,
           qlName: l.name,
@@ -306,16 +306,13 @@ export async function searchBookmarks(
     const { link, rest, args } = quicklink
     results.unshift({
       kind: 'search',
-      label: args.length
-        ? rest
-          ? `Search ${link.name} for “${rest}”`
-          : `Open ${link.name}…`
-        : `Open ${link.name}`,
-      detail: args.length && rest ? '' : (hostOf(stripQlPlaceholders(link.template)) ?? ''),
+      label: args.length && rest ? `Search ${link.name} for “${rest}”` : link.name,
+      detail: hostOf(stripQlPlaceholders(link.template)) ?? '',
       template: link.template,
       qlRest: rest,
       qlKeyword: link.keyword,
       qlName: link.name,
+      typeText: 'Quicklink',
       ...quicklinkStyle(link, args.length > 0 && Boolean(rest)),
       group: 'Quicklink',
     })

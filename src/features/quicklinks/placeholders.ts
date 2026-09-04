@@ -134,6 +134,20 @@ export function templateArguments(template: string): ArgumentSpec[] {
   return args
 }
 
+/**
+ * Autocomplete for the create form: the caret sits right after a typed '{';
+ * swap that brace for the full snippet. Null when the trigger isn't there.
+ */
+export function completePlaceholder(
+  text: string,
+  caret: number,
+  snippet: string,
+): { text: string; caret: number } | null {
+  if (text[caret - 1] !== '{') return null
+  const next = text.slice(0, caret - 1) + snippet + text.slice(caret)
+  return { text: next, caret: caret - 1 + snippet.length }
+}
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 

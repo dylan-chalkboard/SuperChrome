@@ -39,6 +39,7 @@ import { tileGradient } from './features/gradients'
 import { GROUP_COLORS } from './features/tabs/search'
 import { cleanHost, hostOf } from './features/navigation'
 import {
+  completePlaceholder,
   parseQuicklinks,
   preserveQuicklinkExtras,
   quicklinkStyle,
@@ -409,6 +410,32 @@ const PALETTE_CSS = `
 .ql-error { font-size: 12px; color: #e05d5d; min-height: 15px; }
 .ql-glyph { font-size: 12px; font-weight: 600; color: #fff; display: flex; align-items: center; justify-content: center; }
 .ql-examples { flex-wrap: wrap; }
+.ql-menu {
+  position: absolute; left: 0; z-index: 5; min-width: 280px;
+  background: #26262b; border: 1px solid #ffffff24; border-radius: 10px;
+  padding: 5px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+.ql-menu-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 18px;
+  padding: 6px 10px; border-radius: 7px; font-size: 13px; color: #e8e8e8; cursor: pointer;
+}
+.ql-menu-row.selected, .ql-menu-row:hover { background: #ffffff14; }
+.ql-menu-preview { color: #ffffff59; font-size: 12px; }
+.light .ql-menu { background: #f4f4f6; border-color: #00000020; }
+.light .ql-menu-row { color: #26262b; }
+.light .ql-menu-row.selected, .light .ql-menu-row:hover { background: #00000010; }
+.light .ql-menu-preview { color: #00000059; }
+.ql-args { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.ql-chip { color: #ffffff; font-size: 15px; white-space: nowrap; }
+.ql-args input, .ql-args select {
+  background: transparent; border: 1px solid #ffffff2e; border-radius: 8px;
+  color: #e8e8e8; font: inherit; font-size: 13.5px; padding: 5px 10px; outline: none;
+  min-width: 90px; max-width: 220px;
+}
+.ql-args select { cursor: pointer; }
+.ql-args input:focus, .ql-args select:focus { border-color: #4c9df388; }
+.light .ql-chip { color: #1c1c1e; }
+.light .ql-args input, .light .ql-args select { border-color: #00000026; color: #26262b; }
 .ql-examples button { background: #ffffff10; border: 1px solid #ffffff20; }
 .light .ql-examples button { background: #00000008; border-color: #00000020; }
 .settings input[type='number'] { width: 70px; }
@@ -741,11 +768,6 @@ function openPalette(prefix: string): void {
   paletteInput.addEventListener('input', () => {
     if (uiState === 'actions') closeActions()
     if (uiState === 'rename') return
-    if (uiState === 'ql-args') {
-      // Argument typing filters options; it never switches modes.
-      void updateList()
-      return
-    }
     captureModePrefix()
     void updateList()
   })
@@ -761,6 +783,7 @@ function openPalette(prefix: string): void {
         paletteInput &&
         uiState !== 'settings' &&
         uiState !== 'quicklink-edit' &&
+        uiState !== 'ql-args' &&
         !libraryOwnsInput() &&
         shadow.activeElement !== paletteInput
       ) {
@@ -966,8 +989,23 @@ function onGlobalKey(e: KeyboardEvent): void {
     return
   }
 
-  // Quicklink form owns the keyboard: Enter saves, Esc cancels.
+  // Inline argument fields own the keyboard: Enter opens, Esc backs out;
+  // everything else (typing, Tab, select arrows) is native field behavior.
+  if (uiState === 'ql-args') {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      exitQlArgsInline(true)
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      void submitQlArgs(e.metaKey || e.ctrlKey)
+    }
+    return
+  }
+
+  // Quicklink form owns the keyboard: Enter saves, Esc cancels — unless the
+  // { placeholder menu is open, which claims arrows/Enter/Esc first.
   if (uiState === 'quicklink-edit') {
+    if (qlMenuKey(e)) return
     if (e.key === 'Escape') {
       e.preventDefault()
       exitQuicklinkEdit()
@@ -1103,7 +1141,6 @@ function onGlobalKey(e: KeyboardEvent): void {
   if (e.key === 'Escape') {
     e.preventDefault()
     if (uiState === 'move' || uiState === 'group' || uiState === 'links') exitSubState(false)
-    else if (uiState === 'ql-args') qlArgBack()
     else if (browseStack.length && currentMode() === 'bookmarks') popFolder()
     // Inside a prefix mode, Esc steps back to home; only home Esc closes.
     else if (modePrefix) setInput('')
@@ -1253,7 +1290,7 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     return
   }
   if (uiState === 'ql-args') {
-    commitQlArg(item.text ?? '')
+    void submitQlArgs(altAction)
     return
   }
   if (item.template !== undefined) {
@@ -3307,13 +3344,13 @@ async function enterQuicklinksView(): Promise<void> {
 /* ---------- Quicklink argument prompts + open-time substitution ---------- */
 
 let capturedSelection = ''
-let qlPrompt: {
+/** Raycast-style inline argument entry: fields live in the input row itself. */
+let qlArgsUi: {
   template: string
-  name: string
   newTab: boolean
-  args: ArgumentSpec[]
-  values: Record<string, string>
-  index: number
+  fields: Array<{ arg: ArgumentSpec; el: HTMLInputElement | HTMLSelectElement }>
+  row: HTMLElement
+  display: RemoteItem
 } | null = null
 
 /** Typed text against a dropdown argument: option label/value wins, else verbatim. */
@@ -3326,63 +3363,101 @@ function resolveArgInput(arg: ArgumentSpec, typed: string): string {
 
 async function openQuicklink(item: RemoteItem, newTab: boolean): Promise<void> {
   const template = item.template ?? ''
-  const name = item.qlName ?? item.label
   const args = templateArguments(template)
-  const values: Record<string, string> = {}
-  if (item.qlRest && args.length) values[args[0].key] = resolveArgInput(args[0], item.qlRest)
-  const pending = args.filter((a) => values[a.key] === undefined && a.default === undefined)
-  if (!pending.length) {
+  const prefill: Record<string, string> = {}
+  if (item.qlRest && args.length) prefill[args[0].key] = resolveArgInput(args[0], item.qlRest)
+  const needsUi = args.some((a) => prefill[a.key] === undefined && a.default === undefined)
+  if (!needsUi) {
+    const values: Record<string, string> = {}
+    for (const arg of args) values[arg.key] = prefill[arg.key] ?? arg.default ?? ''
     await finishQuicklink(template, values, newTab)
     return
   }
-  qlPrompt = { template, name, newTab, args: pending, values, index: 0 }
-  if (uiState === 'actions') closeActions()
-  uiState = 'ql-args'
-  savedQuery = modePrefix + (paletteInput?.value ?? '')
-  modePrefix = ''
-  promptQlArg()
+  enterQlArgsInline(item, args, prefill, newTab)
 }
 
-function promptQlArg(): void {
-  if (!paletteInput || !qlPrompt) return
-  const arg = qlPrompt.args[qlPrompt.index]
-  paletteInput.value = ''
-  paletteInput.placeholder = `${qlPrompt.name} — ${arg.name || 'value'}…`
-  paletteInput.focus()
+function enterQlArgsInline(
+  item: RemoteItem,
+  args: ArgumentSpec[],
+  prefill: Record<string, string>,
+  newTab: boolean,
+): void {
+  if (!paletteInput || !inputRowEl) return
+  if (uiState === 'actions') closeActions()
+  uiState = 'ql-args'
+  savedQuery = modePrefix + paletteInput.value
+  modePrefix = ''
+  paletteInput.style.display = 'none'
+
+  const row = document.createElement('div')
+  row.className = 'ql-args'
+  const chip = document.createElement('span')
+  chip.className = 'ql-chip'
+  chip.textContent = item.qlKeyword ?? item.qlName ?? item.label
+  row.appendChild(chip)
+
+  const fields = args.map((arg) => {
+    let el: HTMLInputElement | HTMLSelectElement
+    if (arg.options) {
+      const sel = document.createElement('select')
+      for (const o of arg.options) {
+        const opt = document.createElement('option')
+        opt.value = o.value
+        opt.textContent = o.label
+        sel.appendChild(opt)
+      }
+      const preset = prefill[arg.key] ?? arg.default
+      if (preset && arg.options.some((o) => o.value === preset)) sel.value = preset
+      el = sel
+    } else {
+      const input = document.createElement('input')
+      input.spellcheck = false
+      input.placeholder = arg.name || 'Argument'
+      input.value = prefill[arg.key] ?? arg.default ?? ''
+      el = input
+    }
+    row.appendChild(el)
+    return { arg, el }
+  })
+
+  qlArgsUi = {
+    template: item.template ?? '',
+    newTab,
+    fields,
+    row,
+    display: { ...item, template: undefined, group: undefined },
+  }
+  paletteInput.insertAdjacentElement('afterend', row)
+  const firstEmpty = fields.find((f) => f.el instanceof HTMLInputElement && !f.el.value)
+  ;(firstEmpty ?? fields[0])?.el.focus()
   void updateList()
 }
 
-function commitQlArg(value: string): void {
-  if (!qlPrompt) return
-  const arg = qlPrompt.args[qlPrompt.index]
-  if (!value) return // required argument — wait for input
-  qlPrompt.values[arg.key] = value
-  qlPrompt.index++
-  if (qlPrompt.index < qlPrompt.args.length) {
-    promptQlArg()
+/** Enter anywhere in the arg fields: open once every required value is present. */
+async function submitQlArgs(newTabOverride: boolean): Promise<void> {
+  if (!qlArgsUi) return
+  const empty = qlArgsUi.fields.find(
+    (f) => f.el instanceof HTMLInputElement && !f.el.value.trim() && f.arg.default === undefined,
+  )
+  if (empty) {
+    empty.el.focus()
     return
   }
-  const { template, values, newTab } = qlPrompt
-  exitQlArgs(false)
-  void finishQuicklink(template, values, newTab)
-}
-
-/** Esc inside the prompt flow: step back one argument, then out to the list. */
-function qlArgBack(): void {
-  if (!qlPrompt) return
-  if (qlPrompt.index > 0) {
-    qlPrompt.index--
-    promptQlArg()
-    return
+  const values: Record<string, string> = {}
+  for (const f of qlArgsUi.fields) {
+    values[f.arg.key] = f.el.value.trim() || (f.arg.default ?? '')
   }
-  exitQlArgs(true)
+  const { template, newTab } = qlArgsUi
+  exitQlArgsInline(false)
+  await finishQuicklink(template, values, newTab || newTabOverride)
 }
 
-function exitQlArgs(restore: boolean): void {
-  qlPrompt = null
+function exitQlArgsInline(restore: boolean): void {
+  qlArgsUi?.row.remove()
+  qlArgsUi = null
   uiState = 'list'
   if (!paletteInput) return
-  paletteInput.placeholder = 'Search bookmarks and commands…'
+  paletteInput.style.display = ''
   if (restore) {
     modePrefix = savedQuery && PREFIX_CHARS.includes(savedQuery[0]) ? savedQuery[0] : ''
     paletteInput.value = modePrefix ? savedQuery.slice(1) : savedQuery
@@ -3414,6 +3489,113 @@ let quicklinkFields: {
   getColor: () => string | undefined
   error: HTMLElement
 } | null = null
+
+/* Typing '{' in the Link field pops a placeholder menu (Raycast-style). */
+interface QlMenuItem {
+  label: string
+  snippet: string
+  /** Substring of the snippet to leave selected so typing replaces it. */
+  select?: string
+  preview?: string
+}
+let qlMenu: { el: HTMLDivElement; index: number; items: QlMenuItem[] } | null = null
+
+function qlMenuItems(): QlMenuItem[] {
+  return [
+    { label: 'Argument', snippet: '{argument name="Argument"}', select: 'Argument' },
+    {
+      label: 'Dropdown Argument',
+      snippet: '{argument name="Argument" options="one, two"}',
+      select: 'Argument',
+    },
+    { label: 'Clipboard Text', snippet: '{clipboard}' },
+    { label: 'Selected Text', snippet: '{selection}' },
+    { label: 'UUID', snippet: '{uuid}' },
+    { label: 'Time', snippet: '{time}', preview: renderTemplate('{time}', {}) },
+    { label: 'Date', snippet: '{date}', preview: renderTemplate('{date}', {}) },
+    { label: 'Date & Time', snippet: '{datetime}', preview: renderTemplate('{datetime}', {}) },
+    { label: 'Weekday', snippet: '{day}', preview: renderTemplate('{day}', {}) },
+  ]
+}
+
+function closeQlMenu(): void {
+  qlMenu?.el.remove()
+  qlMenu = null
+}
+
+function highlightQlMenu(): void {
+  qlMenu?.el
+    .querySelectorAll<HTMLElement>('.ql-menu-row')
+    .forEach((row, i) => row.classList.toggle('selected', i === qlMenu?.index))
+}
+
+function insertQlMenuItem(item: QlMenuItem): void {
+  const link = quicklinkFields?.link
+  if (!link) return
+  const caret = link.selectionStart ?? link.value.length
+  const done = completePlaceholder(link.value, caret, item.snippet)
+  closeQlMenu()
+  if (!done) return
+  link.value = done.text
+  link.focus()
+  if (item.select) {
+    const start = done.caret - item.snippet.length + item.snippet.indexOf(item.select)
+    link.setSelectionRange(start, start + item.select.length)
+  } else {
+    link.setSelectionRange(done.caret, done.caret)
+  }
+}
+
+function openQlMenu(anchor: HTMLElement): void {
+  closeQlMenu()
+  const items = qlMenuItems()
+  const el = document.createElement('div')
+  el.className = 'ql-menu'
+  el.style.top = `${anchor.offsetTop + anchor.offsetHeight + 4}px`
+  items.forEach((item, i) => {
+    const row = document.createElement('div')
+    row.className = 'ql-menu-row' + (i === 0 ? ' selected' : '')
+    const label = document.createElement('span')
+    label.textContent = item.label
+    row.appendChild(label)
+    if (item.preview) {
+      const preview = document.createElement('span')
+      preview.className = 'ql-menu-preview'
+      preview.textContent = item.preview
+      row.appendChild(preview)
+    }
+    row.addEventListener('mousedown', (e) => {
+      e.preventDefault()
+      insertQlMenuItem(item)
+    })
+    el.appendChild(row)
+  })
+  anchor.parentElement?.appendChild(el)
+  qlMenu = { el, index: 0, items }
+}
+
+/** Menu keys while the create form is open; true when the event was consumed. */
+function qlMenuKey(e: KeyboardEvent): boolean {
+  if (!qlMenu) return false
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault()
+    const n = qlMenu.items.length
+    qlMenu.index = (qlMenu.index + (e.key === 'ArrowDown' ? 1 : -1) + n) % n
+    highlightQlMenu()
+    return true
+  }
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    insertQlMenuItem(qlMenu.items[qlMenu.index])
+    return true
+  }
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    closeQlMenu()
+    return true
+  }
+  return false
+}
 /** When set, saving replaces the quicklink with this keyword instead of adding. */
 let quicklinkEditing: string | null = null
 
@@ -3437,6 +3619,7 @@ function enterQuicklinkEdit(prefill?: {
 
 function exitQuicklinkEdit(): void {
   if (!paletteInput) return
+  closeQlMenu()
   quicklinkFields = null
   quicklinkEditing = null
   uiState = 'list'
@@ -3487,12 +3670,18 @@ function renderQuicklinkEdit(prefill?: {
   row('Keyword', keyword)
   row('Name', name)
   const linkWrap = document.createElement('div')
+  linkWrap.style.position = 'relative'
   const hint = document.createElement('span')
   hint.className = 'set-hint'
-  hint.textContent =
-    'Include {argument} to prompt (add options="a, b" for a dropdown) — or {clipboard}, {selection}, {date}, {uuid}. Plain links work too.'
+  hint.textContent = 'Type { for dynamic placeholders — arguments, dropdowns, clipboard, dates…'
   linkWrap.append(link, hint)
   row('Link', linkWrap)
+  link.addEventListener('input', () => {
+    const caret = link.selectionStart ?? 0
+    if (link.value[caret - 1] === '{') openQlMenu(link)
+    else closeQlMenu()
+  })
+  link.addEventListener('blur', () => setTimeout(closeQlMenu, 100))
 
   // Color + icon, Raycast-style: preset tile colors and an emoji/monogram
   // glyph; both optional — favicon (or the search glyph) is the default.
@@ -3656,54 +3845,8 @@ async function updateList(): Promise<void> {
 
   if (uiState === 'rename' || uiState === 'settings' || uiState === 'fav-custom' || uiState === 'quicklink-edit') return
 
-  if (uiState === 'ql-args' && qlPrompt) {
-    const arg = qlPrompt.args[qlPrompt.index]
-    const typed = paletteInput.value.trim()
-    const argLabel = arg.name || 'value'
-    let items: RemoteItem[]
-    if (arg.options) {
-      items = arg.options
-        .map((o) => ({ o, s: localFuzzy(typed.toLowerCase(), o.label.toLowerCase()) }))
-        .filter((x) => x.s !== null)
-        .sort((a, b) => b.s! - a.s!)
-        .map(
-          (x): RemoteItem => ({
-            kind: 'search',
-            label: x.o.label,
-            detail: x.o.value === x.o.label ? '' : x.o.value,
-            text: x.o.value,
-            icon: 'search',
-            color: tileGradient('#e8964a'),
-            typeText: 'Option',
-          }),
-        )
-      if (!items.length && typed) {
-        items = [
-          {
-            kind: 'search',
-            label: `Use “${typed}”`,
-            detail: '',
-            text: typed,
-            icon: 'search',
-            color: tileGradient('#e8964a'),
-            typeText: 'Option',
-          },
-        ]
-      }
-    } else {
-      items = [
-        {
-          kind: 'search',
-          label: typed ? `${argLabel}: ${typed}` : `Type ${argLabel}…`,
-          detail: '',
-          text: typed,
-          icon: 'search',
-          color: tileGradient('#e8964a'),
-          typeText: qlPrompt.index === qlPrompt.args.length - 1 ? 'Open' : 'Next',
-        },
-      ]
-    }
-    renderItems(`${qlPrompt.name} — ${argLabel}`, items)
+  if (uiState === 'ql-args' && qlArgsUi) {
+    renderItems('Quicklink', [qlArgsUi.display])
     return
   }
 

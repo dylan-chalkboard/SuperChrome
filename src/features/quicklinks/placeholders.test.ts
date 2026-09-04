@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { renderTemplate, templateArguments } from './placeholders'
+import { completePlaceholder, renderTemplate, templateArguments } from './placeholders'
 
 const NOW = new Date('2026-09-04T15:30:45')
 
@@ -35,6 +35,24 @@ describe('templateArguments', () => {
   })
   it('ignores non-argument placeholders and unknown types', () => {
     expect(templateArguments('https://x.com/{clipboard}/{date}/{nonsense}')).toEqual([])
+  })
+})
+
+describe('completePlaceholder', () => {
+  it('replaces the just-typed brace with the snippet and moves the caret', () => {
+    expect(completePlaceholder('https://g.com/?q={', 18, '{clipboard}')).toEqual({
+      text: 'https://g.com/?q={clipboard}',
+      caret: 28,
+    })
+  })
+  it('works mid-string', () => {
+    expect(completePlaceholder('https://x.com/{/tail', 15, '{uuid}')).toEqual({
+      text: 'https://x.com/{uuid}/tail',
+      caret: 20,
+    })
+  })
+  it('returns null when the caret is not right after an open brace', () => {
+    expect(completePlaceholder('https://g.com/?q=', 17, '{uuid}')).toBeNull()
   })
 })
 

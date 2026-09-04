@@ -3,6 +3,20 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.34.0
+
+- **Inline arguments, Raycast-style**: picking an arg-ful quicklink keeps
+  the keyword visible and puts each argument right in the input row — text
+  fields with the argument's name as placeholder, dropdowns as native
+  selects (preselected to their default). Tab between fields, ↵ opens,
+  esc backs out. Replaces the sequential prompt flow
+- **`{` autocomplete in the create form**: typing { in the Link field pops
+  a placeholder menu (Argument, Dropdown Argument, Clipboard, Selected
+  Text, UUID, Time/Date/Date & Time/Weekday with live previews); picking
+  Argument leaves the name selected so you type straight over it
+- Quicklink rows now read like Raycast's: name + domain with a Quicklink
+  type label, no "Open …"/"Search …" phrasing
+
 ## 0.33.0
 
 - **`>Quicklinks`** — browse every quicklink in one filtered list; ⌘K
