@@ -3,6 +3,12 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.35.1
+
+- Argument entry no longer changes the input row's height — the search
+  input stays in the layout at zero width so its padding keeps the row at
+  its fixed size
+
 ## 0.35.0
 
 - **Quicklink mode**: entering argument entry now tints the input row

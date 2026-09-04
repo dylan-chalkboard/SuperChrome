@@ -127,6 +127,9 @@ const PALETTE_CSS = `
 .input-row.mode-downloads { --mode-tint: rgba(58, 169, 159, 0.22); border-bottom-color: rgba(58, 169, 159, 0.35); }
 .input-row.mode-snippets { --mode-tint: rgba(232, 150, 74, 0.22); border-bottom-color: rgba(232, 150, 74, 0.35); }
 .input-row.mode-quicklink { --mode-tint: rgba(232, 150, 74, 0.22); border-bottom-color: rgba(232, 150, 74, 0.35); }
+/* Argument entry: the real input shrinks to zero width but keeps its vertical
+   padding, so the row height never changes; the arg fields fill the space. */
+.mode-quicklink .input { flex: 0 0 0; width: 0; min-width: 0; padding-right: 0; }
 .input-row.mode-library { --mode-tint: rgba(224, 93, 93, 0.22); border-bottom-color: rgba(224, 93, 93, 0.35); }
 @keyframes menu-in {
   from { opacity: 0; transform: translateY(4px); }
@@ -426,7 +429,7 @@ const PALETTE_CSS = `
 .light .ql-menu-row { color: #26262b; }
 .light .ql-menu-row.selected, .light .ql-menu-row:hover { background: #00000010; }
 .light .ql-menu-preview { color: #00000059; }
-.ql-args { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.ql-args { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; padding-right: 16px; overflow: hidden; }
 .ql-chip { color: #ffffff; font-size: 15px; white-space: nowrap; }
 .ql-args input, .ql-args select {
   background: transparent; border: 1px solid #ffffff2e; border-radius: 8px;
@@ -3401,7 +3404,9 @@ function enterQlArgsInline(
   uiState = 'ql-args'
   savedQuery = modePrefix + paletteInput.value
   modePrefix = ''
-  paletteInput.style.display = 'none'
+  // The input stays in the layout at zero width (via .mode-quicklink .input)
+  // so its padding keeps driving the row height — the row must never resize.
+  paletteInput.value = ''
 
   const row = document.createElement('div')
   row.className = 'ql-args'
@@ -3471,7 +3476,6 @@ function exitQlArgsInline(restore: boolean): void {
   qlArgsUi = null
   uiState = 'list'
   if (!paletteInput) return
-  paletteInput.style.display = ''
   if (restore) {
     modePrefix = savedQuery && PREFIX_CHARS.includes(savedQuery[0]) ? savedQuery[0] : ''
     paletteInput.value = modePrefix ? savedQuery.slice(1) : savedQuery
