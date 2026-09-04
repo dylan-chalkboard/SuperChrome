@@ -391,10 +391,13 @@ const PALETTE_CSS = `
 .seg button.on { background: #ffffff1f; color: #ffffff; }
 .check { display: flex; align-items: center; gap: 8px; color: #e0e0e0; font-size: 13px; cursor: pointer; }
 .settings input[type='range'] { width: 200px; accent-color: #4c9df3; }
-.settings select, .settings input[type='number'] {
+.settings select, .settings input[type='number'], .settings input[type='text'] {
   background: #ffffff10; border: 1px solid #ffffff20; border-radius: 6px;
   color: #e8e8e8; font: inherit; padding: 4px 8px; outline: none;
 }
+.settings input[type='text'] { width: 100%; box-sizing: border-box; padding: 6px 10px; }
+.settings input[type='text']:focus { border-color: #4c9df388; }
+.ql-error { font-size: 12px; color: #e05d5d; min-height: 15px; }
 .settings input[type='number'] { width: 70px; }
 .settings input[type='color'] {
   width: 38px; height: 26px; padding: 2px; cursor: pointer;
@@ -416,6 +419,7 @@ const PALETTE_CSS = `
 .light .check { color: #303036; }
 .light .set-swatches span { color: #00000059; }
 .light .settings select, .light .settings input[type='number'],
+.light .settings input[type='text'],
 .light .settings input[type='color'], .light .settings textarea {
   background: #00000008; border-color: #00000020; color: #26262b;
 }
@@ -487,7 +491,7 @@ const GROUP_LABELS: Record<string, string> = {
   library: 'Bookmarks',
 }
 
-type UiState = 'list' | 'actions' | 'rename' | 'move' | 'group' | 'settings' | 'links' | 'fav-custom'
+type UiState = 'list' | 'actions' | 'rename' | 'move' | 'group' | 'settings' | 'links' | 'fav-custom' | 'quicklink-edit'
 
 let paletteHost: HTMLDivElement | null = null
 let paletteInput: HTMLInputElement | null = null
@@ -735,6 +739,7 @@ function openPalette(prefix: string): void {
         paletteHost &&
         paletteInput &&
         uiState !== 'settings' &&
+        uiState !== 'quicklink-edit' &&
         !libraryOwnsInput() &&
         shadow.activeElement !== paletteInput
       ) {
@@ -868,7 +873,9 @@ function renderFooter(): void {
   const primary = document.createElement('span')
   primary.className = 'action'
   const primaryLabel =
-    uiState === 'settings' || uiState === 'fav-custom'
+    uiState === 'quicklink-edit'
+      ? 'Save Quicklink'
+      : uiState === 'settings' || uiState === 'fav-custom'
       ? 'Done'
       : uiState === 'move'
         ? 'Move Here'
@@ -880,6 +887,12 @@ function renderFooter(): void {
               ? 'Insert'
               : 'Open'
   primary.append(document.createTextNode(primaryLabel), kbd(uiState === 'settings' || uiState === 'fav-custom' ? 'esc' : '↵'))
+  if (uiState === 'quicklink-edit') {
+    const cancel = document.createElement('span')
+    cancel.className = 'action'
+    cancel.append(document.createTextNode('Cancel'), kbd('esc'))
+    paletteFooter.appendChild(cancel)
+  }
   paletteFooter.appendChild(primary)
 
   if (uiState === 'list' && (mode === 'bookmarks' || mode === 'history' || mode === 'library')) {
@@ -929,6 +942,18 @@ function onGlobalKey(e: KeyboardEvent): void {
   if (brandMenuEl && e.key === 'Escape') {
     e.preventDefault()
     closeBrandMenu()
+    return
+  }
+
+  // Quicklink form owns the keyboard: Enter saves, Esc cancels.
+  if (uiState === 'quicklink-edit') {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      exitQuicklinkEdit()
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      void saveQuicklinkEdit()
+    }
     return
   }
 
@@ -1201,6 +1226,12 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     await commitGroup(item)
     return
   }
+  if (item.fillInput !== undefined) {
+    // Quicklink-by-name rows with a {query} template: type the keyword and
+    // let the user supply the argument.
+    setInput(item.fillInput)
+    return
+  }
   if (item.kind === 'download') {
     void chrome.runtime.sendMessage({ type: 'download-open', downloadId: item.downloadId })
     closePalette()
@@ -1323,6 +1354,12 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     return
   } else if (item.commandId === 'new-folder') {
     enterNewFolder()
+    return
+  } else if (item.commandId === 'create-quicklink') {
+    enterQuicklinkEdit()
+    return
+  } else if (item.commandId === 'save-page-quicklink') {
+    enterQuicklinkEdit({ name: document.title, link: location.href })
     return
   } else if (item.commandId?.startsWith('onboard:')) {
     const key = item.commandId.slice('onboard:'.length)
@@ -3164,6 +3201,112 @@ async function renderSettings(): Promise<void> {
   paletteList.appendChild(form)
 }
 
+/* ---------- Create Quicklink form (Raycast-style) ---------- */
+
+let quicklinkFields: { keyword: HTMLInputElement; name: HTMLInputElement; link: HTMLInputElement; error: HTMLElement } | null = null
+
+function enterQuicklinkEdit(prefill?: { name?: string; link?: string }): void {
+  if (!paletteInput || !paletteList || uiState === 'quicklink-edit') return
+  if (uiState === 'actions') closeActions()
+  uiState = 'quicklink-edit'
+  savedQuery = modePrefix + paletteInput.value
+  if (inputRowEl) inputRowEl.style.display = 'none'
+  renderQuicklinkEdit(prefill)
+  renderFooter()
+}
+
+function exitQuicklinkEdit(): void {
+  if (!paletteInput) return
+  quicklinkFields = null
+  uiState = 'list'
+  if (inputRowEl) inputRowEl.style.display = ''
+  modePrefix = savedQuery && PREFIX_CHARS.includes(savedQuery[0]) ? savedQuery[0] : ''
+  paletteInput.value = modePrefix ? savedQuery.slice(1) : savedQuery
+  paletteInput.focus()
+  void updateList()
+}
+
+function renderQuicklinkEdit(prefill?: { name?: string; link?: string }): void {
+  if (!paletteList) return
+  paletteList.textContent = ''
+  selectorEl = null
+  flatItems = []
+  favBarItems = []
+  favIndex = -1
+
+  const form = document.createElement('div')
+  form.className = 'settings'
+
+  const row = (label: string, control: HTMLElement): void => {
+    const el = document.createElement('div')
+    el.className = 'set-row'
+    const lab = document.createElement('label')
+    lab.textContent = label
+    el.append(lab, control)
+    form.appendChild(el)
+  }
+  const field = (placeholder: string, value = ''): HTMLInputElement => {
+    const input = document.createElement('input')
+    input.type = 'text'
+    input.spellcheck = false
+    input.placeholder = placeholder
+    input.value = value
+    return input
+  }
+
+  const keyword = field('gh', '')
+  const name = field('Quicklink name', prefill?.name ?? '')
+  const link = field('https://github.com/search?q={query}', prefill?.link ?? '')
+  row('Keyword', keyword)
+  row('Name', name)
+  const linkWrap = document.createElement('div')
+  const hint = document.createElement('span')
+  hint.className = 'set-hint'
+  hint.textContent = 'Include {query} to make it a search; leave it out for a plain link'
+  linkWrap.append(link, hint)
+  row('Link', linkWrap)
+
+  const error = document.createElement('div')
+  error.className = 'set-row'
+  const errorText = document.createElement('span')
+  errorText.className = 'ql-error'
+  error.append(document.createElement('label'), errorText)
+  form.appendChild(error)
+
+  quicklinkFields = { keyword, name, link, error: errorText }
+  paletteList.appendChild(form)
+  keyword.focus()
+}
+
+async function saveQuicklinkEdit(): Promise<void> {
+  if (!quicklinkFields) return
+  const keyword = quicklinkFields.keyword.value.trim().toLowerCase()
+  const name = quicklinkFields.name.value.trim()
+  const link = quicklinkFields.link.value.trim()
+  const fail = (message: string, focus: HTMLInputElement): void => {
+    if (quicklinkFields) quicklinkFields.error.textContent = message
+    focus.focus()
+  }
+  if (!keyword) return fail('Keyword is required.', quicklinkFields.keyword)
+  if (/\s/.test(keyword)) return fail('Keyword cannot contain spaces.', quicklinkFields.keyword)
+  if (!name) return fail('Name is required.', quicklinkFields.name)
+  if (!link) return fail('Link is required.', quicklinkFields.link)
+  try {
+    const url = new URL(link.replace('{query}', 'test'))
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error()
+  } catch {
+    return fail('Link must be an http(s) URL.', quicklinkFields.link)
+  }
+  const s = await getSettings()
+  if (s.quicklinks.some((l) => l.keyword.toLowerCase() === keyword)) {
+    return fail(`Keyword “${keyword}” is already taken.`, quicklinkFields.keyword)
+  }
+  const next = { ...s, quicklinks: [...s.quicklinks, { keyword, name, template: link }] }
+  await chrome.storage.sync.set({ settings: next })
+  exitQuicklinkEdit()
+  showToast(`Quicklink “${name}” saved`)
+}
+
 /* ---------- List rendering ---------- */
 
 function localFuzzy(query: string, text: string): number | null {
@@ -3190,7 +3333,7 @@ async function updateList(): Promise<void> {
   renderFooter()
   updateModeStyling()
 
-  if (uiState === 'rename' || uiState === 'settings' || uiState === 'fav-custom') return
+  if (uiState === 'rename' || uiState === 'settings' || uiState === 'fav-custom' || uiState === 'quicklink-edit') return
 
   if (uiState === 'group') {
     const query = paletteInput.value.trim().toLowerCase()

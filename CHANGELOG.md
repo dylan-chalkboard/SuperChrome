@@ -3,6 +3,17 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.30.0
+
+- **Quicklinks, Raycast-style**: `>Create Quicklink` opens an in-palette
+  form (Keyword / Name / Link) — no more editing the settings textarea;
+  `>Save Page as Quicklink` prefills it with the current tab
+- **Static quicklinks**: links without `{query}` are now allowed — the
+  bare keyword offers "Open <Name>" directly
+- Quicklinks also match by name in the root search alongside bookmarks;
+  picking a `{query}` one types its keyword for you so you just add the
+  search terms
+
 ## 0.29.0
 
 - **State restoration**: reopening the palette within 90 seconds picks up

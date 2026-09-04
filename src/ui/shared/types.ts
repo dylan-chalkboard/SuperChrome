@@ -25,6 +25,8 @@ export interface RemoteItem {
   typeText?: string
   /** URL already open in a tab: row shows "Switch to Tab" and switches. */
   openTab?: boolean
+  /** Selecting the row types this into the palette input instead of acting. */
+  fillInput?: string
 }
 
 export interface PaletteAction {

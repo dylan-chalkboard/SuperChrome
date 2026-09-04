@@ -27,6 +27,8 @@ export interface PaletteItem {
   downloadId?: number
   /** Overrides the mode's default group header in the results list. */
   group?: string
+  /** Selecting the row types this into the palette input instead of acting. */
+  fillInput?: string
   /** Indices into the ranked text that matched the query, for highlighting. */
   positions?: number[]
 }

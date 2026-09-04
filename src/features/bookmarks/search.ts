@@ -1,7 +1,7 @@
 import { tryCalculate, tryConvert } from '../calculator'
 import { commandEntries } from '../commands'
 import { tileGradient } from '../gradients'
-import { urlFromQuery } from '../navigation'
+import { hostOf, urlFromQuery } from '../navigation'
 import { matchQuicklink } from '../quicklinks'
 import { frecency, rank } from '../ranking'
 import type { UsageMap } from '../ranking'
@@ -258,8 +258,43 @@ export async function searchBookmarks(
       usageKey: `history:${r.url}`,
     }))
 
+  // Quicklinks: "yt lofi beats" searches the keyword's site directly; a bare
+  // static keyword ("dash") offers the link itself.
+  const quicklink = matchQuicklink(rawQuery, settings.quicklinks)
+
+  // Quicklinks also surface by name alongside bookmarks, Raycast-style. A
+  // static link opens; a {query} link fills the input with its keyword so the
+  // user types the argument. The exact-keyword match above is excluded so the
+  // same link never shows twice.
+  const favicon = (url: string): string =>
+    chrome.runtime.getURL('/_favicon/') + `?pageUrl=${encodeURIComponent(url)}&size=32`
+  const quicklinkEntries = settings.quicklinks
+    .filter((l) => l.name !== quicklink?.name)
+    .map((l) => ({
+      item: l.template.includes('{query}')
+        ? {
+            kind: 'search' as const,
+            label: `Search ${l.name}…`,
+            detail: '',
+            fillInput: `${l.keyword} `,
+            icon: 'search',
+            color: tileGradient('#e8964a'),
+            typeText: 'Quicklink',
+          }
+        : {
+            kind: 'search' as const,
+            label: l.name,
+            detail: hostOf(l.template) ?? '',
+            url: l.template,
+            iconUrl: favicon(l.template),
+            typeText: 'Quicklink',
+          },
+      text: `${l.name} ${l.keyword}`.toLowerCase(),
+      usageKey: `quicklink:${l.keyword}`,
+    }))
+
   const results = rank<PaletteItem>(
-    [...bookmarkEntries, ...folderEntries, ...commands, ...tabEntries, ...historyEntries],
+    [...bookmarkEntries, ...folderEntries, ...commands, ...quicklinkEntries, ...tabEntries, ...historyEntries],
     query,
     usage,
     decay,
@@ -274,18 +309,27 @@ export async function searchBookmarks(
       group: 'Calculator',
     })
   }
-  // Quicklinks: "yt lofi beats" searches the keyword's site directly.
-  const quicklink = matchQuicklink(rawQuery, settings.quicklinks)
   if (quicklink) {
-    results.unshift({
-      kind: 'search',
-      label: `Search ${quicklink.name} for “${quicklink.query}”`,
-      detail: '',
-      url: quicklink.url,
-      icon: 'search',
-      color: tileGradient('#e8964a'),
-      group: 'Quicklink',
-    })
+    results.unshift(
+      quicklink.kind === 'open'
+        ? {
+            kind: 'search',
+            label: `Open ${quicklink.name}`,
+            detail: hostOf(quicklink.url) ?? '',
+            url: quicklink.url,
+            iconUrl: favicon(quicklink.url),
+            group: 'Quicklink',
+          }
+        : {
+            kind: 'search',
+            label: `Search ${quicklink.name} for “${quicklink.query}”`,
+            detail: '',
+            url: quicklink.url,
+            icon: 'search',
+            color: tileGradient('#e8964a'),
+            group: 'Quicklink',
+          },
+    )
   }
   // Address-bar behavior: a URL-shaped query gets a direct "Open" row on top.
   const directUrl = urlFromQuery(rawQuery)

@@ -197,11 +197,14 @@ describe('snippets', () => {
 })
 
 describe('quicklinks', () => {
+  const DASH = { keyword: 'dash', name: 'Team Dashboard', template: 'https://example.com/dash' }
+
   it('matches a keyword and encodes the query', () => {
     expect(matchQuicklink('yt lofi beats', DEFAULT_QUICKLINKS)).toEqual({
       name: 'YouTube',
       url: 'https://www.youtube.com/results?search_query=lofi%20beats',
       query: 'lofi beats',
+      kind: 'search',
     })
   })
   it('is case-insensitive on the keyword and needs a query after it', () => {
@@ -210,6 +213,18 @@ describe('quicklinks', () => {
     expect(matchQuicklink('yt ', DEFAULT_QUICKLINKS)).toBeNull()
     expect(matchQuicklink('unknown thing', DEFAULT_QUICKLINKS)).toBeNull()
   })
+  it('opens a static link on its bare keyword', () => {
+    expect(matchQuicklink('dash', [DASH])).toEqual({
+      name: 'Team Dashboard',
+      url: 'https://example.com/dash',
+      query: '',
+      kind: 'open',
+    })
+    expect(matchQuicklink('DASH ', [DASH])?.kind).toBe('open')
+  })
+  it('does not match a static link with an argument', () => {
+    expect(matchQuicklink('dash foo', [DASH])).toBeNull()
+  })
   it('parses and serializes the options-page text format', () => {
     const text = 'yt | YouTube | https://youtube.com/results?q={query}\nbad line\nnp | npm | https://npmjs.com/search?q={query}'
     const links = parseQuicklinks(text)
@@ -217,8 +232,10 @@ describe('quicklinks', () => {
     expect(links[1]).toEqual({ keyword: 'np', name: 'npm', template: 'https://npmjs.com/search?q={query}' })
     expect(parseQuicklinks(serializeQuicklinks(links))).toEqual(links)
   })
-  it('drops templates missing the {query} placeholder', () => {
-    expect(parseQuicklinks('x | X | https://example.com')).toEqual([])
+  it('keeps static templates without {query} and round-trips them', () => {
+    const links = parseQuicklinks('x | X | https://example.com')
+    expect(links).toEqual([{ keyword: 'x', name: 'X', template: 'https://example.com' }])
+    expect(parseQuicklinks(serializeQuicklinks(links))).toEqual(links)
   })
 })
 

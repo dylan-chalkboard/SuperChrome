@@ -31,8 +31,10 @@ links, match by name in root search, and are created through a small form
   whose template lacks `{query}` yields an open-link match. Keyword +
   argument on a `{query}` template behaves exactly as today. Keyword +
   argument on a static template does not match.
-- New `searchQuicklinksByName(query, links)` fuzzy-matches quicklinks by
-  their `name` field for root-search integration.
+- Name matching rides the blended search's existing `rank()`/`fuzzyMatch`
+  pipeline (quicklinks become rank entries with text `name keyword`), rather
+  than a separate `searchQuicklinksByName` helper — implementation deviation
+  from the original draft, avoiding a second ranking pass.
 
 ### 2. Root search integration (`src/features/bookmarks/search.ts`)
 
