@@ -71,6 +71,14 @@ import { ALL_ICONS, BOOKMARK_SVG, CLOCK_SVG, CMD_ICONS, COMMAND_SVG, DOC_SVG, CL
   TERMINAL_APP_SVG, ONBOARD_DONE_SVG, ONBOARD_TODO_SVG, RIBBON_SVG } from './ui/shared/icons'
 import { MODE_PLACEHOLDERS, MODE_PREFIX, PREFIX_CHARS, mode } from './ui/shared/mode'
 import type { FavoriteEntry, PaletteAction, RemoteItem } from './ui/shared/types'
+import {
+  FIND_CAP,
+  buildIndex,
+  findMatches,
+  rectsFor,
+  type FindMatch,
+  type FindNode,
+} from './features/find'
 
 interface FolderInfo {
   id: string
@@ -509,6 +517,86 @@ const PALETTE_CSS = `
 .panel.no-motion, .no-motion .selector { transition: none !important; }
 .no-motion .input-row, .no-motion .input-row::before, .no-motion .hint .kbd { transition: none !important; }
 .no-motion .mode-glyph, .no-motion .actions, .no-motion .brand-menu { animation: none !important; }
+/* ---------- SuperFind ---------- */
+.sf-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  pointer-events: none;
+}
+/* Siri-style rainbow edge glow: a blurred conic ring hugging the viewport. */
+.sf-frame {
+  position: fixed;
+  inset: 0;
+  border-radius: 18px;
+  padding: 3px;
+  background: conic-gradient(
+    from 0deg,
+    #ff2d95, #ff9a3d, #ffe14d, #4dff9e, #3dc9ff, #9a5dff, #ff2d95
+  );
+  filter: blur(14px);
+  opacity: 0.85;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: sf-spin 8s linear infinite;
+}
+@keyframes sf-spin { to { transform: rotate(360deg); } }
+.no-motion .sf-frame, .sf-overlay.no-motion .sf-frame { animation: none; }
+.sf-pill {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: rgba(20, 20, 24, 0.82);
+  backdrop-filter: blur(20px) saturate(160%);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font: 500 14px/1.2 -apple-system, system-ui, sans-serif;
+}
+.sf-pill .sf-logo { width: 18px; height: 18px; }
+.sf-pill .sf-label { opacity: 0.7; }
+.sf-pill .sf-query { font-weight: 600; }
+.sf-pill .sf-count { margin-left: 8px; opacity: 0.55; font-variant-numeric: tabular-nums; }
+.sf-hint {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 7px 14px;
+  border-radius: 10px;
+  background: rgba(20, 20, 24, 0.72);
+  color: rgba(255, 255, 255, 0.75);
+  font: 500 12px/1.2 -apple-system, system-ui, sans-serif;
+  backdrop-filter: blur(14px);
+}
+.sf-mark {
+  position: fixed;
+  border-radius: 3px;
+  background: rgba(255, 225, 77, 0.28);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 154, 61, 0.6);
+  transition: background 0.1s ease, box-shadow 0.1s ease;
+}
+.sf-mark.sf-current {
+  background: rgba(255, 154, 61, 0.42);
+  box-shadow: inset 0 0 0 2px #ff2d95, 0 0 14px rgba(255, 45, 149, 0.55);
+}
+.sf-empty {
+  position: fixed;
+  top: 62px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: rgba(20, 20, 24, 0.72);
+  color: rgba(255, 255, 255, 0.7);
+  font: 500 13px/1.2 -apple-system, system-ui, sans-serif;
+}
 `
 
 const TYPE_LABELS: Record<string, string> = {
@@ -553,6 +641,14 @@ let modeGlyphEl: HTMLElement | null = null
  */
 let modePrefix = ''
 let actionsEl: HTMLElement | null = null
+// SuperFind state
+let paletteShadow: ShadowRoot | null = null
+let findIndex: FindNode[] = []
+let findMatchesState: FindMatch[] = []
+let findSelected = 0
+let findTotal = 0
+let findCapped = false
+let findOverlay: HTMLElement | null = null
 let brandMenuEl: HTMLElement | null = null
 let pageListItems: RemoteItem[] = []
 let pageListLabel = ''
@@ -687,6 +783,7 @@ function captureModePrefix(): void {
 }
 
 function closePalette(): void {
+  teardownFind()
   // Browse-level state only; sub-states (settings, save flow, …) reset.
   lastSnapshot =
     (uiState === 'list' || uiState === 'actions') && paletteInput
@@ -712,6 +809,7 @@ function closePalette(): void {
     host?.remove()
   }
   paletteHost = null
+  paletteShadow = null
   paletteInput = null
   paletteList = null
   paletteFooter = null
@@ -732,6 +830,7 @@ function openPalette(prefix: string): void {
   paletteHost = document.createElement('div')
   paletteHost.style.cssText = 'position:fixed;inset:0;z-index:2147483647;'
   const shadow = paletteHost.attachShadow({ mode: 'closed' })
+  paletteShadow = shadow
 
   const style = document.createElement('style')
   style.textContent = PALETTE_CSS + LIBRARY_CSS + DROPDOWN_CSS
@@ -3916,6 +4015,119 @@ function localFuzzy(query: string, text: string): number | null {
   return qi === query.length ? score : null
 }
 
+function teardownFind(): void {
+  window.removeEventListener('scroll', repositionFindMarkers, true)
+  window.removeEventListener('resize', repositionFindMarkers, true)
+  findOverlay?.remove()
+  findOverlay = null
+  findIndex = []
+  findMatchesState = []
+  findSelected = 0
+  findTotal = 0
+  findCapped = false
+}
+
+function repositionFindMarkers(): void {
+  if (!findOverlay) return
+  const marks = findOverlay.querySelectorAll<HTMLElement>('.sf-mark')
+  marks.forEach((mark) => {
+    const i = Number(mark.dataset.i)
+    const match = findMatchesState[i]
+    if (!match) return
+    const rects = rectsFor(match, findIndex)
+    const r = rects[0]
+    if (!r) {
+      mark.style.display = 'none'
+      return
+    }
+    mark.style.display = ''
+    mark.style.left = `${r.left}px`
+    mark.style.top = `${r.top}px`
+    mark.style.width = `${r.width}px`
+    mark.style.height = `${r.height}px`
+  })
+}
+
+/**
+ * Render (or refresh) the SuperFind overlay for the current query. Rebuilds the
+ * node index on first entry, re-runs matching each call, and paints markers.
+ */
+function renderFind(): void {
+  if (!paletteInput || !paletteHost) return
+  const shadow = paletteShadow
+  if (!shadow) return
+
+  if (findIndex.length === 0) findIndex = buildIndex(paletteHost)
+
+  const query = paletteInput.value
+  const result = findMatches(findIndex, query, FIND_CAP)
+  findMatchesState = result.matches
+  findTotal = result.total
+  findCapped = result.capped
+  if (findSelected >= findMatchesState.length) findSelected = 0
+
+  // Build the overlay skeleton once.
+  if (!findOverlay) {
+    findOverlay = document.createElement('div')
+    findOverlay.className = 'sf-overlay'
+    findOverlay.innerHTML = `
+      <div class="sf-frame"></div>
+      <div class="sf-pill">
+        <img class="sf-logo" alt="SuperChrome" />
+        <span class="sf-label">SuperFind:</span>
+        <span class="sf-query"></span>
+        <span class="sf-count"></span>
+      </div>
+      <div class="sf-hint">↑↓ move&nbsp;&nbsp;↵ click&nbsp;&nbsp;esc exit</div>`
+    findOverlay.querySelector<HTMLImageElement>('.sf-logo')!.src =
+      chrome.runtime.getURL('/icons/footer.png')
+    if (reducedMotion()) findOverlay.classList.add('no-motion')
+    shadow.appendChild(findOverlay)
+    window.addEventListener('scroll', repositionFindMarkers, true)
+    window.addEventListener('resize', repositionFindMarkers, true)
+  }
+
+  // Update pill text + counter.
+  findOverlay.querySelector('.sf-query')!.textContent = query
+  const countEl = findOverlay.querySelector('.sf-count')!
+  countEl.textContent = findTotal
+    ? `${findSelected + 1} / ${findCapped ? `${FIND_CAP}+` : findTotal}`
+    : query.trim()
+      ? '0 / 0'
+      : ''
+
+  // Empty-state note.
+  let empty = findOverlay.querySelector<HTMLElement>('.sf-empty')
+  if (query.trim() && findTotal === 0) {
+    if (!empty) {
+      empty = document.createElement('div')
+      empty.className = 'sf-empty'
+      empty.textContent = 'No matches on this page'
+      findOverlay.appendChild(empty)
+    }
+  } else {
+    empty?.remove()
+  }
+
+  // Rebuild markers.
+  findOverlay.querySelectorAll('.sf-mark').forEach((m) => m.remove())
+  findMatchesState.forEach((_, i) => {
+    const mark = document.createElement('div')
+    mark.className = 'sf-mark' + (i === findSelected ? ' sf-current' : '')
+    mark.dataset.i = String(i)
+    findOverlay!.appendChild(mark)
+  })
+  repositionFindMarkers()
+  scrollSelectedFindIntoView()
+}
+
+function scrollSelectedFindIntoView(): void {
+  const match = findMatchesState[findSelected]
+  if (!match) return
+  const entry = findIndex[match.nodeIndex]
+  entry?.node.parentElement?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+}
+
 async function updateList(): Promise<void> {
   if (!paletteInput || !paletteList) return
   const token = ++queryToken
@@ -3923,7 +4135,14 @@ async function updateList(): Promise<void> {
   renderFooter()
   updateModeStyling()
 
+  if (findOverlay && currentMode() !== 'find') teardownFind()
+
   if (uiState === 'rename' || uiState === 'settings' || uiState === 'fav-custom' || uiState === 'quicklink-edit') return
+
+  if (currentMode() === 'find' && uiState === 'list') {
+    renderFind()
+    return
+  }
 
   if (uiState === 'ql-args' && qlArgsUi) {
     renderItems('Quicklink', [qlArgsUi.display])
