@@ -532,7 +532,9 @@ const PALETTE_CSS = `
   inset: 0;
   z-index: 2147483646;
   pointer-events: none;
+  animation: sf-in 0.2s ease-out both;
 }
+.sf-overlay.no-motion { animation: none; }
 /* Siri-style rainbow edge glow: a blurred conic ring hugging the viewport. */
 .sf-frame {
   position: fixed;
@@ -548,15 +550,23 @@ const PALETTE_CSS = `
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
-  animation: sf-glow 8s linear infinite;
+  animation: sf-frame-in 0.4s ease-out both, sf-glow 8s linear infinite;
 }
 @keyframes sf-glow { to { filter: blur(14px) hue-rotate(360deg); } }
+@keyframes sf-frame-in { from { opacity: 0; transform: scale(1.05); } to { opacity: 0.85; transform: scale(1); } }
+@keyframes sf-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sf-pill-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
 .no-motion .sf-frame, .sf-overlay.no-motion .sf-frame { animation: none; }
+.sf-overlay.no-motion .sf-pill { animation: none; }
 .sf-pill {
   position: fixed;
   top: 18px;
   left: 50%;
   transform: translateX(-50%);
+  animation: sf-pill-in 0.28s cubic-bezier(.2, .8, .2, 1) both;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -587,11 +597,17 @@ const PALETTE_CSS = `
 .sf-mark {
   position: fixed;
   box-sizing: border-box;
+  z-index: 1;
   border-radius: 3px;
   background: rgba(255, 255, 255, 0.16);
-  transition: background 0.1s ease;
 }
-.sf-mark.sf-current {
+/* The selected match: a single persistent rainbow box that glides to each
+   new position so you can see where the selection moved. */
+.sf-cursor {
+  position: fixed;
+  box-sizing: border-box;
+  z-index: 2;
+  pointer-events: none;
   border-radius: 4px;
   border: 2px solid transparent;
   background:
@@ -600,7 +616,10 @@ const PALETTE_CSS = `
       from 0deg,
       #ff2d95, #ff9a3d, #ffe14d, #4dff9e, #3dc9ff, #9a5dff, #ff2d95
     ) border-box;
+  transition: left 0.17s cubic-bezier(.2, .8, .2, 1), top 0.17s cubic-bezier(.2, .8, .2, 1),
+              width 0.17s ease, height 0.17s ease;
 }
+.sf-overlay.no-motion .sf-cursor { transition: none; }
 .sf-empty {
   position: fixed;
   top: 62px;
@@ -879,7 +898,9 @@ function openPalette(prefix: string): void {
   if (
     lastSnapshot &&
     Date.now() - lastSnapshot.at < SNAPSHOT_TTL_MS &&
-    (prefix === '' || lastSnapshot.prefix === modePrefix)
+    (prefix === '' || lastSnapshot.prefix === modePrefix) &&
+    // SuperFind always opens fresh — never restore a stale on-page search.
+    lastSnapshot.prefix !== '.'
   ) {
     modePrefix = lastSnapshot.prefix
     paletteInput.value = lastSnapshot.query
@@ -1610,6 +1631,7 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
       'mode-emoji': ':',
       'mode-snippets': '%',
       'mode-library': '*',
+      'mode-find': '.',
       'open-downloads': '~',
     }
     setInput(prefixes[item.commandId] ?? '')
@@ -4086,6 +4108,30 @@ function repositionFindMarkers(): void {
     mark.style.width = `${r.width}px`
     mark.style.height = `${r.height}px`
   })
+  // The cursor tracks scroll instantly (no glide) so it stays pinned to its match.
+  positionFindCursor(false)
+}
+
+/**
+ * Move the persistent rainbow selection box to the current match. `animate`
+ * glides it (arrow navigation); otherwise it snaps (query change, scrolling).
+ */
+function positionFindCursor(animate: boolean): void {
+  if (!findOverlay) return
+  const cursor = findOverlay.querySelector<HTMLElement>('.sf-cursor')
+  if (!cursor) return
+  const match = findMatchesState[findSelected]
+  const r = match ? rectsFor(match, findIndex)[0] : undefined
+  if (!r) {
+    cursor.style.display = 'none'
+    return
+  }
+  cursor.style.transition = animate ? '' : 'none'
+  cursor.style.display = ''
+  cursor.style.left = `${r.left}px`
+  cursor.style.top = `${r.top}px`
+  cursor.style.width = `${r.width}px`
+  cursor.style.height = `${r.height}px`
 }
 
 /**
@@ -4105,8 +4151,9 @@ function renderFind(): void {
   findTotal = result.total
   findCapped = result.capped
 
+  const queryChanged = query !== findLastQuery
   // FIX 2: On query change, reset selection to first in-viewport match.
-  if (query !== findLastQuery) {
+  if (queryChanged) {
     findLastQuery = query
     const vh = window.innerHeight
     const firstInView = findMatchesState.findIndex((match) => {
@@ -4129,6 +4176,7 @@ function renderFind(): void {
     findOverlay.className = 'sf-overlay'
     findOverlay.innerHTML = `
       <div class="sf-frame"></div>
+      <div class="sf-cursor" style="display:none"></div>
       <div class="sf-pill">
         <img class="sf-logo" alt="SuperChrome" />
         <span class="sf-label">SuperFind:</span>
@@ -4166,15 +4214,21 @@ function renderFind(): void {
     empty?.remove()
   }
 
-  // Rebuild markers.
-  findOverlay.querySelectorAll('.sf-mark').forEach((m) => m.remove())
-  findMatchesState.forEach((_, i) => {
-    const mark = document.createElement('div')
-    mark.className = 'sf-mark' + (i === findSelected ? ' sf-current' : '')
-    mark.dataset.i = String(i)
-    findOverlay!.appendChild(mark)
-  })
-  repositionFindMarkers()
+  // Rebuild the neutral match markers only when the match set changed (query
+  // change). On arrow navigation the markers are unchanged — only the cursor
+  // moves — so we skip the rebuild to avoid flicker.
+  if (queryChanged) {
+    findOverlay.querySelectorAll('.sf-mark').forEach((m) => m.remove())
+    findMatchesState.forEach((_, i) => {
+      const mark = document.createElement('div')
+      mark.className = 'sf-mark'
+      mark.dataset.i = String(i)
+      findOverlay!.appendChild(mark)
+    })
+    repositionFindMarkers()
+  }
+  // Glide the cursor on navigation; snap it on a query change.
+  positionFindCursor(!queryChanged)
   scrollSelectedFindIntoView()
 }
 

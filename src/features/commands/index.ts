@@ -21,6 +21,7 @@ export const PALETTE_COMMANDS = [
   { id: 'mode-emoji', label: 'Emoji' },
   { id: 'mode-snippets', label: 'Snippets' },
   { id: 'mode-library', label: 'Bookmarks' },
+  { id: 'mode-find', label: 'SuperFind' },
   { id: 'open-options', label: 'SuperChrome: Settings' },
   { id: 'show-onboarding', label: 'SuperChrome: Getting Started' },
   { id: 'page-links', label: 'Grab Page Links' },
