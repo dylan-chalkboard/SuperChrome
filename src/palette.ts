@@ -4216,6 +4216,32 @@ function positionFindSelection(animate: boolean): void {
   }
 }
 
+/**
+ * Dispatch a faithful user-click at (x, y) on the topmost real element there —
+ * a full pointer/mouse sequence so widgets that listen for pointerdown/mousedown
+ * (not just click) activate. Falls back to the resolved element if the hit-test
+ * finds nothing.
+ */
+function simulateClick(x: number, y: number, fallback: HTMLElement): void {
+  const el = (document.elementFromPoint(x, y) as HTMLElement | null) ?? fallback
+  if (typeof el.focus === 'function') el.focus()
+  const base: MouseEventInit = {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    view: window,
+    clientX: x,
+    clientY: y,
+    button: 0,
+  }
+  const p: PointerEventInit = { ...base, pointerId: 1, pointerType: 'mouse', isPrimary: true }
+  el.dispatchEvent(new PointerEvent('pointerdown', p))
+  el.dispatchEvent(new MouseEvent('mousedown', base))
+  el.dispatchEvent(new PointerEvent('pointerup', p))
+  el.dispatchEvent(new MouseEvent('mouseup', base))
+  el.dispatchEvent(new MouseEvent('click', base))
+}
+
 /** What Enter will do to the selected match: a link's destination, or a hint. */
 function findActionLabel(match: FindMatch): string | null {
   const entry = findIndex[match.nodeIndex]
@@ -4379,8 +4405,15 @@ function activateFindSelection(newTab: boolean): void {
       window.open(href, '_blank')
       return
     }
+    // Click the actual topmost element at the match's centre with a full
+    // pointer/mouse sequence — real user click, not just el.click() on an
+    // ancestor (which misses pointerdown/mousedown-driven widgets).
+    const r = rectsFor(match, findIndex)[0]
+    const cx = r ? r.left + r.width / 2 : 0
+    const cy = r ? r.top + r.height / 2 : 0
     closePalette()
-    el.click()
+    if (r) simulateClick(cx, cy, el)
+    else el.click()
     return
   }
 
