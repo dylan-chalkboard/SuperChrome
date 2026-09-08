@@ -548,9 +548,9 @@ const PALETTE_CSS = `
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
-  animation: sf-spin 8s linear infinite;
+  animation: sf-glow 8s linear infinite;
 }
-@keyframes sf-spin { to { transform: rotate(360deg); } }
+@keyframes sf-glow { to { filter: blur(14px) hue-rotate(360deg); } }
 .no-motion .sf-frame, .sf-overlay.no-motion .sf-frame { animation: none; }
 .sf-pill {
   position: fixed;
