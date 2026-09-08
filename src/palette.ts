@@ -519,6 +519,14 @@ const PALETTE_CSS = `
 .no-motion .input-row, .no-motion .input-row::before, .no-motion .hint .kbd { transition: none !important; }
 .no-motion .mode-glyph, .no-motion .actions, .no-motion .brand-menu { animation: none !important; }
 /* ---------- SuperFind ---------- */
+/* When SuperFind takes over the panel, make it visually transparent and
+   let pointer events pass through the backdrop to the page. The input
+   keeps its layout slot (display:none would steal focus), but is invisible. */
+.panel.sf-takeover { background: transparent; border: none; box-shadow: none; }
+.panel.sf-takeover .list, .panel.sf-takeover .footer, .panel.sf-takeover .hint,
+.panel.sf-takeover .mode-glyph, .panel.sf-takeover .back-btn { display: none; }
+.panel.sf-takeover .input { opacity: 0; }
+.backdrop.sf-takeover { pointer-events: none; }
 .sf-overlay {
   position: fixed;
   inset: 0;
@@ -650,6 +658,8 @@ let findSelected = 0
 let findTotal = 0
 let findCapped = false
 let findOverlay: HTMLElement | null = null
+/** Tracks the last query value; when it changes we reset selection to first in-viewport match. */
+let findLastQuery = ''
 let brandMenuEl: HTMLElement | null = null
 let pageListItems: RemoteItem[] = []
 let pageListLabel = ''
@@ -4046,6 +4056,9 @@ function teardownFind(): void {
   findSelected = 0
   findTotal = 0
   findCapped = false
+  findLastQuery = ''
+  panelEl?.classList.remove('sf-takeover')
+  panelEl?.parentElement?.classList.remove('sf-takeover')
 }
 
 function repositionFindMarkers(): void {
@@ -4085,7 +4098,24 @@ function renderFind(): void {
   findMatchesState = result.matches
   findTotal = result.total
   findCapped = result.capped
-  if (findSelected >= findMatchesState.length) findSelected = 0
+
+  // FIX 2: On query change, reset selection to first in-viewport match.
+  if (query !== findLastQuery) {
+    findLastQuery = query
+    const vh = window.innerHeight
+    const firstInView = findMatchesState.findIndex((match) => {
+      const r = rectsFor(match, findIndex)[0]
+      return r !== undefined && r.top >= 0 && r.top <= vh
+    })
+    findSelected = firstInView >= 0 ? firstInView : 0
+  } else {
+    // Arrow navigation: only clamp if out of bounds.
+    if (findSelected >= findMatchesState.length) findSelected = 0
+  }
+
+  // FIX 1: Apply takeover styling so only the overlay (not the normal panel) is visible.
+  panelEl?.classList.add('sf-takeover')
+  panelEl?.parentElement?.classList.add('sf-takeover')
 
   // Build the overlay skeleton once.
   if (!findOverlay) {
@@ -4146,7 +4176,7 @@ function scrollSelectedFindIntoView(): void {
   const match = findMatchesState[findSelected]
   if (!match) return
   const entry = findIndex[match.nodeIndex]
-  entry?.node.parentElement?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  entry?.node.parentElement?.scrollIntoView({ block: 'center', behavior: 'auto' })
 }
 
 function activateFindSelection(newTab: boolean): void {

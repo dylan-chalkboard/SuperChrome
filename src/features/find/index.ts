@@ -101,8 +101,9 @@ export function rectsFor(match: FindMatch, index: FindNode[]): DOMRect[] {
 
 export type ActivationKind = 'editable' | 'clickable' | 'text'
 
+// FIX 5: Exclude tabindex="-1" (programmatically-focusable but non-interactive elements).
 const CLICKABLE_SELECTOR =
-  'a[href], button, [role="button"], input, select, textarea, summary, label, [onclick], [tabindex]'
+  'a[href], button, [role="button"], input, select, textarea, summary, label, [onclick], [tabindex]:not([tabindex="-1"])'
 
 /** Classify the nearest interactive ancestor of a matched text node. */
 export function activationTarget(node: Text): { kind: ActivationKind; el: HTMLElement | null } {
@@ -110,7 +111,9 @@ export function activationTarget(node: Text): { kind: ActivationKind; el: HTMLEl
   const el = start ? (start.closest(CLICKABLE_SELECTOR) as HTMLElement | null) : null
   if (!el) return { kind: 'text', el: null }
   const tag = el.tagName
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || (el as HTMLElement).isContentEditable) {
+  // FIX 4: Treat SELECT as editable (focus it); the caller already guards setSelectionRange
+  // to HTMLInputElement/HTMLTextAreaElement only, so a focused <select> is handled correctly.
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (el as HTMLElement).isContentEditable) {
     return { kind: 'editable', el }
   }
   return { kind: 'clickable', el }
