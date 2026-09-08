@@ -594,28 +594,33 @@ const PALETTE_CSS = `
   font: 500 12px/1.2 -apple-system, system-ui, sans-serif;
   backdrop-filter: blur(14px);
 }
+/* Matches are OUTLINED, not filled, so the matched text stays fully readable:
+   a very faint tint plus a thin amber ring that hugs each match. */
 .sf-mark {
   position: fixed;
   box-sizing: border-box;
   z-index: 1;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 213, 74, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 190, 60, 0.5);
 }
-/* The selected match: a single persistent rainbow box that glides to each
-   new position so you can see where the selection moved. */
+/* The selected match: a single persistent rainbow RING (transparent centre, via
+   the same mask trick as the frame) that glides to each new position so you can
+   see where the selection moved — the text underneath stays visible. */
 .sf-cursor {
   position: fixed;
   box-sizing: border-box;
   z-index: 2;
   pointer-events: none;
   border-radius: 4px;
-  border: 2px solid transparent;
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2)) padding-box,
-    conic-gradient(
-      from 0deg,
-      #ff2d95, #ff9a3d, #ffe14d, #4dff9e, #3dc9ff, #9a5dff, #ff2d95
-    ) border-box;
+  padding: 2.5px;
+  background: conic-gradient(
+    from 0deg,
+    #ff2d95, #ff9a3d, #ffe14d, #4dff9e, #3dc9ff, #9a5dff, #ff2d95
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
   transition: left 0.17s cubic-bezier(.2, .8, .2, 1), top 0.17s cubic-bezier(.2, .8, .2, 1),
               width 0.17s ease, height 0.17s ease;
 }
