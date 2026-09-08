@@ -604,6 +604,7 @@ const PALETTE_CSS = `
   background: rgba(255, 213, 74, 0.12);
   box-shadow: inset 0 0 0 1px rgba(255, 190, 60, 0.5);
 }
+.sf-mark.sf-sel-hidden { display: none; }
 /* The selected match: a single persistent rainbow RING (transparent centre, via
    the same mask trick as the frame) that glides to each new position so you can
    see where the selection moved — the text underneath stays visible. */
@@ -4140,6 +4141,11 @@ const SEL_PAD_Y = 6
  */
 function positionFindSelection(animate: boolean): void {
   if (!findOverlay) return
+  // Hide the neutral amber outline on the selected match so only the rainbow
+  // ring shows there.
+  findOverlay.querySelectorAll<HTMLElement>('.sf-mark').forEach((m) => {
+    m.classList.toggle('sf-sel-hidden', Number(m.dataset.i) === findSelected)
+  })
   const cursor = findOverlay.querySelector<HTMLElement>('.sf-cursor')
   const scrim = findOverlay.querySelector<HTMLElement>('.sf-scrim')
   const els = [cursor, scrim].filter((e): e is HTMLElement => e !== null)
