@@ -73,6 +73,7 @@ import { MODE_PLACEHOLDERS, MODE_PREFIX, PREFIX_CHARS, mode } from './ui/shared/
 import type { FavoriteEntry, PaletteAction, RemoteItem } from './ui/shared/types'
 import {
   FIND_CAP,
+  activationTarget,
   buildIndex,
   findMatches,
   rectsFor,
@@ -1096,6 +1097,26 @@ function onGlobalKey(e: KeyboardEvent): void {
   if (!paletteHost) return
   e.stopPropagation()
   if (e.type !== 'keydown') return
+
+  if (currentMode() === 'find' && uiState === 'list' && findMatchesState.length) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      findSelected = (findSelected + 1) % findMatchesState.length
+      renderFind()
+      return
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      findSelected = (findSelected - 1 + findMatchesState.length) % findMatchesState.length
+      renderFind()
+      return
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      activateFindSelection(e.metaKey || e.ctrlKey)
+      return
+    }
+  }
 
   if (brandMenuEl && e.key === 'Escape') {
     e.preventDefault()
@@ -4126,6 +4147,53 @@ function scrollSelectedFindIntoView(): void {
   if (!match) return
   const entry = findIndex[match.nodeIndex]
   entry?.node.parentElement?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+}
+
+function activateFindSelection(newTab: boolean): void {
+  const match = findMatchesState[findSelected]
+  if (!match) return
+  const entry = findIndex[match.nodeIndex]
+  if (!entry) return
+  const target = activationTarget(entry.node)
+
+  if (target.kind === 'editable' && target.el) {
+    const el = target.el
+    closePalette()
+    el.focus()
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+      const caret = Math.min(match.end, el.value.length)
+      el.setSelectionRange(caret, caret)
+    }
+    return
+  }
+
+  if (target.kind === 'clickable' && target.el) {
+    const el = target.el
+    if (newTab && el instanceof HTMLAnchorElement && el.href) {
+      const href = el.href
+      closePalette()
+      window.open(href, '_blank')
+      return
+    }
+    closePalette()
+    el.click()
+    return
+  }
+
+  // Plain text: select it and scroll into view.
+  const range = document.createRange()
+  try {
+    range.setStart(entry.node, match.start)
+    range.setEnd(entry.node, match.end)
+  } catch {
+    closePalette()
+    return
+  }
+  const sel = window.getSelection()
+  closePalette()
+  sel?.removeAllRanges()
+  sel?.addRange(range)
+  entry.node.parentElement?.scrollIntoView({ block: 'center', behavior: 'smooth' })
 }
 
 async function updateList(): Promise<void> {
