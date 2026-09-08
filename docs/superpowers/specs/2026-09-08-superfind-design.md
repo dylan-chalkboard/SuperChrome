@@ -24,6 +24,10 @@ script with full DOM access, so matching reads the live DOM directly — no OCR.
 - **Navigate / pick:** `↑`/`↓` cycle matches, `Enter` activates.
 - **Chrome:** screen-edge frame + top-center branded pill. **Highlights only** —
   no match list. On-page highlights are the interface.
+- **Frame style:** an animated **Siri-style rainbow edge glow** — a soft, blurred
+  multicolor gradient (pink → purple → blue → orange) hugging the viewport edges,
+  brightest at the corners, slowly rotating/breathing. Not a hard border. Respects
+  `prefers-reduced-motion` (static glow when motion is reduced).
 - **Plain-text activation:** focus + caret if editable; otherwise select the text
   and scroll into view.
 - **Out of scope:** custom keyboard shortcuts for custom commands (a separate
@@ -36,8 +40,9 @@ script with full DOM access, so matching reads the live DOM directly — no OCR.
    floating palette panel is replaced by the SuperFind chrome (precedent: the `*`
    library view already fully takes over the palette render).
 2. The SuperFind chrome is a full-viewport fixed overlay:
-   - a subtle inset **glowing border** (signature cyan `#34c3b5`) around the
-     viewport, signalling "find mode",
+   - an animated **Siri-style rainbow edge glow** around the viewport (soft
+     blurred pink→purple→blue→orange, brightest at corners), signalling
+     "find mode",
    - a **top-center pill**: `◆ SuperChrome  SuperFind: <query>` with a
      `current / total` counter beneath (e.g. `3 / 12`),
    - a **bottom hint line**: `↑↓ move   ↵ click   esc exit`.
@@ -99,8 +104,11 @@ mirroring the existing per-feature module layout.
 - `mode('.') → 'find'`.
 - `MODE_PLACEHOLDERS.find = 'Find & click anything on this page…'`.
 - `MODE_PREFIX.find = '.'`.
-- Signature color `#34c3b5` for the frame glow, pill accent, glyph, and highlight
-  markers (added alongside the existing `mode-*` tint/glyph CSS in `palette.ts`).
+- Mode styling in `palette.ts`: the animated rainbow edge glow (a
+  `conic-gradient`/blurred multi-stop gradient layer, `@keyframes` rotation gated
+  on `prefers-reduced-motion`), the branded pill, and the glyph. Highlight markers
+  use a warm readable fill with a rainbow-tinted outline so the selected match
+  reads against any page.
 
 ## Activation (Enter)
 
