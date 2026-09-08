@@ -522,7 +522,7 @@ const PALETTE_CSS = `
 /* When SuperFind takes over the panel, make it visually transparent and
    let pointer events pass through the backdrop to the page. The input
    keeps its layout slot (display:none would steal focus), but is invisible. */
-.panel.sf-takeover { background: transparent; border: none; box-shadow: none; }
+.panel.sf-takeover { background: transparent; border: none; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
 .panel.sf-takeover .list, .panel.sf-takeover .footer, .panel.sf-takeover .hint,
 .panel.sf-takeover .mode-glyph, .panel.sf-takeover .back-btn { display: none; }
 .panel.sf-takeover .input { opacity: 0; }
