@@ -4199,9 +4199,17 @@ function positionFindSelection(animate: boolean): void {
     if (label) {
       bubble.textContent = label
       bubble.style.transition = animate ? '' : 'opacity 0.12s ease'
-      bubble.style.left = `${left + width / 2}px`
-      bubble.style.top = `${top + height + 7}px`
       bubble.classList.add('sf-show')
+      // Clamp within the viewport so edge matches don't push the bubble off-screen.
+      const m = 8
+      const bw = bubble.offsetWidth
+      const bh = bubble.offsetHeight
+      const cx = left + width / 2
+      const clampedX = Math.min(Math.max(cx, bw / 2 + m), window.innerWidth - bw / 2 - m)
+      const below = top + height + 7
+      const flip = below + bh > window.innerHeight - m
+      bubble.style.left = `${clampedX}px`
+      bubble.style.top = `${flip ? top - bh - 7 : below}px`
     } else {
       bubble.classList.remove('sf-show')
     }
