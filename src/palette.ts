@@ -625,6 +625,17 @@ const PALETTE_CSS = `
               width 0.17s ease, height 0.17s ease;
 }
 .sf-overlay.no-motion .sf-cursor { transition: none; }
+/* Dimming film over the whole page with a spotlight hole at the selected match —
+   the huge box-shadow darkens everything except this element's own rect. */
+.sf-scrim {
+  position: fixed;
+  z-index: 0;
+  border-radius: 6px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+  transition: left 0.17s cubic-bezier(.2, .8, .2, 1), top 0.17s cubic-bezier(.2, .8, .2, 1),
+              width 0.17s ease, height 0.17s ease;
+}
+.sf-overlay.no-motion .sf-scrim { transition: none; }
 .sf-empty {
   position: fixed;
   top: 62px;
@@ -4113,30 +4124,43 @@ function repositionFindMarkers(): void {
     mark.style.width = `${r.width}px`
     mark.style.height = `${r.height}px`
   })
-  // The cursor tracks scroll instantly (no glide) so it stays pinned to its match.
-  positionFindCursor(false)
+  // The selection tracks scroll instantly (no glide) so it stays pinned.
+  positionFindSelection(false)
 }
 
+// The selected ring + spotlight sit slightly OUTSIDE the word so the box frames
+// it rather than hugging the glyphs.
+const SEL_PAD_X = 5
+const SEL_PAD_Y = 3
+
 /**
- * Move the persistent rainbow selection box to the current match. `animate`
- * glides it (arrow navigation); otherwise it snaps (query change, scrolling).
+ * Move the selection chrome — the rainbow ring and the dimming scrim's spotlight
+ * hole — to the current match, inflated by SEL_PAD so it frames the word.
+ * `animate` glides it (arrow navigation); otherwise it snaps (query change, scroll).
  */
-function positionFindCursor(animate: boolean): void {
+function positionFindSelection(animate: boolean): void {
   if (!findOverlay) return
   const cursor = findOverlay.querySelector<HTMLElement>('.sf-cursor')
-  if (!cursor) return
+  const scrim = findOverlay.querySelector<HTMLElement>('.sf-scrim')
+  const els = [cursor, scrim].filter((e): e is HTMLElement => e !== null)
   const match = findMatchesState[findSelected]
   const r = match ? rectsFor(match, findIndex)[0] : undefined
   if (!r) {
-    cursor.style.display = 'none'
+    els.forEach((e) => (e.style.display = 'none'))
     return
   }
-  cursor.style.transition = animate ? '' : 'none'
-  cursor.style.display = ''
-  cursor.style.left = `${r.left}px`
-  cursor.style.top = `${r.top}px`
-  cursor.style.width = `${r.width}px`
-  cursor.style.height = `${r.height}px`
+  const left = r.left - SEL_PAD_X
+  const top = r.top - SEL_PAD_Y
+  const width = r.width + SEL_PAD_X * 2
+  const height = r.height + SEL_PAD_Y * 2
+  els.forEach((e) => {
+    e.style.transition = animate ? '' : 'none'
+    e.style.display = ''
+    e.style.left = `${left}px`
+    e.style.top = `${top}px`
+    e.style.width = `${width}px`
+    e.style.height = `${height}px`
+  })
 }
 
 /**
@@ -4180,6 +4204,7 @@ function renderFind(): void {
     findOverlay = document.createElement('div')
     findOverlay.className = 'sf-overlay'
     findOverlay.innerHTML = `
+      <div class="sf-scrim" style="display:none"></div>
       <div class="sf-frame"></div>
       <div class="sf-cursor" style="display:none"></div>
       <div class="sf-pill">
@@ -4232,8 +4257,8 @@ function renderFind(): void {
     })
     repositionFindMarkers()
   }
-  // Glide the cursor on navigation; snap it on a query change.
-  positionFindCursor(!queryChanged)
+  // Glide the selection on navigation; snap it on a query change.
+  positionFindSelection(!queryChanged)
   scrollSelectedFindIntoView()
 }
 
