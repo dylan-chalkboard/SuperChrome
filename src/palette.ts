@@ -637,6 +637,29 @@ const PALETTE_CSS = `
               width 0.17s ease, height 0.17s ease;
 }
 .sf-overlay.no-motion .sf-scrim { transition: none; }
+/* Action bubble under the selected match — shows a link's destination. */
+.sf-bubble {
+  position: fixed;
+  z-index: 3;
+  transform: translateX(-50%);
+  max-width: 60vw;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(20, 20, 24, 0.92);
+  color: #fff;
+  font: 500 12px/1.2 -apple-system, system-ui, sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(14px);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease, left 0.17s cubic-bezier(.2, .8, .2, 1),
+              top 0.17s cubic-bezier(.2, .8, .2, 1);
+}
+.sf-bubble.sf-show { opacity: 1; }
+.sf-overlay.no-motion .sf-bubble { transition: opacity 0.12s ease; }
 .sf-empty {
   position: fixed;
   top: 62px;
@@ -4148,11 +4171,13 @@ function positionFindSelection(animate: boolean): void {
   })
   const cursor = findOverlay.querySelector<HTMLElement>('.sf-cursor')
   const scrim = findOverlay.querySelector<HTMLElement>('.sf-scrim')
+  const bubble = findOverlay.querySelector<HTMLElement>('.sf-bubble')
   const els = [cursor, scrim].filter((e): e is HTMLElement => e !== null)
   const match = findMatchesState[findSelected]
   const r = match ? rectsFor(match, findIndex)[0] : undefined
   if (!r) {
     els.forEach((e) => (e.style.display = 'none'))
+    bubble?.classList.remove('sf-show')
     return
   }
   const left = r.left - SEL_PAD_X
@@ -4167,6 +4192,42 @@ function positionFindSelection(animate: boolean): void {
     e.style.width = `${width}px`
     e.style.height = `${height}px`
   })
+
+  // Action bubble under the selection: where Enter will take you (or what it does).
+  if (bubble) {
+    const label = match ? findActionLabel(match) : null
+    if (label) {
+      bubble.textContent = label
+      bubble.style.transition = animate ? '' : 'opacity 0.12s ease'
+      bubble.style.left = `${left + width / 2}px`
+      bubble.style.top = `${top + height + 7}px`
+      bubble.classList.add('sf-show')
+    } else {
+      bubble.classList.remove('sf-show')
+    }
+  }
+}
+
+/** What Enter will do to the selected match: a link's destination, or a hint. */
+function findActionLabel(match: FindMatch): string | null {
+  const entry = findIndex[match.nodeIndex]
+  if (!entry) return null
+  const target = activationTarget(entry.node)
+  if (target.kind === 'clickable' && target.el) {
+    if (target.el instanceof HTMLAnchorElement && target.el.href) {
+      try {
+        const u = new URL(target.el.href)
+        let dest = (u.hostname.replace(/^www\./, '') + (u.pathname === '/' ? '' : u.pathname)) || u.href
+        if (u.search) dest += u.search
+        return dest.length > 48 ? `${dest.slice(0, 47)}…` : dest
+      } catch {
+        return target.el.href
+      }
+    }
+    return 'Activate'
+  }
+  if (target.kind === 'editable') return 'Edit field'
+  return null
 }
 
 /**
@@ -4213,6 +4274,7 @@ function renderFind(): void {
       <div class="sf-scrim" style="display:none"></div>
       <div class="sf-frame"></div>
       <div class="sf-cursor" style="display:none"></div>
+      <div class="sf-bubble"></div>
       <div class="sf-pill">
         <img class="sf-logo" alt="SuperChrome" />
         <span class="sf-label">SuperFind:</span>
