@@ -3,6 +3,10 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.37.0
+
+- **SuperFind** (`.` prefix): keyboard find-and-click over any visible text on the page — Siri-style rainbow frame, on-page highlights, `↑↓` navigate, `↵` click/focus/select, `⌘↵` opens links in a new tab.
+
 ## 0.36.0
 
 - **Custom dropdown component** (`src/ui/shared/dropdown.ts`): argument
