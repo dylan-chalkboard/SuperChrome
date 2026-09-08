@@ -1,4 +1,4 @@
-export const PREFIX_CHARS = '>@#:~%*'
+export const PREFIX_CHARS = '>@#:~%*.'
 
 /** The palette mode selected by a typed prefix character. */
 export function mode(prefix: string): string {
@@ -9,6 +9,7 @@ export function mode(prefix: string): string {
   if (prefix === '~') return 'downloads'
   if (prefix === '%') return 'snippets'
   if (prefix === '*') return 'library'
+  if (prefix === '.') return 'find'
   return 'bookmarks'
 }
 
@@ -21,6 +22,7 @@ export const MODE_PLACEHOLDERS: Record<string, string> = {
   downloads: 'Search downloads…',
   snippets: 'Search snippets…',
   library: 'Search bookmarks…',
+  find: 'Find & click anything on this page…',
 }
 
 export const MODE_PREFIX: Record<string, string> = {
@@ -30,4 +32,5 @@ export const MODE_PREFIX: Record<string, string> = {
   history: '#',
   snippets: '%',
   library: '*',
+  find: '.',
 }
