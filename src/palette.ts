@@ -539,7 +539,7 @@ const PALETTE_CSS = `
 .sf-frame {
   position: fixed;
   inset: 0;
-  border-radius: 18px;
+  border-radius: 30px;
   padding: 3px;
   background: conic-gradient(
     from 0deg,
@@ -612,7 +612,7 @@ const PALETTE_CSS = `
   box-sizing: border-box;
   z-index: 2;
   pointer-events: none;
-  border-radius: 4px;
+  border-radius: 8px;
   padding: 2.5px;
   background: conic-gradient(
     from 0deg,
@@ -630,7 +630,7 @@ const PALETTE_CSS = `
 .sf-scrim {
   position: fixed;
   z-index: 0;
-  border-radius: 6px;
+  border-radius: 9px;
   box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
   transition: left 0.17s cubic-bezier(.2, .8, .2, 1), top 0.17s cubic-bezier(.2, .8, .2, 1),
               width 0.17s ease, height 0.17s ease;
@@ -4130,8 +4130,8 @@ function repositionFindMarkers(): void {
 
 // The selected ring + spotlight sit slightly OUTSIDE the word so the box frames
 // it rather than hugging the glyphs.
-const SEL_PAD_X = 5
-const SEL_PAD_Y = 3
+const SEL_PAD_X = 9
+const SEL_PAD_Y = 6
 
 /**
  * Move the selection chrome — the rainbow ring and the dimming scrim's spotlight
@@ -4265,8 +4265,16 @@ function renderFind(): void {
 function scrollSelectedFindIntoView(): void {
   const match = findMatchesState[findSelected]
   if (!match) return
-  const entry = findIndex[match.nodeIndex]
-  entry?.node.parentElement?.scrollIntoView({ block: 'center', behavior: 'auto' })
+  // Scroll by the MATCH's own rect, not its parent element — a large parent
+  // block can already intersect the viewport (so parent.scrollIntoView is a
+  // no-op) while the specific matched text sits off-screen.
+  const r = rectsFor(match, findIndex)[0]
+  if (!r) return
+  const vh = window.innerHeight
+  const margin = 100
+  if (r.top >= margin && r.bottom <= vh - margin) return // already comfortably visible
+  const targetY = window.scrollY + r.top + r.height / 2 - vh / 2
+  window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' })
 }
 
 function activateFindSelection(newTab: boolean): void {
