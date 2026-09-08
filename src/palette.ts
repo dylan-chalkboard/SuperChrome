@@ -586,14 +586,20 @@ const PALETTE_CSS = `
 }
 .sf-mark {
   position: fixed;
+  box-sizing: border-box;
   border-radius: 3px;
-  background: rgba(255, 225, 77, 0.28);
-  box-shadow: inset 0 0 0 1.5px rgba(255, 154, 61, 0.6);
-  transition: background 0.1s ease, box-shadow 0.1s ease;
+  background: rgba(255, 255, 255, 0.16);
+  transition: background 0.1s ease;
 }
 .sf-mark.sf-current {
-  background: rgba(255, 154, 61, 0.42);
-  box-shadow: inset 0 0 0 2px #ff2d95, 0 0 14px rgba(255, 45, 149, 0.55);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2)) padding-box,
+    conic-gradient(
+      from 0deg,
+      #ff2d95, #ff9a3d, #ffe14d, #4dff9e, #3dc9ff, #9a5dff, #ff2d95
+    ) border-box;
 }
 .sf-empty {
   position: fixed;
