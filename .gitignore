@@ -3,4 +3,5 @@ dist/
 chrome-theme/Cached Theme.pak
 superchrome-*.zip
 .superpowers/
+.claude/settings.local.json
 .DS_Store

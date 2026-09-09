@@ -11,6 +11,7 @@ import { searchHistory } from './features/history/search'
 import { hostOf } from './features/navigation'
 import { rank } from './features/ranking'
 import { searchSnippets } from './features/snippets/search'
+import { runSpeedTest } from './features/speedtest'
 import { GROUP_COLORS, searchTabs } from './features/tabs/search'
 
 async function togglePaletteIn(
@@ -240,6 +241,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     .then(sendResponse)
     .catch((err) => sendResponse({ error: String(err) }))
   return true
+})
+
+// Speed test streams progress over a Port for its ~10s lifetime; a page CSP
+// would block the same fetches from the content script, so it runs here.
+// Closing the palette disconnects the port, which aborts in-flight requests.
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'speedtest') return
+  const ctrl = new AbortController()
+  port.onDisconnect.addListener(() => ctrl.abort())
+  const post = (frame: unknown): void => {
+    try {
+      port.postMessage(frame)
+    } catch {
+      // Port already closed (palette dismissed mid-test) — nothing to do.
+    }
+  }
+  runSpeedTest({ signal: ctrl.signal, onProgress: post })
+    .then(() => port.disconnect())
+    .catch((err) => {
+      if (!ctrl.signal.aborted) post({ phase: 'error', error: String(err) })
+    })
 })
 
 async function handleMessage(

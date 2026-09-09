@@ -53,6 +53,7 @@ import {
 import type { ArgumentSpec } from './features/quicklinks'
 import { parseSnippets, serializeSnippets } from './features/snippets'
 import { findTrackers } from './features/page/trackers'
+import type { SpeedProgress } from './features/speedtest'
 import qrcode from 'qrcode-generator'
 import {
   favKey,
@@ -729,6 +730,7 @@ let brandMenuEl: HTMLElement | null = null
 let pageListItems: RemoteItem[] = []
 let pageListLabel = ''
 let pageListHeader: HTMLElement | null = null
+let speedPort: chrome.runtime.Port | null = null
 
 /** Where the palette was when it closed — restored on reopen for 90s. */
 interface PaletteSnapshot {
@@ -860,6 +862,7 @@ function captureModePrefix(): void {
 
 function closePalette(): void {
   teardownFind()
+  teardownSpeedTest()
   // Browse-level state only; sub-states (settings, save flow, …) reset.
   lastSnapshot =
     (uiState === 'list' || uiState === 'actions') && paletteInput
@@ -1584,6 +1587,9 @@ async function executeItem(item: RemoteItem, altAction: boolean): Promise<void> 
     return
   } else if (item.commandId === 'page-info') {
     enterPageInfo()
+    return
+  } else if (item.commandId === 'speed-test') {
+    enterSpeedTest()
     return
   } else if (item.commandId === 'page-trackers') {
     enterTrackers()
@@ -2736,6 +2742,110 @@ function enterQr(): void {
     'options',
     header,
   )
+}
+
+function teardownSpeedTest(): void {
+  if (!speedPort) return
+  try {
+    speedPort.disconnect()
+  } catch {
+    // Already gone.
+  }
+  speedPort = null
+}
+
+function enterSpeedTest(): void {
+  teardownSpeedTest()
+
+  const fmt = (n?: number): string =>
+    n === undefined ? '—' : n >= 100 ? Math.round(n).toString() : n.toFixed(1)
+
+  const header = document.createElement('div')
+  header.style.cssText =
+    'display:flex;flex-direction:column;gap:12px;padding:18px 16px 10px;'
+
+  const values = {} as Record<'down' | 'up' | 'ping', HTMLSpanElement>
+  const metric = (
+    key: 'down' | 'up' | 'ping',
+    glyph: string,
+    name: string,
+    unit: string,
+    accent: string,
+  ): HTMLElement => {
+    const row = document.createElement('div')
+    row.style.cssText = 'display:flex;align-items:baseline;gap:10px;'
+    const badge = document.createElement('span')
+    badge.textContent = glyph
+    badge.style.cssText = `width:22px;text-align:center;font-size:15px;color:${accent};`
+    const title = document.createElement('span')
+    title.textContent = name
+    title.style.cssText = 'flex:1;font-size:13px;opacity:0.6;'
+    const value = document.createElement('span')
+    value.textContent = '—'
+    value.style.cssText =
+      'font-size:26px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-0.02em;'
+    const suffix = document.createElement('span')
+    suffix.textContent = unit
+    suffix.style.cssText = 'font-size:12px;opacity:0.5;'
+    row.append(badge, title, value, suffix)
+    values[key] = value
+    return row
+  }
+
+  header.append(
+    metric('down', '↓', 'Download', 'Mbps', '#4c9df3'),
+    metric('up', '↑', 'Upload', 'Mbps', '#4caf7d'),
+    metric('ping', '●', 'Ping', 'ms', '#e0619e'),
+  )
+  const status = document.createElement('div')
+  status.style.cssText = 'font-size:12px;opacity:0.5;text-align:center;padding-top:2px;'
+  status.textContent = 'Pinging…'
+  header.append(status)
+
+  const copyRow: RemoteItem = {
+    kind: 'calc',
+    label: 'Copy result',
+    detail: '',
+    text: '',
+    icon: 'link',
+    color: tileGradient('#4caf7d'),
+    typeText: 'Copy',
+  }
+  const rows: RemoteItem[] = [
+    copyRow,
+    {
+      kind: 'command',
+      commandId: 'speed-test',
+      label: 'Run again',
+      detail: '',
+      icon: 'reset',
+      color: tileGradient('#3ab5c6'),
+    },
+  ]
+
+  speedPort = chrome.runtime.connect({ name: 'speedtest' })
+  speedPort.onMessage.addListener((frame: SpeedProgress) => {
+    if (frame.pingMs !== undefined) values.ping.textContent = Math.round(frame.pingMs).toString()
+    if (frame.downMbps !== undefined) values.down.textContent = fmt(frame.downMbps)
+    if (frame.upMbps !== undefined) values.up.textContent = fmt(frame.upMbps)
+    if (frame.phase === 'ping') status.textContent = 'Testing download…'
+    else if (frame.phase === 'download') status.textContent = 'Testing download…'
+    else if (frame.phase === 'upload') status.textContent = 'Testing upload…'
+    else if (frame.phase === 'error') status.textContent = "Couldn't run speed test"
+    else if (frame.phase === 'done') {
+      status.textContent = 'Done'
+      copyRow.text = `↓ ${fmt(frame.downMbps)} Mbps · ↑ ${fmt(frame.upMbps)} Mbps · ${Math.round(
+        frame.pingMs ?? 0,
+      )} ms ping`
+      copyRow.detail = copyRow.text
+      void updateList()
+    }
+  })
+  speedPort.onDisconnect.addListener(() => {
+    speedPort = null
+  })
+
+  enterPageList('Speed Test', rows, 'options', header)
 }
 
 /* ---------- Screenshot / Zap Ads (page actions) ---------- */
