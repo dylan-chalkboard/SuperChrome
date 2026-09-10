@@ -102,9 +102,9 @@ export function mountBackdrop(
           Math.sin((nx + ny) * 6 + t * 0.6) +
           Math.sin(Math.hypot(nx - 0.5, ny - 0.5) * 12 - t * 1.3)
         const v = (wave + 4) / 8 // 0..1
-        // Thickness is the effect: crest dots nearly fill the cell, troughs vanish.
+        // Thickness is the effect: crest dots read clearly, troughs vanish.
         const s = Math.pow(v, 1.7)
-        const r = s * (GAP * 0.5) * (0.4 + 0.6 * vert)
+        const r = s * (GAP * 0.18) * (0.4 + 0.6 * vert)
         if (r < 0.35) continue
         const alpha = (0.55 + 0.45 * s) * (0.18 + 0.82 * vert)
         ctx.fillStyle = dotColor(nx, alpha)
