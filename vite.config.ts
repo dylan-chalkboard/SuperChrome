@@ -9,6 +9,7 @@ export default defineConfig({
       input: {
         background: 'src/background.ts',
         options: 'options.html',
+        newtab: 'newtab.html',
       },
       output: {
         entryFileNames: '[name].js',

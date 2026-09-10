@@ -99,6 +99,8 @@ const PALETTE_CSS = `
 .backdrop {
   position: fixed; inset: 0;
 }
+.backdrop.page { background: transparent; }
+.backdrop.page .panel { top: 16vh; }
 .panel {
   position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
   transition: opacity 0.13s ease, transform 0.13s ease;
@@ -727,6 +729,9 @@ let findOverlay: HTMLElement | null = null
 /** Tracks the last query value; when it changes we reset selection to first in-viewport match. */
 let findLastQuery = ''
 let brandMenuEl: HTMLElement | null = null
+// When loaded on the new tab override page, the palette IS the page: it
+// auto-opens and never tears down (closing resets to an empty home instead).
+const pageMode = (window as unknown as { __scPageMode?: boolean }).__scPageMode === true
 let pageListItems: RemoteItem[] = []
 let pageListLabel = ''
 let pageListHeader: HTMLElement | null = null
@@ -861,6 +866,14 @@ function captureModePrefix(): void {
 }
 
 function closePalette(): void {
+  if (pageMode) {
+    // The palette IS the new tab page — never tear down. Reset to empty home.
+    exitSubState(false)
+    teardownFind()
+    teardownSpeedTest()
+    setInput('')
+    return
+  }
   teardownFind()
   teardownSpeedTest()
   // Browse-level state only; sub-states (settings, save flow, …) reset.
@@ -916,8 +929,11 @@ function openPalette(prefix: string): void {
 
   const backdrop = document.createElement('div')
   backdrop.className = 'backdrop'
+  if (pageMode) backdrop.classList.add('page')
   backdrop.addEventListener('mousedown', (e) => {
-    if (e.target === backdrop) closePalette()
+    if (e.target !== backdrop) return
+    if (pageMode) paletteInput?.focus()
+    else closePalette()
   })
 
   panelEl = document.createElement('div')
@@ -4961,4 +4977,7 @@ initLibrary({
   enterRename: (item) => enterRename(item),
   kbd,
 })
+
+// On the new tab override page the palette is the page itself — open it now.
+if (pageMode) openPalette('')
 })()
