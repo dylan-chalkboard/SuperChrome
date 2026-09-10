@@ -1,4 +1,4 @@
-import { backdropVariant, buildBackdrop } from './features/newtab/backdrop'
+import { backdropVariant, mountBackdrop } from './features/newtab/backdrop'
 
 // Set before palette.js is injected so it opens the menu immediately as the page.
 // (Inline <script> can't do this — MV3 extension-page CSP blocks inline code.)
@@ -26,9 +26,7 @@ async function init(): Promise<void> {
   const systemReduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   const motion = !(prefs.reduceMotion || systemReduce)
 
-  const { style, root } = buildBackdrop({ variant, motion })
-  document.head.appendChild(style)
-  document.body.appendChild(root)
+  mountBackdrop(document.body, { variant, motion })
 
   // Inject the palette content-script bundle; it reads window.__scPageMode and
   // auto-opens itself as the page.

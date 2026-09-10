@@ -10,108 +10,127 @@ export function backdropVariant(
   return prefersLight ? 'light' : 'dark'
 }
 
-// Soft vertical light beams: position (vw), width (px), opacity, sway seconds.
-// Hand-tuned for a calm, non-repeating composition.
-const BEAMS: Array<{ x: number; w: number; o: number; dur: number; delay: number }> = [
-  { x: 8, w: 140, o: 0.35, dur: 17, delay: 0 },
-  { x: 22, w: 90, o: 0.22, dur: 21, delay: -6 },
-  { x: 38, w: 200, o: 0.45, dur: 19, delay: -3 },
-  { x: 52, w: 110, o: 0.3, dur: 23, delay: -9 },
-  { x: 66, w: 170, o: 0.4, dur: 18, delay: -2 },
-  { x: 80, w: 95, o: 0.24, dur: 22, delay: -7 },
-  { x: 92, w: 150, o: 0.33, dur: 20, delay: -4 },
+// Gradient stops swept left→right across the dot field: pink → purple → cyan.
+const STOPS: Array<[number, number, number]> = [
+  [255, 47, 176],
+  [139, 92, 246],
+  [34, 211, 238],
 ]
+
+/** Colour along the horizontal gradient at position nx (0..1), with alpha a. */
+export function dotColor(nx: number, a: number): string {
+  const x = Math.min(1, Math.max(0, nx))
+  const [a0, a1, f] = x <= 0.5 ? [STOPS[0], STOPS[1], x / 0.5] : [STOPS[1], STOPS[2], (x - 0.5) / 0.5]
+  const r = Math.round(a0[0] + (a1[0] - a0[0]) * f)
+  const g = Math.round(a0[1] + (a1[1] - a0[1]) * f)
+  const b = Math.round(a0[2] + (a1[2] - a0[2]) * f)
+  return `rgba(${r},${g},${b},${a})`
+}
 
 export const BACKDROP_CSS = `
 html, body { margin: 0; height: 100%; overflow: hidden; }
-.nt-backdrop {
-  position: fixed; inset: 0; z-index: 0; overflow: hidden;
-  background:
-    radial-gradient(130% 120% at 50% 38%, #1b3f86 0%, #12305f 40%, #0a1d44 68%, #050c1f 100%);
-}
-/* Ambient glow that gently drifts so the whole field feels alive. */
-.nt-backdrop::after {
-  content: ''; position: absolute; inset: -20%;
-  background: radial-gradient(45% 55% at 50% 42%, rgba(70,130,255,0.35), transparent 70%);
-  animation: nt-glow 24s ease-in-out infinite;
-}
-.nt-beams { position: absolute; inset: 0; }
-.nt-beam {
-  position: absolute; top: -20%; height: 140%;
-  background: linear-gradient(to bottom,
-    transparent 0%, rgba(150,195,255,0.9) 45%, rgba(190,220,255,0.95) 55%, transparent 100%);
-  filter: blur(34px);
-  mix-blend-mode: screen;
-  transform: translateX(0);
-  animation: nt-sway var(--dur, 20s) ease-in-out infinite;
-  animation-delay: var(--delay, 0s);
-  will-change: transform, opacity;
-}
-.nt-backdrop .nt-mark {
+.nt-backdrop { position: fixed; inset: 0; z-index: 0; background: #05070f; }
+.nt-backdrop.light { background: #f5f7ff; }
+.nt-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.nt-mark {
   position: fixed; left: 20px; bottom: 16px; z-index: 1;
-  height: 20px; width: auto; opacity: 0.5;
+  height: 18px; width: auto; opacity: 0.45; pointer-events: none;
   filter: drop-shadow(0 1px 6px rgba(0,0,0,0.45));
-  pointer-events: none;
 }
-/* Light theme */
-.nt-backdrop.light {
-  background: radial-gradient(130% 120% at 50% 38%, #eaf2ff 0%, #c3d9ff 45%, #93b6ff 100%);
-}
-.nt-backdrop.light::after {
-  background: radial-gradient(45% 55% at 50% 42%, rgba(255,255,255,0.5), transparent 70%);
-}
-.nt-backdrop.light .nt-beam {
-  mix-blend-mode: soft-light;
-  background: linear-gradient(to bottom,
-    transparent 0%, rgba(255,255,255,0.95) 50%, transparent 100%);
-}
-.nt-backdrop.light .nt-mark { filter: invert(1) drop-shadow(0 1px 6px rgba(0,0,0,0.15)); }
-@keyframes nt-sway {
-  0%, 100% { transform: translateX(-14px); opacity: 0.75; }
-  50% { transform: translateX(14px); opacity: 1; }
-}
-@keyframes nt-glow {
-  0%, 100% { transform: translateX(-4%) scale(1); opacity: 0.85; }
-  50% { transform: translateX(4%) scale(1.06); opacity: 1; }
-}
-/* Reduce-motion: hold everything still. */
-.nt-static::after { animation: none; }
-.nt-static .nt-beam { animation: none; opacity: 0.9; }
+.nt-backdrop.light .nt-mark { filter: invert(1) drop-shadow(0 1px 6px rgba(0,0,0,0.12)); }
 `
 
-/** Builds the backdrop DOM. Caller appends style to <head> and root to <body>. */
-export function buildBackdrop(opts: { variant: BackdropVariant; motion: boolean }): {
-  style: HTMLStyleElement
-  root: HTMLElement
-} {
+const GAP = 22 // px between dots
+
+/**
+ * Mounts the animated halftone dot-wave into `container`. Dots pulse in size and
+ * opacity from a flowing sine field, coloured along a pink→purple→cyan gradient,
+ * denser toward the bottom and fading out near the top. Returns a stop handle.
+ */
+export function mountBackdrop(
+  container: HTMLElement,
+  opts: { variant: BackdropVariant; motion: boolean },
+): () => void {
   const style = document.createElement('style')
   style.textContent = BACKDROP_CSS
 
   const root = document.createElement('div')
-  root.className = `nt-backdrop ${opts.variant === 'light' ? 'light' : ''} ${
-    opts.motion ? '' : 'nt-static'
-  }`
-    .replace(/\s+/g, ' ')
-    .trim()
+  root.className = `nt-backdrop ${opts.variant === 'light' ? 'light' : ''}`.trim()
 
-  const beams = document.createElement('div')
-  beams.className = 'nt-beams'
-  for (const b of BEAMS) {
-    const beam = document.createElement('div')
-    beam.className = 'nt-beam'
-    beam.style.left = `${b.x}vw`
-    beam.style.width = `${b.w}px`
-    beam.style.opacity = String(b.o)
-    beam.style.setProperty('--dur', `${b.dur}s`)
-    beam.style.setProperty('--delay', `${b.delay}s`)
-    beams.appendChild(beam)
-  }
+  const canvas = document.createElement('canvas')
+  canvas.className = 'nt-canvas'
+  root.appendChild(canvas)
 
   const mark = document.createElement('img')
   mark.className = 'nt-mark'
   mark.src = 'icons/footer.png'
   mark.alt = 'SuperChrome'
+  root.appendChild(mark)
 
-  root.append(beams, mark)
-  return { style, root }
+  container.append(style, root)
+
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return () => {}
+
+  let dpr = 1
+  let vw = 0
+  let vh = 0
+  const resize = (): void => {
+    dpr = Math.min(2, window.devicePixelRatio || 1)
+    vw = window.innerWidth
+    vh = window.innerHeight
+    canvas.width = Math.floor(vw * dpr)
+    canvas.height = Math.floor(vh * dpr)
+  }
+  resize()
+
+  const draw = (time: number): void => {
+    const t = time * 0.001
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.clearRect(0, 0, vw, vh)
+    for (let y = 0; y <= vh + GAP; y += GAP) {
+      const ny = y / vh
+      // Depth: dots grow and brighten toward the bottom, fade out up top.
+      const vert = Math.pow(Math.min(1, ny), 1.25)
+      if (vert < 0.02) continue
+      for (let x = 0; x <= vw + GAP; x += GAP) {
+        const nx = x / vw
+        // Flowing surface: a few sines plus a swirl term for organic wave bands.
+        const wave =
+          Math.sin(nx * 7 + t * 1.1) +
+          Math.sin(ny * 5 - t * 0.9) +
+          Math.sin((nx + ny) * 6 + t * 0.6) +
+          Math.sin(Math.hypot(nx - 0.5, ny - 0.5) * 12 - t * 1.3)
+        const v = (wave + 4) / 8 // 0..1
+        // Thickness is the effect: crest dots nearly fill the cell, troughs vanish.
+        const s = Math.pow(v, 1.7)
+        const r = s * (GAP * 0.5) * (0.4 + 0.6 * vert)
+        if (r < 0.35) continue
+        const alpha = (0.55 + 0.45 * s) * (0.18 + 0.82 * vert)
+        ctx.fillStyle = dotColor(nx, alpha)
+        ctx.beginPath()
+        ctx.arc(x, y, r, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+  }
+
+  let raf = 0
+  const loop = (time: number): void => {
+    draw(time)
+    raf = requestAnimationFrame(loop)
+  }
+  const onResize = (): void => {
+    resize()
+    if (!opts.motion) draw(0)
+  }
+  window.addEventListener('resize', onResize)
+
+  if (opts.motion) raf = requestAnimationFrame(loop)
+  else draw(0)
+
+  return () => {
+    cancelAnimationFrame(raf)
+    window.removeEventListener('resize', onResize)
+  }
 }
