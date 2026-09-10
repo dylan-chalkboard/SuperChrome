@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { backdropVariant, dotColor } from './backdrop'
+import { backdropVariant, dotInk } from './backdrop'
 
 describe('backdropVariant', () => {
   it('honors explicit light', () => {
@@ -14,18 +14,11 @@ describe('backdropVariant', () => {
   })
 })
 
-describe('dotColor', () => {
-  it('is pink at the left edge', () => {
-    expect(dotColor(0, 1)).toBe('rgba(255,47,176,1)')
+describe('dotInk', () => {
+  it('is white on the dark theme', () => {
+    expect(dotInk('dark', 0.8)).toBe('rgba(255,255,255,0.8)')
   })
-  it('is purple in the middle', () => {
-    expect(dotColor(0.5, 1)).toBe('rgba(139,92,246,1)')
-  })
-  it('is cyan at the right edge', () => {
-    expect(dotColor(1, 0.5)).toBe('rgba(34,211,238,0.5)')
-  })
-  it('clamps out-of-range positions', () => {
-    expect(dotColor(-1, 1)).toBe('rgba(255,47,176,1)')
-    expect(dotColor(2, 1)).toBe('rgba(34,211,238,1)')
+  it('is near-black on the light theme', () => {
+    expect(dotInk('light', 0.5)).toBe('rgba(18,22,38,0.5)')
   })
 })

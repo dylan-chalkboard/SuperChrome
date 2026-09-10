@@ -10,21 +10,9 @@ export function backdropVariant(
   return prefersLight ? 'light' : 'dark'
 }
 
-// Gradient stops swept left→right across the dot field: pink → purple → cyan.
-const STOPS: Array<[number, number, number]> = [
-  [255, 47, 176],
-  [139, 92, 246],
-  [34, 211, 238],
-]
-
-/** Colour along the horizontal gradient at position nx (0..1), with alpha a. */
-export function dotColor(nx: number, a: number): string {
-  const x = Math.min(1, Math.max(0, nx))
-  const [a0, a1, f] = x <= 0.5 ? [STOPS[0], STOPS[1], x / 0.5] : [STOPS[1], STOPS[2], (x - 0.5) / 0.5]
-  const r = Math.round(a0[0] + (a1[0] - a0[0]) * f)
-  const g = Math.round(a0[1] + (a1[1] - a0[1]) * f)
-  const b = Math.round(a0[2] + (a1[2] - a0[2]) * f)
-  return `rgba(${r},${g},${b},${a})`
+/** Monochrome dot ink: white on the dark theme, near-black on the light theme. */
+export function dotInk(variant: BackdropVariant, a: number): string {
+  return variant === 'light' ? `rgba(18,22,38,${a})` : `rgba(255,255,255,${a})`
 }
 
 export const BACKDROP_CSS = `
@@ -107,7 +95,7 @@ export function mountBackdrop(
         const r = s * (GAP * 0.18) * (0.4 + 0.6 * vert)
         if (r < 0.35) continue
         const alpha = (0.55 + 0.45 * s) * (0.18 + 0.82 * vert)
-        ctx.fillStyle = dotColor(nx, alpha)
+        ctx.fillStyle = dotInk(opts.variant, alpha)
         ctx.beginPath()
         ctx.arc(x, y, r, 0, Math.PI * 2)
         ctx.fill()
