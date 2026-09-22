@@ -3,6 +3,10 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.39.0
+
+- **Palette size** (Settings → *Palette size*): a slider (90%–140%) that scales the whole palette — font, rows, icons, and panel width — as a unit. Defaults to today's size and applies both on the new tab and the on-page overlay. Also available on the options page.
+
 ## 0.38.0
 
 - **New tab → palette**: opening a new tab now shows the palette immediately over an animated backdrop.

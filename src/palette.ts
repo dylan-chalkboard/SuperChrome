@@ -8,7 +8,12 @@
  * Cmd+K opens a Raycast-style actions panel for the selected item.
  */
 
-import { getSettings } from './core/settings'
+import {
+  getSettings,
+  clampPaletteScale,
+  PALETTE_SCALE_MIN,
+  PALETTE_SCALE_MAX,
+} from './core/settings'
 import { normalizeBackdropId } from './features/newtab/backdrop-meta'
 import { BACKDROPS, resolveBackdrop } from './features/newtab/registry'
 import { FOLDER_COLORS, TILE_COLORS, TILE_GRADIENTS, folderSvg } from './features/bookmarks/colors'
@@ -104,19 +109,25 @@ const PALETTE_CSS = `
 .backdrop.page { background: transparent; }
 .backdrop.page .panel { top: 16vh; }
 .panel {
+  /* One "scaled pixel". Every size-driving value below is expressed as
+     calc(N * var(--u)) so a single --sc-scale (from the Palette size setting,
+     default 1) grows the whole palette as a unit. The 94vw cap and backdrop
+     blur stay in real px so the panel never outgrows the viewport. */
+  --u: calc(1px * var(--sc-scale, 1));
   position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
   transition: opacity 0.13s ease, transform 0.13s ease;
-  width: min(720px, 94vw);
+  width: min(calc(720 * var(--u)), 94vw);
   background: rgba(24, 24, 26, var(--sc-op, 0.8));
   backdrop-filter: blur(60px) saturate(1.6);
   -webkit-backdrop-filter: blur(60px) saturate(1.6);
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 16px;
+  border-radius: calc(16 * var(--u));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
     inset 0 0 0 0.5px rgba(255, 255, 255, 0.06),
     0 16px 48px rgba(0, 0, 0, 0.6);
-  font: 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: calc(13 * var(--u));
   color: #ccccccdd;
   overflow: hidden;
 }
@@ -158,7 +169,8 @@ const PALETTE_CSS = `
 }
 .back-btn {
   display: none; align-items: center; justify-content: center;
-  width: 26px; height: 26px; margin-left: 12px; border-radius: 7px;
+  width: calc(26 * var(--u)); height: calc(26 * var(--u));
+  margin-left: calc(12 * var(--u)); border-radius: calc(7 * var(--u));
   background: #ffffff14; color: #ccccccbb; cursor: pointer; flex: none;
 }
 .back-btn:hover { background: #ffffff24; color: #ffffff; }
@@ -166,8 +178,8 @@ const PALETTE_CSS = `
 .light .back-btn { background: #00000010; color: #00000080; }
 .light .back-btn:hover { background: #0000001c; color: #1c1c1e; }
 .mode-glyph {
-  display: none; padding-left: 16px;
-  font-size: 15px; font-weight: 700; line-height: 1;
+  display: none; padding-left: calc(16 * var(--u));
+  font-size: calc(15 * var(--u)); font-weight: 700; line-height: 1;
 }
 [class*=" mode-"] > .mode-glyph { display: block; animation: glyph-in 0.18s ease-out; }
 .mode-commands .mode-glyph { color: #4c9df3; }
@@ -183,14 +195,15 @@ const PALETTE_CSS = `
 .input {
   flex: 1; min-width: 0;
   background: transparent; border: none; outline: none;
-  padding: 14px 16px; color: #e8e8e8;
-  font-size: 15px; font-family: inherit;
+  padding: calc(14 * var(--u)) calc(16 * var(--u)); color: #e8e8e8;
+  font-size: calc(15 * var(--u)); font-family: inherit;
 }
 .input::placeholder { color: #ffffff40; }
-.hint { display: flex; margin-right: 14px; flex-shrink: 0; }
+.hint { display: flex; margin-right: calc(14 * var(--u)); flex-shrink: 0; }
 .kbd {
   background: #ffffff14; color: #cccccc99;
-  border-radius: 4px; padding: 2px 7px; font-size: 11px;
+  border-radius: calc(4 * var(--u)); padding: calc(2 * var(--u)) calc(7 * var(--u));
+  font-size: calc(11 * var(--u));
 }
 .hint .kbd {
   margin-right: 6px; max-width: 100px; overflow: hidden; white-space: nowrap;
@@ -220,10 +233,10 @@ const PALETTE_CSS = `
 .kbd.chip-downloads.active { background: #3aa99f; color: #ffffff; }
 .kbd.chip-snippets.active { background: #e8964a; color: #ffffff; }
 .kbd.chip-library.active { background: #e05d5d; color: #ffffff; }
-.list { height: 55vh; overflow-y: auto; padding: 8px; position: relative; }
+.list { height: 55vh; overflow-y: auto; padding: calc(8 * var(--u)); position: relative; }
 .selector {
-  position: absolute; left: 8px; right: 8px; top: 0; height: 40px;
-  border-radius: 8px;
+  position: absolute; left: calc(8 * var(--u)); right: calc(8 * var(--u)); top: 0;
+  height: calc(40 * var(--u)); border-radius: calc(8 * var(--u));
   background: rgba(255, 255, 255, 0.14);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   transition: transform 0.1s ease, height 0.1s ease;
@@ -232,12 +245,13 @@ const PALETTE_CSS = `
   opacity: 0;
 }
 .group-label {
-  font-size: 11px; font-weight: 600;
-  color: #ffffff59; padding: 8px 8px 4px;
+  font-size: calc(11 * var(--u)); font-weight: 600;
+  color: #ffffff59; padding: calc(8 * var(--u)) calc(8 * var(--u)) calc(4 * var(--u));
 }
 .item {
-  display: flex; align-items: center; gap: 10px;
-  height: 40px; padding: 0 10px; border-radius: 8px; cursor: pointer;
+  display: flex; align-items: center; gap: calc(10 * var(--u));
+  height: calc(40 * var(--u)); padding: 0 calc(10 * var(--u));
+  border-radius: calc(8 * var(--u)); cursor: pointer;
   white-space: nowrap;
   position: relative; z-index: 1;
 }
@@ -246,41 +260,42 @@ const PALETTE_CSS = `
 }
 .emoji-cell {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 3px; height: 58px; padding: 4px; border-radius: 8px; cursor: pointer;
+  gap: calc(3 * var(--u)); height: calc(58 * var(--u)); padding: calc(4 * var(--u));
+  border-radius: calc(8 * var(--u)); cursor: pointer;
   min-width: 0;
 }
-.emoji-cell .glyph { font-size: 22px; line-height: 1; }
+.emoji-cell .glyph { font-size: calc(22 * var(--u)); line-height: 1; }
 .emoji-cell .emoji-name {
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: 9px; color: #ffffff59;
+  font-size: calc(9 * var(--u)); color: #ffffff59;
 }
 .emoji-cell.selected, .emoji-cell:hover { background: rgba(255, 255, 255, 0.14); }
 .item .icon {
   display: flex; align-items: center; justify-content: center;
-  width: 24px; height: 24px; border-radius: 6px;
+  width: calc(24 * var(--u)); height: calc(24 * var(--u)); border-radius: calc(6 * var(--u));
   background: #ffffff10;
   flex-shrink: 0;
 }
 .item .icon.plain { background: transparent; }
-.fav-bar { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px 4px; }
+.fav-bar { display: flex; flex-wrap: wrap; gap: calc(6 * var(--u)); padding: calc(10 * var(--u)) calc(12 * var(--u)) calc(4 * var(--u)); }
 .fav-item {
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  width: 64px; flex: none;
+  display: flex; flex-direction: column; align-items: center; gap: calc(4 * var(--u));
+  width: calc(64 * var(--u)); flex: none;
 }
 .fav-tile {
-  width: 46px; height: 46px; border-radius: 12px;
+  width: calc(46 * var(--u)); height: calc(46 * var(--u)); border-radius: calc(12 * var(--u));
   background: #ffffff10; color: #ffffff;
   display: flex; align-items: center; justify-content: center;
   transition: box-shadow 0.12s ease;
 }
-.fav-tile .fav-emoji { font-size: 24px; line-height: 1; }
+.fav-tile .fav-emoji { font-size: calc(24 * var(--u)); line-height: 1; }
 .fav-item:hover .fav-tile, .fav-item.selected .fav-tile { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35); }
 .fav-star { display: flex; flex-shrink: 0; color: #e8c341; }
-.fav-tile img { width: 28px; height: 28px; border-radius: 6px; }
-.fav-tile svg { width: 23px; height: 23px; }
+.fav-tile img { width: calc(28 * var(--u)); height: calc(28 * var(--u)); border-radius: calc(6 * var(--u)); }
+.fav-tile svg { width: calc(23 * var(--u)); height: calc(23 * var(--u)); }
 .fav-cap {
-  max-width: 62px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: 9px; color: #ffffff59;
+  max-width: calc(62 * var(--u)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: calc(9 * var(--u)); color: #ffffff59;
 }
 .item .icon.kind-command { background: var(--sc-command, linear-gradient(135deg, #4cd5f3, #4c65f3)); color: #ffffff; }
 .item .icon.kind-folder { background: transparent; }
@@ -291,9 +306,9 @@ const PALETTE_CSS = `
 .item .icon.kind-download { background: linear-gradient(135deg, #3aa97a, #3a8ea9); color: #ffffff; }
 .item .icon.kind-snippet { background: linear-gradient(135deg, #e8614a, #e8cb4a); color: #ffffff; }
 .group-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.item .icon.kind-calc { background: linear-gradient(135deg, #4caf5c, #4caf9e); color: #ffffff; font-weight: 700; font-size: 14px; }
-.item .icon.emoji-glyph { font-size: 17px; }
-.item .icon img { width: 18px; height: 18px; border-radius: 4px; }
+.item .icon.kind-calc { background: linear-gradient(135deg, #4caf5c, #4caf9e); color: #ffffff; font-weight: 700; font-size: calc(14 * var(--u)); }
+.item .icon.emoji-glyph { font-size: calc(17 * var(--u)); }
+.item .icon img { width: calc(18 * var(--u)); height: calc(18 * var(--u)); border-radius: calc(4 * var(--u)); }
 .item .title {
   overflow: hidden; text-overflow: ellipsis;
   flex-shrink: 0; max-width: 55%;
@@ -302,33 +317,33 @@ const PALETTE_CSS = `
 .item .title b { color: #ffffff; font-weight: 700; }
 .item .detail {
   flex: 1; overflow: hidden; text-overflow: ellipsis;
-  color: #ffffff4d; font-size: 13px;
+  color: #ffffff4d; font-size: calc(13 * var(--u));
 }
 .open-tab-arrow {
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  width: 24px; height: 24px; margin-left: 8px; border-radius: 7px;
+  width: calc(24 * var(--u)); height: calc(24 * var(--u)); margin-left: calc(8 * var(--u)); border-radius: calc(7 * var(--u));
   background: #ffffff14; color: #e8e8e8;
 }
 .light .open-tab-arrow { background: #00000010; color: #303036; }
 .item .type {
   flex-shrink: 0; margin-left: auto;
-  color: #ffffff4d; font-size: 12px;
+  color: #ffffff4d; font-size: calc(12 * var(--u));
 }
 .empty { padding: 16px; color: #ffffff59; }
 .footer {
-  display: flex; align-items: center; gap: 14px;
-  height: 38px; padding: 0 14px;
+  display: flex; align-items: center; gap: calc(14 * var(--u));
+  height: calc(38 * var(--u)); padding: 0 calc(14 * var(--u));
   border-top: 1px solid #ffffff10;
   /* Solid at all times — the glass treatment stops above this bar. */
   background: #1b1b1e;
-  color: #cccccc80; font-size: 12px;
+  color: #cccccc80; font-size: calc(12 * var(--u));
 }
 .light .footer { background: #ececef; }
 .footer .spacer { flex: 1; }
 .footer .action { display: flex; align-items: center; gap: 6px; }
 .footer .brand-logo {
-  width: 26px; height: 26px; opacity: 0.5; cursor: pointer;
-  box-sizing: content-box; padding: 3px; margin: -3px; border-radius: 6px;
+  width: calc(26 * var(--u)); height: calc(26 * var(--u)); opacity: 0.5; cursor: pointer;
+  box-sizing: content-box; padding: calc(3 * var(--u)); margin: calc(-3 * var(--u)); border-radius: calc(6 * var(--u));
 }
 .footer .brand-logo:hover { opacity: 0.9; background: #ffffff14; }
 .light .footer .brand-logo:hover { background: #00000010; }
@@ -364,8 +379,8 @@ const PALETTE_CSS = `
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 8px 24px #00000088;
 }
 .action-row {
-  display: flex; align-items: center; gap: 10px;
-  height: 30px; padding: 0 10px; border-radius: 6px; cursor: pointer;
+  display: flex; align-items: center; gap: calc(10 * var(--u));
+  height: calc(30 * var(--u)); padding: 0 calc(10 * var(--u)); border-radius: calc(6 * var(--u)); cursor: pointer;
   color: #e0e0e0; white-space: nowrap;
 }
 .action-row .spacer { flex: 1; min-width: 16px; }
@@ -854,6 +869,7 @@ async function applyUserSettings(): Promise<void> {
     if (typeof settings.glassOpacity === 'number') {
       panelEl.style.setProperty('--sc-op', String(settings.glassOpacity))
     }
+    panelEl.style.setProperty('--sc-scale', String(clampPaletteScale(settings.paletteScale)))
     const colors = settings.iconColors ?? {}
     for (const key of ['command', 'folder', 'history', 'fallback'] as const) {
       if (typeof colors[key] === 'string') {
@@ -3611,6 +3627,20 @@ async function renderSettings(): Promise<void> {
   opacity.value = String(s.glassOpacity)
   row('Glass opacity', opacity)
 
+  // Palette size: scales the whole palette live via --sc-scale (default 1).
+  const paletteScale = wire(document.createElement('input'))
+  paletteScale.type = 'range'
+  paletteScale.min = String(PALETTE_SCALE_MIN)
+  paletteScale.max = String(PALETTE_SCALE_MAX)
+  paletteScale.step = '0.05'
+  paletteScale.value = String(clampPaletteScale(s.paletteScale))
+  // Reflect the change immediately — save() debounces, but the panel should
+  // grow as the slider moves.
+  paletteScale.addEventListener('input', () => {
+    panelEl?.style.setProperty('--sc-scale', String(clampPaletteScale(paletteScale.value)))
+  })
+  row('Palette size', paletteScale)
+
   const swatches = document.createElement('div')
   swatches.className = 'set-swatches'
   const colorInput = (value: string, label: string): HTMLInputElement => {
@@ -3797,6 +3827,7 @@ async function renderSettings(): Promise<void> {
     ...s,
     appearance: appearanceValue,
     glassOpacity: Math.min(1, Math.max(0.4, Number(opacity.value) || s.glassOpacity)),
+    paletteScale: clampPaletteScale(paletteScale.value),
     iconColors: {
       command: colorCommand.value,
       folder: s.iconColors.folder,

@@ -10,9 +10,11 @@ import {
 import type { Quicklink, Snippet } from './lib'
 import { BACKDROPS } from './features/newtab/registry'
 import { DEFAULT_BACKDROP_ID, normalizeBackdropId } from './features/newtab/backdrop-meta'
+import { clampPaletteScale } from './core/settings'
 
 interface UserSettings {
   glassOpacity: number
+  paletteScale: number
   iconColors: { command: string; folder: string; history: string; fallback: string }
   frecencyDecayDays: number
   defaultMode: 'bookmarks' | 'commands' | 'tabs' | 'history'
@@ -29,6 +31,7 @@ interface UserSettings {
 
 const DEFAULTS: UserSettings = {
   glassOpacity: 0.8,
+  paletteScale: 1,
   iconColors: { command: '#4c9df3', folder: '#e0a63c', history: '#9a6ee8', fallback: '#e05d5d' },
   frecencyDecayDays: 14,
   defaultMode: 'bookmarks',
@@ -47,6 +50,8 @@ const el = <T extends HTMLElement>(id: string): T => document.getElementById(id)
 
 const opacity = el<HTMLInputElement>('opacity')
 const opacityValue = el<HTMLSpanElement>('opacity-value')
+const paletteScale = el<HTMLInputElement>('palette-scale')
+const paletteScaleValue = el<HTMLSpanElement>('palette-scale-value')
 const colorCommand = el<HTMLInputElement>('color-command')
 const colorHistory = el<HTMLInputElement>('color-history')
 const colorFallback = el<HTMLInputElement>('color-fallback')
@@ -137,6 +142,8 @@ function populate(s: UserSettings): void {
   loadedQuicklinks = s.quicklinks
   opacity.value = String(s.glassOpacity)
   opacityValue.textContent = `${Math.round(s.glassOpacity * 100)}%`
+  paletteScale.value = String(clampPaletteScale(s.paletteScale))
+  paletteScaleValue.textContent = `${Math.round(clampPaletteScale(s.paletteScale) * 100)}%`
   colorCommand.value = s.iconColors.command
   colorHistory.value = s.iconColors.history
   colorFallback.value = s.iconColors.fallback
@@ -158,6 +165,7 @@ function populate(s: UserSettings): void {
 function collect(): UserSettings {
   return {
     glassOpacity: Math.min(1, Math.max(0.4, Number(opacity.value) || DEFAULTS.glassOpacity)),
+    paletteScale: clampPaletteScale(paletteScale.value),
     // Folder tiles no longer take a color (filled blue folder icon instead);
     // the stored key stays for settings-shape compatibility.
     iconColors: {
@@ -188,6 +196,7 @@ function save(): void {
   saveTimer = setTimeout(() => {
     const settings = collect()
     opacityValue.textContent = `${Math.round(settings.glassOpacity * 100)}%`
+    paletteScaleValue.textContent = `${Math.round(settings.paletteScale * 100)}%`
     applyAppearance(settings.appearance)
     void chrome.storage.sync.set({ settings }).then(() => {
       status.classList.add('show')
@@ -197,7 +206,7 @@ function save(): void {
   }, 200)
 }
 
-for (const input of [opacity, colorCommand, colorHistory, colorFallback, defaultMode, appearance, darkenPhotos, newTab, reduceMotion, decay, sites, quicklinks, snippets]) {
+for (const input of [opacity, paletteScale, colorCommand, colorHistory, colorFallback, defaultMode, appearance, darkenPhotos, newTab, reduceMotion, decay, sites, quicklinks, snippets]) {
   input.addEventListener('input', save)
   input.addEventListener('change', save)
 }
