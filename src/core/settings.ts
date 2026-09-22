@@ -2,6 +2,7 @@ import { DEFAULT_QUICKLINKS } from '../features/quicklinks'
 import type { Quicklink } from '../features/quicklinks'
 import type { Snippet } from '../features/snippets'
 import type { PaletteMode } from './types'
+import { DEFAULT_BACKDROP_ID, normalizeBackdropId } from '../features/newtab/backdrop-meta'
 
 export interface UserSettings {
   glassOpacity: number
@@ -9,6 +10,11 @@ export interface UserSettings {
   frecencyDecayDays: number
   defaultMode: PaletteMode
   appearance: 'system' | 'dark' | 'light'
+  /** New tab backdrop id (see features/newtab/registry). */
+  backdrop: string
+  /** Backdrop animation speed multiplier (0.5 calm, 1 normal, 1.8 lively). */
+  backdropSpeed: number
+  darkenPhotos: boolean
   openInNewTab: boolean
   reduceMotion: boolean
   disabledSites: string[]
@@ -22,6 +28,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
   frecencyDecayDays: 14,
   defaultMode: 'bookmarks',
   appearance: 'system',
+  backdrop: DEFAULT_BACKDROP_ID,
+  backdropSpeed: 1,
+  darkenPhotos: true,
   openInNewTab: false,
   reduceMotion: false,
   disabledSites: [],
@@ -36,6 +45,8 @@ export async function getSettings(): Promise<UserSettings> {
       ...DEFAULT_SETTINGS,
       ...settings,
       iconColors: { ...DEFAULT_SETTINGS.iconColors, ...settings?.iconColors },
+      backdrop: normalizeBackdropId(settings?.backdrop),
+      darkenPhotos: settings?.darkenPhotos !== false,
     }
   } catch {
     return DEFAULT_SETTINGS

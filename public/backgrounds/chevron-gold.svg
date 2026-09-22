@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3840 2160" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <pattern id="chevrons" width="600" height="250" patternUnits="userSpaceOnUse">
+      <path d="M0 -120V370 M300 -120V370 M600 -120V370 M-300 -105 Q-150 -5 0 85 Q150 175 300 85 Q450 -5 600 85 Q750 175 900 85" fill="none" stroke="#d6a35d" stroke-width="22" stroke-linejoin="round" stroke-linecap="round"/>
+    </pattern>
+  </defs>
+  <rect width="3840" height="2160" fill="#fffaf0"/>
+  <rect width="3840" height="2160" fill="url(#chevrons)"/>
+</svg>

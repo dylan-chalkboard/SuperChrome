@@ -3,6 +3,15 @@
 All notable changes to SuperChrome. Versions follow the extension's
 `manifest.json` version.
 
+## 0.38.0
+
+- **New tab → palette**: opening a new tab now shows the palette immediately over an animated backdrop.
+- **Backdrop picker** (Settings → *New tab backdrop*): choose from ten photographic scenes, seven original abstract image styles, Fluid, Quiet abstract, or None. The in-palette Settings view shows a live preview and scene thumbnails; choosing one updates the open new-tab background. Reduced motion shows a still frame.
+- **Photo brightness**: Settings now has a live “Darken photos behind the palette” toggle. The seven abstract scenes were re-exported at higher display resolution and quality to reduce pixelation.
+- **Minimal dark backdrops**: Charcoal folds and Dark facets add two quieter, crisp vector options inspired by the latest references.
+- **Woven wallpapers**: Sand, sage, and blue colorways of a crisp vector brush-pattern wallpaper.
+- **Geometric wallpapers**: Chevron gold and ink, plus interlocking ribbon patterns in blue and olive.
+
 ## 0.37.0
 
 - **SuperFind** (`.` prefix): keyboard find-and-click over any visible text on the page — Siri-style rainbow frame, on-page highlights, `↑↓` navigate, `↵` click/focus/select, `⌘↵` opens links in a new tab.

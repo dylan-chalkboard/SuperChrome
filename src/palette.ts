@@ -9,6 +9,8 @@
  */
 
 import { getSettings } from './core/settings'
+import { normalizeBackdropId } from './features/newtab/backdrop-meta'
+import { BACKDROPS, resolveBackdrop } from './features/newtab/registry'
 import { FOLDER_COLORS, TILE_COLORS, TILE_GRADIENTS, folderSvg } from './features/bookmarks/colors'
 import { folderColorOf, loadFolderColors, setFolderColor } from './ui/shared/folder-colors'
 import { ONBOARD_STEPS, onboardProgress, onboardVisible } from './features/onboarding'
@@ -468,6 +470,29 @@ const PALETTE_CSS = `
 }
 .set-swatches { display: flex; gap: 12px; align-items: center; }
 .set-swatches span { font-size: 11px; color: #ffffff59; }
+.set-backdrop-browser { min-width: 0; }
+.set-backdrop-stage {
+  position: relative; height: 190px; overflow: hidden; border-radius: 9px;
+  background: #101722; border: 1px solid #ffffff20;
+}
+.set-backdrop-stage .nt-backdrop { border-radius: 8px; }
+.set-backdrop-caption { color: #ffffffa6; font-size: 12px; margin: 8px 0 10px; }
+.set-backdrop-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.set-backdrop-group { grid-column: 1 / -1; color: #ffffff7a; font-size: 11px; margin-top: 7px; }
+.set-backdrop-choice {
+  display: block; width: 100%; padding: 0; text-align: left; overflow: hidden;
+  border: 1px solid #ffffff24; border-radius: 7px; background: #121720;
+  color: #ffffffa6; cursor: pointer; font: inherit;
+}
+.set-backdrop-choice:hover { border-color: #ffffff80; }
+.set-backdrop-choice:focus-visible { outline: 2px solid #77b2ff; outline-offset: 2px; }
+.set-backdrop-choice.on { border-color: #78adf7; box-shadow: 0 0 0 1px #78adf7; color: #ffffff; }
+.set-backdrop-thumb { position: relative; display: block; height: 54px; overflow: hidden; }
+.set-backdrop-label { display: block; padding: 5px 6px; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.light .set-backdrop-caption { color: #000000a6; }
+.light .set-backdrop-group { color: #0000007a; }
+.light .set-backdrop-choice { color: #303036; border-color: #00000026; background: #eef0f5; }
+.light .set-backdrop-choice.on { border-color: #357bc8; box-shadow: 0 0 0 1px #357bc8; }
 .light .set-row > label { color: #00000073; }
 .light .set-hint { color: #00000045; }
 .light .set-div { background: #00000010; }
@@ -866,6 +891,7 @@ function captureModePrefix(): void {
 }
 
 function closePalette(): void {
+  cleanupSettingsBackdrops()
   if (pageMode) {
     // The palette IS the new tab page — never tear down. Reset to empty home.
     exitSubState(false)
@@ -2641,6 +2667,7 @@ async function commitGroup(groupItem: RemoteItem): Promise<void> {
 }
 
 function exitSubState(_commit: boolean): void {
+  if (uiState === 'settings') cleanupSettingsBackdrops()
   creatingFolder = false
   if (uiState === 'actions') closeActions()
   if (!paletteInput) return
@@ -3496,6 +3523,7 @@ function enterSettings(): void {
 }
 
 function exitSettings(): void {
+  cleanupSettingsBackdrops()
   if (!paletteInput) return
   uiState = 'list'
   if (inputRowEl) inputRowEl.style.display = ''
@@ -3505,9 +3533,20 @@ function exitSettings(): void {
   void updateList()
 }
 
+let settingsBackdropStop: (() => void) | null = null
+let settingsThumbStops: Array<() => void> = []
+
+function cleanupSettingsBackdrops(): void {
+  settingsBackdropStop?.()
+  settingsBackdropStop = null
+  for (const stop of settingsThumbStops) stop()
+  settingsThumbStops = []
+}
+
 async function renderSettings(): Promise<void> {
   if (!paletteList) return
   const s = await getSettings()
+  cleanupSettingsBackdrops()
   paletteList.textContent = ''
   selectorEl = null
   flatItems = []
@@ -3553,7 +3592,7 @@ async function renderSettings(): Promise<void> {
     const b = document.createElement('button')
     b.textContent = value[0].toUpperCase() + value.slice(1)
     b.classList.toggle('on', appearanceValue === value)
-    b.addEventListener('mousedown', (e) => {
+    b.addEventListener('click', (e) => {
       e.preventDefault()
       appearanceValue = value
       segButtons.forEach((sb, i) => sb.classList.toggle('on', (['light', 'dark', 'system'] as const)[i] === value))
@@ -3602,6 +3641,70 @@ async function renderSettings(): Promise<void> {
   })
   row('Default mode', defaultModeDd.el)
 
+  let selectedBackdrop = normalizeBackdropId(s.backdrop)
+  const backdropBrowser = document.createElement('div')
+  backdropBrowser.className = 'set-backdrop-browser'
+  const backdropStage = document.createElement('div')
+  backdropStage.className = 'set-backdrop-stage'
+  const backdropCaption = document.createElement('div')
+  backdropCaption.className = 'set-backdrop-caption'
+  backdropCaption.setAttribute('aria-live', 'polite')
+  const backdropGrid = document.createElement('div')
+  backdropGrid.className = 'set-backdrop-grid'
+  const backdropButtons = BACKDROPS.map((def) => {
+    const group = def.id === 'mountain-river' ? 'Landscapes'
+      : def.id === 'liquid-ribbons' ? 'Abstract' : null
+    if (group) {
+      const heading = document.createElement('span')
+      heading.className = 'set-backdrop-group'
+      heading.textContent = group
+      backdropGrid.appendChild(heading)
+    }
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'set-backdrop-choice'
+    button.setAttribute('aria-label', `Choose ${def.label} background`)
+    const thumbnail = document.createElement('span')
+    thumbnail.className = 'set-backdrop-thumb'
+    const label = document.createElement('span')
+    label.className = 'set-backdrop-label'
+    label.textContent = def.label
+    button.append(thumbnail, label)
+    backdropGrid.appendChild(button)
+    button.addEventListener('click', () => {
+      selectedBackdrop = def.id
+      renderSelectedBackdrop()
+      save()
+    })
+    return { def, button, thumbnail }
+  })
+  backdropBrowser.append(backdropStage, backdropCaption, backdropGrid)
+  row('New tab backdrop', backdropBrowser, true)
+
+  // Backdrop speed: Calm / Normal / Lively pills, mirroring Appearance.
+  let speedValue = s.backdropSpeed
+  const speedOpts: Array<{ label: string; value: number }> = [
+    { label: 'Calm', value: 0.5 },
+    { label: 'Normal', value: 1 },
+    { label: 'Lively', value: 1.8 },
+  ]
+  const speedSeg = document.createElement('div')
+  speedSeg.className = 'seg'
+  const speedButtons = speedOpts.map((opt) => {
+    const b = document.createElement('button')
+    b.textContent = opt.label
+    b.classList.toggle('on', speedValue === opt.value)
+    b.addEventListener('click', (e) => {
+      e.preventDefault()
+      speedValue = opt.value
+      speedButtons.forEach((sb, i) => sb.classList.toggle('on', speedOpts[i].value === speedValue))
+      save()
+    })
+    speedSeg.appendChild(b)
+    return b
+  })
+  row('Backdrop speed', speedSeg)
+
   const check = (label: string, checked: boolean): HTMLInputElement => {
     const wrap = document.createElement('label')
     wrap.className = 'check'
@@ -3616,6 +3719,54 @@ async function renderSettings(): Promise<void> {
   }
   const newTab = check('Open results in a new tab', s.openInNewTab)
   const reduceMotionBox = check('Reduce motion', s.reduceMotion)
+  const darkenPhotosBox = check('Darken photos behind the palette', s.darkenPhotos)
+
+  const backdropVariant = (): 'light' | 'dark' =>
+    appearanceValue === 'light' ||
+    (appearanceValue === 'system' && window.matchMedia('(prefers-color-scheme: light)').matches)
+      ? 'light' : 'dark'
+  function renderSelectedBackdrop(): void {
+    settingsBackdropStop?.()
+    backdropStage.textContent = ''
+    const selected = resolveBackdrop(selectedBackdrop)
+    const systemReduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const motion = !(reduceMotionBox.checked || systemReduce)
+    settingsBackdropStop = selected.mount(backdropStage, {
+      variant: backdropVariant(),
+      motion,
+      hideMark: true,
+      contained: true,
+      speed: speedValue,
+      darkenPhotos: darkenPhotosBox.checked,
+    })
+    backdropCaption.textContent = motion
+      ? `${selected.label} · live preview`
+      : `${selected.label} · still preview (reduce motion is on)`
+    backdropButtons.forEach(({ def, button }) => {
+      const active = def.id === selectedBackdrop
+      button.classList.toggle('on', active)
+      button.setAttribute('aria-pressed', String(active))
+    })
+  }
+  function renderBackdropThumbnails(): void {
+    for (const stop of settingsThumbStops) stop()
+    settingsThumbStops = []
+    for (const { def, thumbnail } of backdropButtons) {
+      thumbnail.textContent = ''
+      settingsThumbStops.push(def.mount(thumbnail, {
+        variant: backdropVariant(), motion: false, hideMark: true, contained: true,
+        darkenPhotos: darkenPhotosBox.checked,
+      }))
+    }
+  }
+  for (const button of segButtons) {
+    button.addEventListener('click', () => { renderBackdropThumbnails(); renderSelectedBackdrop() })
+  }
+  for (const button of speedButtons) {
+    button.addEventListener('click', renderSelectedBackdrop)
+  }
+  reduceMotionBox.addEventListener('change', renderSelectedBackdrop)
+  darkenPhotosBox.addEventListener('change', () => { renderBackdropThumbnails(); renderSelectedBackdrop() })
 
   const decay = wire(document.createElement('input'))
   decay.type = 'number'
@@ -3653,8 +3804,11 @@ async function renderSettings(): Promise<void> {
       fallback: colorFallback.value,
     },
     defaultMode: defaultModeDd.value as UserSettings['defaultMode'],
+    backdrop: selectedBackdrop,
+    backdropSpeed: speedValue,
     openInNewTab: newTab.checked,
     reduceMotion: reduceMotionBox.checked,
+    darkenPhotos: darkenPhotosBox.checked,
     frecencyDecayDays: Math.min(90, Math.max(1, Number(decay.value) || s.frecencyDecayDays)),
     quicklinks: preserveQuicklinkExtras(parseQuicklinks(quicklinksArea.value), s.quicklinks),
     snippets: parseSnippets(snippetsArea.value),
@@ -3662,6 +3816,8 @@ async function renderSettings(): Promise<void> {
   })
 
   paletteList.appendChild(form)
+  renderBackdropThumbnails()
+  renderSelectedBackdrop()
 }
 
 /* ---------- Quicklinks browser (>Quicklinks) ---------- */

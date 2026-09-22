@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3840 2160" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <pattern id="hatch" width="9" height="9" patternUnits="userSpaceOnUse">
+      <rect width="9" height="9" fill="#dde0d2"/>
+      <path d="M0 8.5 H9" stroke="#849489" stroke-width="2"/>
+    </pattern>
+    <pattern id="ribbons" width="720" height="600" patternUnits="userSpaceOnUse">
+      <path d="M-30 130 L360 410 L750 130 L750 270 L360 550 L-30 270Z" fill="#dde0d2"/>
+      <path d="M360 410 L750 130 L750 270 L360 550Z" fill="url(#hatch)"/>
+      <path d="M60 60 L360 270 L660 60 L750 130 L360 410 L-30 130Z" fill="#82927e"/>
+    </pattern>
+  </defs>
+  <rect width="3840" height="2160" fill="#313d38"/>
+  <rect width="3840" height="2160" fill="url(#ribbons)"/>
+</svg>
