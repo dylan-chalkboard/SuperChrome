@@ -1,5 +1,6 @@
 import { tryCalculate, tryConvert } from '../calculator'
 import { commandEntries } from '../commands'
+import { dedupeHistory } from '../history/search'
 import { tileGradient } from '../gradients'
 import { hostOf, urlFromQuery } from '../navigation'
 import { matchQuicklink, quicklinkStyle, stripQlPlaceholders, templateArguments } from '../quicklinks'
@@ -150,8 +151,9 @@ export async function searchBookmarks(
   const commands = commandEntries()
 
   if (!query) {
-    // Raycast-style home view: frecency picks up top, then the library with
-    // folders first, then the most-used commands ('>' still shows them all).
+    // Curated home view: a short frecency-ranked Suggested row, then a capped
+    // peek at the bookmarks bar. The full command list lives one keystroke away
+    // under '>', so it's deliberately left off home to keep the scan short.
     const all = [...bookmarkEntries, ...folderEntries, ...commands]
     const suggested = all
       .map((entry) => ({ entry, score: frecency(usage, entry.usageKey, decay) }))
@@ -159,11 +161,6 @@ export async function searchBookmarks(
       .sort((a, b) => b.score - a.score)
       .slice(0, 6)
     const suggestedKeys = new Set(suggested.map((x) => x.entry.usageKey))
-    // Curated definition order keeps related commands together (all the zoom
-    // ones side by side, etc.); Suggested above already covers frequent picks.
-    const allCommands = commands
-      .filter((entry) => !suggestedKeys.has(entry.usageKey))
-      .map((entry) => ({ entry }))
     // Bookmarks section mirrors the bookmarks bar: its top level, folders
     // first, plus the other root folders — drill in for everything else.
     const bar = root.children?.[0]
@@ -196,13 +193,14 @@ export async function searchBookmarks(
       }
     }
     const visibleTop = topLevel.filter((entry) => !suggestedKeys.has(entry.usageKey))
+    // Cap the peek so home stays scannable: a few folders, a few bookmarks.
+    const bookmarksSection = [
+      ...visibleTop.filter((e) => e.item.kind === 'folder').slice(0, 4),
+      ...visibleTop.filter((e) => e.item.kind === 'bookmark').slice(0, 6),
+    ].slice(0, 8)
     return [
       ...suggested.map((x): PaletteItem => ({ ...x.entry.item, group: 'Suggested' })),
-      ...[
-        ...visibleTop.filter((e) => e.item.kind === 'folder'),
-        ...visibleTop.filter((e) => e.item.kind === 'bookmark'),
-      ].map((entry): PaletteItem => ({ ...entry.item, group: 'Bookmarks' })),
-      ...allCommands.map((x): PaletteItem => ({ ...x.entry.item, group: 'Commands' })),
+      ...bookmarksSection.map((entry): PaletteItem => ({ ...entry.item, group: 'Bookmarks' })),
     ]
   }
 
@@ -240,23 +238,25 @@ export async function searchBookmarks(
     }
   }
 
-  // History rides along in the ranked list; bookmarked URLs win the dedup.
+  // History rides along in the ranked list; bookmarked URLs win the dedup, and
+  // near-duplicate pages (same title + host) collapse to a single row.
   const bookmarkUrls = new Set(flat.map((b) => b.url))
-  const historyEntries = (
-    await chrome.history.search({ text: rawQuery.trim(), maxResults: 30, startTime: 0 })
+  const historyHits = dedupeHistory(
+    (await chrome.history.search({ text: rawQuery.trim(), maxResults: 30, startTime: 0 }))
+      .filter((r) => r.url && !bookmarkUrls.has(r.url))
+      .map((r) => ({ url: r.url!, label: r.title || r.url! })),
   )
-    .filter((r) => r.url && !bookmarkUrls.has(r.url))
-    .map((r) => ({
-      item: {
-        kind: 'history' as const,
-        label: r.title || r.url!,
-        detail: '',
-        url: r.url,
-        openTab: r.url ? openUrls.has(normUrl(r.url)) : undefined,
-      },
-      text: `${r.title ?? ''} ${r.url}`.toLowerCase(),
-      usageKey: `history:${r.url}`,
-    }))
+  const historyEntries = historyHits.map((r) => ({
+    item: {
+      kind: 'history' as const,
+      label: r.label,
+      detail: '',
+      url: r.url,
+      openTab: openUrls.has(normUrl(r.url)),
+    },
+    text: `${r.label} ${r.url}`.toLowerCase(),
+    usageKey: `history:${r.url}`,
+  }))
 
   // Quicklinks: "yt lofi beats" searches the keyword's site directly; a bare
   // keyword offers the link (prompting for any arguments at open time).

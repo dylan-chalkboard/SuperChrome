@@ -245,12 +245,14 @@ const PALETTE_CSS = `
   opacity: 0;
 }
 .group-label {
-  font-size: calc(11 * var(--u)); font-weight: 600;
-  color: #ffffff59; padding: calc(8 * var(--u)) calc(8 * var(--u)) calc(4 * var(--u));
+  font-size: calc(11 * var(--u)); font-weight: 600; letter-spacing: 0.02em;
+  color: #ffffff59; padding: calc(12 * var(--u)) calc(8 * var(--u)) calc(5 * var(--u));
 }
+/* First header hugs the top; only inter-section gaps get the extra breathing room. */
+.group-label:first-of-type { padding-top: calc(8 * var(--u)); }
 .item {
   display: flex; align-items: center; gap: calc(10 * var(--u));
-  height: calc(40 * var(--u)); padding: 0 calc(10 * var(--u));
+  height: calc(44 * var(--u)); padding: 0 calc(10 * var(--u));
   border-radius: calc(8 * var(--u)); cursor: pointer;
   white-space: nowrap;
   position: relative; z-index: 1;
@@ -276,7 +278,9 @@ const PALETTE_CSS = `
   background: #ffffff10;
   flex-shrink: 0;
 }
-.item .icon.plain { background: transparent; }
+/* Favicons/glyphs share the same neutral tile as command icons so every row
+   lines up in one icon column (Raycast-style). */
+.item .icon.plain { background: #ffffff10; }
 .fav-bar { display: flex; flex-wrap: wrap; gap: calc(6 * var(--u)); padding: calc(10 * var(--u)) calc(12 * var(--u)) calc(4 * var(--u)); }
 .fav-item {
   display: flex; flex-direction: column; align-items: center; gap: calc(4 * var(--u));
@@ -298,7 +302,7 @@ const PALETTE_CSS = `
   font-size: calc(9 * var(--u)); color: #ffffff59;
 }
 .item .icon.kind-command { background: var(--sc-command, linear-gradient(135deg, #4cd5f3, #4c65f3)); color: #ffffff; }
-.item .icon.kind-folder { background: transparent; }
+.item .icon.kind-folder { background: #ffffff10; }
 .item .icon.kind-history { background: var(--sc-history, linear-gradient(135deg, #716ee8, #c36ee8)); color: #ffffff; }
 .item .icon.kind-bookmark, .item .icon.kind-tab, .item .icon.kind-closed {
   background: var(--sc-fallback, linear-gradient(135deg, #e05d89, #e0895d)); color: #ffffff;
@@ -326,8 +330,8 @@ const PALETTE_CSS = `
 }
 .light .open-tab-arrow { background: #00000010; color: #303036; }
 .item .type {
-  flex-shrink: 0; margin-left: auto;
-  color: #ffffff4d; font-size: calc(12 * var(--u));
+  flex-shrink: 0; margin-left: auto; text-align: right;
+  color: #ffffff73; font-size: calc(11 * var(--u)); font-weight: 500;
 }
 .empty { padding: 16px; color: #ffffff59; }
 .footer {
@@ -536,9 +540,10 @@ const PALETTE_CSS = `
 .light .group-label { color: #00000059; }
 .light .item .title { color: #26262b; }
 .light .item .title b { color: #000000; }
-.light .item .detail, .light .item .type { color: #00000045; }
+.light .item .detail { color: #00000045; }
+.light .item .type { color: #00000066; }
 .light .item .icon { background: #00000010; }
-.light .item .icon.plain, .light .item .icon.kind-folder { background: transparent; }
+.light .item .icon.plain, .light .item .icon.kind-folder { background: #00000010; }
 .light .fav-tile { background: #0000000d; }
 .light .fav-item:hover .fav-tile, .light .fav-item.selected .fav-tile { box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.25); }
 .light .fav-cap { color: #00000059; }
@@ -729,6 +734,9 @@ const TYPE_LABELS: Record<string, string> = {
   search: 'Search',
   snippet: 'Snippet',
 }
+
+/** Modes whose rows are all one kind — the per-row type label is redundant. */
+const SINGLE_KIND_MODES = new Set(['history', 'commands', 'downloads', 'tabs', 'emoji', 'snippets'])
 
 const GROUP_LABELS: Record<string, string> = {
   bookmarks: 'Bookmarks',
@@ -4940,6 +4948,11 @@ function renderItems(
     return
   }
 
+  // Single-kind modes already announce themselves in the header/mode glyph, so
+  // repeating "History" (etc.) on every row is pure noise — drop it there and
+  // only keep the type column in the blended home/search view where kinds mix.
+  const hideType = SINGLE_KIND_MODES.has(currentMode())
+
   let lastGroup: string | null = null
   items.forEach((item, index) => {
     const group = item.group ?? groupLabel
@@ -4959,6 +4972,9 @@ function renderItems(
     const type = document.createElement('span')
     type.className = 'type'
     type.textContent = item.openTab ? 'Switch to Tab' : (item.typeText ?? TYPE_LABELS[item.kind] ?? '')
+    // openTab rows keep "Switch to Tab" even in single-kind modes — it signals
+    // Enter's behaviour, not just the item's kind.
+    const showType = !!type.textContent && (!hideType || !!item.openTab)
     row.append(iconFor(item), title, detail)
     if (item.groupColor) {
       const dot = document.createElement('span')
@@ -4973,7 +4989,7 @@ function renderItems(
       star.innerHTML = STAR_SVG
       row.appendChild(star)
     }
-    row.appendChild(type)
+    if (showType) row.appendChild(type)
     if (item.openTab) {
       const arrow = document.createElement('span')
       arrow.className = 'open-tab-arrow'

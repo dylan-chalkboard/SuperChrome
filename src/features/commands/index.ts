@@ -147,6 +147,92 @@ export const COMMAND_META: Record<string, { icon: string; color: string }> = {
   'open-version': { icon: 'info', color: '#7d8a97' },
 }
 
+/**
+ * Command → category, so the '>' list clusters related actions under headers
+ * (all the zoom commands together, everything "fun" in one place, etc.).
+ * Anything unmapped falls back to 'More' at the end.
+ */
+export const COMMAND_CATEGORY: Record<string, string> = {
+  'switch-to-tab': 'Search',
+  'mode-commands': 'Search',
+  'mode-history': 'Search',
+  'mode-emoji': 'Search',
+  'mode-snippets': 'Search',
+  'mode-library': 'Search',
+  'mode-find': 'Search',
+  'new-tab': 'Tabs',
+  'reopen-tab': 'Tabs',
+  'duplicate-tab': 'Tabs',
+  'toggle-pin': 'Tabs',
+  'close-tab': 'Tabs',
+  'close-duplicate-tabs': 'Tabs',
+  'move-tab-new-window': 'Tabs',
+  'new-group-from-tab': 'Tabs',
+  'split-view': 'Tabs',
+  'go-back': 'Navigation',
+  'go-forward': 'Navigation',
+  'find-in-page': 'Navigation',
+  'zoom-in': 'Window & Zoom',
+  'zoom-out': 'Window & Zoom',
+  'zoom-reset': 'Window & Zoom',
+  'toggle-fullscreen': 'Window & Zoom',
+  'merge-windows': 'Window & Zoom',
+  'new-incognito-window': 'Window & Zoom',
+  'toggle-bookmarks-bar': 'Window & Zoom',
+  'page-links': 'Page Tools',
+  'page-images': 'Page Tools',
+  'page-outline': 'Page Tools',
+  'page-info': 'Page Tools',
+  'page-trackers': 'Page Tools',
+  screenshot: 'Page Tools',
+  'speed-test': 'Page Tools',
+  'zap-ads': 'Page Tools',
+  wayback: 'Page Tools',
+  'qr-page': 'Page Tools',
+  'pick-color': 'Page Tools',
+  'copy-page-url': 'Page Tools',
+  'copy-page-md': 'Page Tools',
+  'save-page': 'Page Tools',
+  'print-page': 'Page Tools',
+  'bookmark-tab': 'Bookmarks & Links',
+  'new-folder': 'Bookmarks & Links',
+  'create-quicklink': 'Bookmarks & Links',
+  'save-page-quicklink': 'Bookmarks & Links',
+  'view-quicklinks': 'Bookmarks & Links',
+  'js-console': 'Developer',
+  'open-devtools': 'Developer',
+  'view-source': 'Developer',
+  'open-inspect-devices': 'Developer',
+  'task-manager': 'Developer',
+  confetti: 'Fun',
+  dvd: 'Fun',
+  'open-settings': 'Chrome',
+  'open-webstore': 'Chrome',
+  'open-bookmarks-manager': 'Chrome',
+  'open-history': 'Chrome',
+  'open-downloads': 'Chrome',
+  'open-extensions': 'Chrome',
+  'open-shortcuts': 'Chrome',
+  'open-version': 'Chrome',
+  'open-options': 'SuperChrome',
+  'show-onboarding': 'SuperChrome',
+}
+
+/** Header order for the grouped '>' view; unlisted categories trail after. */
+export const CATEGORY_ORDER = [
+  'Search',
+  'Tabs',
+  'Navigation',
+  'Window & Zoom',
+  'Page Tools',
+  'Bookmarks & Links',
+  'Developer',
+  'Fun',
+  'Chrome',
+  'SuperChrome',
+  'More',
+]
+
 export function commandEntries(): Array<{
   item: PaletteItem
   text: string
@@ -164,6 +250,29 @@ export function commandEntries(): Array<{
     text: c.label.toLowerCase(),
     usageKey: `command:${c.id}`,
   }))
+}
+
+/**
+ * The '>' browse view: commands carrying their category as `group`, ordered by
+ * CATEGORY_ORDER so renderItems draws a header per cluster. Definition order is
+ * preserved within each category.
+ */
+export function commandGroups(): PaletteItem[] {
+  const catRank = (id: string): number => {
+    const cat = COMMAND_CATEGORY[id] ?? 'More'
+    const i = CATEGORY_ORDER.indexOf(cat)
+    return i === -1 ? CATEGORY_ORDER.length : i
+  }
+  return commandEntries()
+    .map((entry, order) => ({ entry, order }))
+    .sort((a, b) => {
+      const r = catRank(a.entry.item.commandId!) - catRank(b.entry.item.commandId!)
+      return r !== 0 ? r : a.order - b.order
+    })
+    .map(({ entry }): PaletteItem => ({
+      ...entry.item,
+      group: COMMAND_CATEGORY[entry.item.commandId!] ?? 'More',
+    }))
 }
 
 /** Popup senders have no tab; fall back to the active tab of the current window. */

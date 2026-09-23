@@ -4,7 +4,7 @@ import type { PaletteItem, PaletteMode } from './core/types'
 import { collectFolders } from './features/bookmarks'
 import { decideSaveState, foldersFirst, resolveInbox } from './features/bookmarks/library'
 import { browseBookmarkFolder, searchBookmarks, searchLibrary } from './features/bookmarks/search'
-import { commandEntries, runCommand, senderTab } from './features/commands'
+import { commandEntries, commandGroups, runCommand, senderTab } from './features/commands'
 import { searchDownloads } from './features/downloads/search'
 import { searchEmoji } from './features/emoji/search'
 import { searchHistory } from './features/history/search'
@@ -71,9 +71,7 @@ async function queryPalette(
   // Browsing '>' keeps the curated order (related commands stay together);
   // typing ranks by fuzzy match blended with usage.
   if (mode === 'commands') {
-    return query
-      ? rank(commandEntries(), query, usage, decay)
-      : commandEntries().map((entry) => entry.item)
+    return query ? rank(commandEntries(), query, usage, decay) : commandGroups()
   }
   if (mode === 'tabs') return searchTabs(query, usage, decay, sender)
   if (mode === 'library') return searchLibrary(rawQuery, usage, decay)

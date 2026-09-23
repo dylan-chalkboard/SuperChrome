@@ -61,6 +61,16 @@ describe('fuzzyMatch', () => {
     const long = fuzzyMatch('news', 'news and other stories')!
     expect(short.score).toBeGreaterThan(long.score)
   })
+
+  it('surfaces a buried word via contiguous substring match', () => {
+    // Greedy subsequence would latch onto the s/e in "SuperChrome"; the
+    // substring path finds the real "settings" word at a boundary instead.
+    const match = fuzzyMatch('settings', 'superchrome: settings')!
+    expect(match).not.toBeNull()
+    expect(match.positions).toEqual([13, 14, 15, 16, 17, 18, 19, 20])
+    const buried = fuzzyMatch('settings', 'save events, edit tags, ignore snippets')
+    expect(match.score).toBeGreaterThan(buried?.score ?? -Infinity)
+  })
 })
 
 describe('frecency', () => {
@@ -116,6 +126,15 @@ describe('rank', () => {
   it('does not attach positions on an empty query', () => {
     const result = rank(entries, '', {})
     expect(result[0].positions).toBeUndefined()
+  })
+
+  it('floats a matching open tab above equal non-tab matches', () => {
+    const tabEntries = [
+      { item: { name: 'bookmark', openTab: false }, text: 'alpha', usageKey: 'x' },
+      { item: { name: 'tab', openTab: true }, text: 'alpha', usageKey: 'y' },
+    ]
+    const result = rank(tabEntries, 'alpha', {})
+    expect(result[0].name).toBe('tab')
   })
 })
 
